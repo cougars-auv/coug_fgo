@@ -1,7 +1,7 @@
 # 🌊 CoUGARs Package Template
 
-[![ROS 2 CI](https://github.com/cougars-oss/coug_template/actions/workflows/ros2_ci.yml/badge.svg)](https://github.com/cougars-oss/coug_template/actions/workflows/ros2_ci.yml)
-[![Docker CI](https://github.com/cougars-oss/coug_template/actions/workflows/docker_ci.yml/badge.svg)](https://github.com/cougars-oss/coug_template/actions/workflows/docker_ci.yml)
+[![ROS 2 CI](https://github.com/cougars-oss/coug_fgo/actions/workflows/ros2_ci.yml/badge.svg)](https://github.com/cougars-oss/coug_template/actions/workflows/ros2_ci.yml)
+[![Docker CI](https://github.com/cougars-oss/coug_fgo/actions/workflows/docker_ci.yml/badge.svg)](https://github.com/cougars-oss/coug_template/actions/workflows/docker_ci.yml)
 
 ## 🤝 Contributing
 
