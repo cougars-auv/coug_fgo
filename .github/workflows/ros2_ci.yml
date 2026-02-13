@@ -42,6 +42,7 @@ jobs:
         with:
           repos-file: 'dependencies.repos'
           packages-path: '.'
+          ssh-key: ${{ secrets.SSH_KEY }}
       - uses: cougars-auv/cougars-dev/.github/actions/build-test-ros2@main
         with:
           packages-path: '.'
