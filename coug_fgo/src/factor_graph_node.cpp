@@ -325,6 +325,7 @@ FactorGraphNode::configureImuPreintegration()
   }
   imu_params->biasAccCovariance = toGtsamSquaredDiagonal(params_.imu.accel_bias_rw_sigmas);
   imu_params->biasOmegaCovariance = toGtsamSquaredDiagonal(params_.imu.gyro_bias_rw_sigmas);
+  imu_params->biasAccOmegaInt = gtsam::Matrix66::Zero();
   imu_params->integrationCovariance =
     gtsam::Matrix33::Identity() * params_.imu.integration_covariance;
 
