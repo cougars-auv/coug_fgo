@@ -72,11 +72,11 @@ public:
     gtsam::OptionalMatrixType H_pose_j = nullptr) const override
   {
     // Predict the translation measurement
-    gtsam::Matrix36 H_tj_posej;
+    gtsam::Matrix36 H_tj_posej = gtsam::Matrix36::Zero();
     gtsam::Point3 t_j = pose_j.translation(H_pose_j ? &H_tj_posej : nullptr);
 
-    gtsam::Matrix36 H_pij_posei;
-    gtsam::Matrix33 H_pij_tj;
+    gtsam::Matrix36 H_pij_posei = gtsam::Matrix36::Zero();
+    gtsam::Matrix33 H_pij_tj = gtsam::Matrix33::Zero();
     gtsam::Point3 p_ij = pose_i.transformTo(
       t_j, H_pose_i ? &H_pij_posei : nullptr,
       H_pose_j ? &H_pij_tj : nullptr);

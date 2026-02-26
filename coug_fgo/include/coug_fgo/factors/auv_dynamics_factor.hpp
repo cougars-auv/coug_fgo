@@ -113,7 +113,10 @@ public:
     gtsam::OptionalMatrixType H_vel2 = nullptr) const override
   {
     // Predict the velocity measurements
-    gtsam::Matrix33 J_vb1_R1, J_vb1_v1, J_vb2_R2, J_vb2_v2;
+    gtsam::Matrix33 J_vb1_R1 = gtsam::Matrix33::Zero();
+    gtsam::Matrix33 J_vb1_v1 = gtsam::Matrix33::Zero();
+    gtsam::Matrix33 J_vb2_R2 = gtsam::Matrix33::Zero();
+    gtsam::Matrix33 J_vb2_v2 = gtsam::Matrix33::Zero();
     gtsam::Vector3 v_body1 =
       pose1.rotation().unrotate(vel1, H_pose1 ? &J_vb1_R1 : nullptr, H_vel1 ? &J_vb1_v1 : nullptr);
     gtsam::Vector3 v_body2 =

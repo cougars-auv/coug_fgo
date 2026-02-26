@@ -570,7 +570,7 @@ gtsam::Vector3 FactorGraphNode::computeInitialVelocity(const gtsam::Rot3 & initi
 
 gtsam::imuBias::ConstantBias FactorGraphNode::computeInitialBias()
 {
-  gtsam::Vector3 init_gyro_bias;
+  gtsam::Vector3 init_gyro_bias = gtsam::Vector3::Zero();
   if (params_.prior.use_parameter_priors) {
     init_gyro_bias = toGtsam(params_.prior.parameter_priors.initial_gyro_bias);
   } else {
@@ -588,7 +588,7 @@ gtsam::imuBias::ConstantBias FactorGraphNode::computeInitialBias()
 void FactorGraphNode::addPriorFactors(gtsam::NonlinearFactorGraph & graph, gtsam::Values & values)
 {
   // Add initial pose prior
-  gtsam::Vector6 prior_pose_sigmas;
+  gtsam::Vector6 prior_pose_sigmas = gtsam::Vector6::Zero();
   prior_pose_sigmas << params_.prior.parameter_priors.initial_orientation_sigmas[0],
     params_.prior.parameter_priors.initial_orientation_sigmas[1],
     params_.prior.parameter_priors.initial_orientation_sigmas[2],
@@ -655,7 +655,7 @@ void FactorGraphNode::addPriorFactors(gtsam::NonlinearFactorGraph & graph, gtsam
   values.insert(V(0), prev_vel_);
 
   // Add initial IMU bias prior
-  gtsam::Vector6 prior_imu_bias_sigmas;
+  gtsam::Vector6 prior_imu_bias_sigmas = gtsam::Vector6::Zero();
   gtsam::Vector3 accel_sigmas = toGtsam(params_.prior.initial_accel_bias_sigmas);
   gtsam::Vector3 gyro_sigmas = toGtsam(params_.prior.initial_gyro_bias_sigmas);
   prior_imu_bias_sigmas << accel_sigmas, gyro_sigmas;
@@ -855,7 +855,7 @@ void FactorGraphNode::addDepthFactor(
     double depth_sigma = params_.depth.parameter_covariance.position_z_noise_sigma;
     depth_noise = gtsam::noiseModel::Isotropic::Sigma(1, depth_sigma);
   } else {
-    gtsam::Matrix11 depth_cov;
+    gtsam::Matrix11 depth_cov = gtsam::Matrix11::Zero();
     depth_cov << depth_msg->pose.covariance[14];
     depth_noise = gtsam::noiseModel::Gaussian::Covariance(depth_cov);
   }
@@ -889,7 +889,7 @@ void FactorGraphNode::addAhrsFactor(
     ahrs_sigmas << params_.ahrs.parameter_covariance.yaw_noise_sigma;
     ahrs_noise = gtsam::noiseModel::Diagonal::Sigmas(ahrs_sigmas);
   } else {
-    gtsam::Matrix11 ahrs_cov;
+    gtsam::Matrix11 ahrs_cov = gtsam::Matrix11::Zero();
     ahrs_cov << ahrs_msg->orientation_covariance[8];
     ahrs_noise = gtsam::noiseModel::Gaussian::Covariance(ahrs_cov);
   }
@@ -1200,7 +1200,8 @@ void FactorGraphNode::addPreintegratedDvlFactor(
       pim.resetIntegration();
 
       double current_loop_time = last_dvl_time;
-      gtsam::Vector3 last_acc, last_gyr;
+      gtsam::Vector3 last_acc = gtsam::Vector3::Zero();
+      gtsam::Vector3 last_gyr = gtsam::Vector3::Zero();
 
       for (const auto & msg : imu_msgs) {
         double imu_time = rclcpp::Time(msg->header.stamp).seconds();
@@ -1220,7 +1221,7 @@ void FactorGraphNode::addPreintegratedDvlFactor(
       gtsam::Rot3 start_imu_rot = getInterpolatedOrientation(imu_msgs, last_dvl_time);
       gtsam::NavState predicted_state = pim.predict(
         gtsam::NavState(
-          gtsam::Pose3(start_imu_rot, gtsam::Point3()),
+          gtsam::Pose3(start_imu_rot, gtsam::Point3::Zero()),
           (start_imu_rot * R_imu_to_dvl).rotate(last_dvl_velocity_)),
         prev_imu_bias_);
 

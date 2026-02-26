@@ -78,7 +78,8 @@ public:
     gtsam::OptionalMatrixType H_vel = nullptr) const override
   {
     // Predict the velocity measurement
-    gtsam::Matrix33 H_unrotate_R, H_unrotate_v;
+    gtsam::Matrix33 H_unrotate_R = gtsam::Matrix33::Zero();
+    gtsam::Matrix33 H_unrotate_v = gtsam::Matrix33::Zero();
     gtsam::Vector3 predicted_vel_base = pose.rotation().unrotate(
       vel_world, H_pose ? &H_unrotate_R : nullptr, H_vel ? &H_unrotate_v : nullptr);
 

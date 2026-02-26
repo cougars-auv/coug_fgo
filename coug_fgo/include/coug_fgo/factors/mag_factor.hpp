@@ -78,7 +78,7 @@ public:
     gtsam::OptionalMatrixType H = nullptr) const override
   {
     // Predict the magnetic field in the body and sensor frames
-    gtsam::Matrix33 H_unrotate_body;
+    gtsam::Matrix33 H_unrotate_body = gtsam::Matrix33::Zero();
     gtsam::Point3 predicted_field_body =
       pose.rotation().unrotate(reference_field_world_, H ? &H_unrotate_body : nullptr);
     gtsam::Point3 predicted_field_sensor = base_R_sensor_.unrotate(predicted_field_body);

@@ -72,7 +72,7 @@ public:
     gtsam::OptionalMatrixType H = nullptr) const override
   {
     // Predict the depth measurement
-    gtsam::Matrix36 H_full;
+    gtsam::Matrix36 H_full = gtsam::Matrix36::Zero();
     gtsam::Point3 p_sensor_est = pose.transformFrom(base_p_sensor_, H ? &H_full : nullptr);
 
     // 1D depth residual
