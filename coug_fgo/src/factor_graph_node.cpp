@@ -795,7 +795,6 @@ void FactorGraphNode::initializeGraph()
     gtsam::ISAM2Params isam2_params;
     isam2_params.relinearizeThreshold = params_.relinearize_threshold;
     isam2_params.relinearizeSkip = params_.relinearize_skip;
-    isam2_params.factorization = gtsam::ISAM2Params::QR;
     if (params_.solver_type == "ISAM2") {
       isam_ = std::make_unique<gtsam::ISAM2>(isam2_params);
       isam_->update(initial_graph, initial_values);
