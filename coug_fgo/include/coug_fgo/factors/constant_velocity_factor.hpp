@@ -77,19 +77,19 @@ public:
   gtsam::Vector evaluateError(
     const gtsam::Pose3 & pose_key1, const gtsam::Vector3 & vel_key1,
     const gtsam::Pose3 & pose_key2, const gtsam::Vector3 & vel_key2,
-    boost::optional<gtsam::Matrix &> H_pose1 = boost::none,
-    boost::optional<gtsam::Matrix &> H_vel1 = boost::none,
-    boost::optional<gtsam::Matrix &> H_pose2 = boost::none,
-    boost::optional<gtsam::Matrix &> H_vel2 = boost::none) const override
+    gtsam::OptionalMatrixType H_pose1 = nullptr,
+    gtsam::OptionalMatrixType H_vel1 = nullptr,
+    gtsam::OptionalMatrixType H_pose2 = nullptr,
+    gtsam::OptionalMatrixType H_vel2 = nullptr) const override
   {
     // Predict the velocity measurements
     gtsam::Matrix33 J_R1_v1, J_v1, J_R2_v2, J_v2;
     gtsam::Vector3 v_body1 = pose_key1.rotation().unrotate(
-      vel_key1, H_pose1 ? &J_R1_v1 : 0,
-      H_vel1 ? &J_v1 : 0);
+      vel_key1, H_pose1 ? &J_R1_v1 : nullptr,
+      H_vel1 ? &J_v1 : nullptr);
     gtsam::Vector3 v_body2 = pose_key2.rotation().unrotate(
-      vel_key2, H_pose2 ? &J_R2_v2 : 0,
-      H_vel2 ? &J_v2 : 0);
+      vel_key2, H_pose2 ? &J_R2_v2 : nullptr,
+      H_vel2 ? &J_v2 : nullptr);
 
     // 3D velocity difference residual
     gtsam::Vector3 error = v_body1 - v_body2;

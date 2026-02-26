@@ -74,13 +74,13 @@ public:
   gtsam::Vector evaluateError(
     const gtsam::Pose3 & pose,
     const gtsam::Vector3 & vel_world,
-    boost::optional<gtsam::Matrix &> H_pose = boost::none,
-    boost::optional<gtsam::Matrix &> H_vel = boost::none) const override
+    gtsam::OptionalMatrixType H_pose = nullptr,
+    gtsam::OptionalMatrixType H_vel = nullptr) const override
   {
     // Predict the velocity measurement
     gtsam::Matrix33 H_unrotate_R, H_unrotate_v;
     gtsam::Vector3 predicted_vel_base = pose.rotation().unrotate(
-      vel_world, H_pose ? &H_unrotate_R : 0, H_vel ? &H_unrotate_v : 0);
+      vel_world, H_pose ? &H_unrotate_R : nullptr, H_vel ? &H_unrotate_v : nullptr);
 
     // 3D velocity residual
     gtsam::Vector3 error = predicted_vel_base - measured_velocity_base_;

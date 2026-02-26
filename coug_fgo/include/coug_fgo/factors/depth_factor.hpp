@@ -69,11 +69,11 @@ public:
    */
   gtsam::Vector evaluateError(
     const gtsam::Pose3 & pose,
-    boost::optional<gtsam::Matrix &> H = boost::none) const override
+    gtsam::OptionalMatrixType H = nullptr) const override
   {
     // Predict the depth measurement
     gtsam::Matrix36 H_full;
-    gtsam::Point3 p_sensor_est = pose.transformFrom(base_p_sensor_, H ? &H_full : 0);
+    gtsam::Point3 p_sensor_est = pose.transformFrom(base_p_sensor_, H ? &H_full : nullptr);
 
     // 1D depth residual
     double error = p_sensor_est.z() - measured_depth_;

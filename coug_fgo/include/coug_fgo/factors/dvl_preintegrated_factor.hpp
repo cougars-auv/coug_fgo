@@ -68,18 +68,18 @@ public:
   gtsam::Vector evaluateError(
     const gtsam::Pose3 & pose_i,
     const gtsam::Pose3 & pose_j,
-    boost::optional<gtsam::Matrix &> H_pose_i = boost::none,
-    boost::optional<gtsam::Matrix &> H_pose_j = boost::none) const override
+    gtsam::OptionalMatrixType H_pose_i = nullptr,
+    gtsam::OptionalMatrixType H_pose_j = nullptr) const override
   {
     // Predict the translation measurement
     gtsam::Matrix36 H_tj_posej;
-    gtsam::Point3 t_j = pose_j.translation(H_pose_j ? &H_tj_posej : 0);
+    gtsam::Point3 t_j = pose_j.translation(H_pose_j ? &H_tj_posej : nullptr);
 
     gtsam::Matrix36 H_pij_posei;
     gtsam::Matrix33 H_pij_tj;
     gtsam::Point3 p_ij = pose_i.transformTo(
-      t_j, H_pose_i ? &H_pij_posei : 0,
-      H_pose_j ? &H_pij_tj : 0);
+      t_j, H_pose_i ? &H_pij_posei : nullptr,
+      H_pose_j ? &H_pij_tj : nullptr);
 
     // 3D translation residual
     gtsam::Vector3 error = p_ij - measured_translation_;

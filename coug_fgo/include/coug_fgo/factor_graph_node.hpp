@@ -28,7 +28,7 @@
 #include <gtsam/navigation/ImuBias.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/Values.h>
-#include <gtsam_unstable/nonlinear/IncrementalFixedLagSmoother.h>
+#include <gtsam/nonlinear/IncrementalFixedLagSmoother.h>
 #include <gtsam/nonlinear/ISAM2.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_broadcaster.h>
@@ -108,7 +108,7 @@ protected:
    * @brief Configures GTSAM combined IMU preintegration parameters.
    * @return GTSAM preintegration parameters.
    */
-  boost::shared_ptr<gtsam::PreintegratedCombinedMeasurements::Params>
+  std::shared_ptr<gtsam::PreintegratedCombinedMeasurements::Params>
   configureImuPreintegration();
 
   /**

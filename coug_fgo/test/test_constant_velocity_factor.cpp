@@ -23,7 +23,8 @@
 #include <gtsam/base/numericalDerivative.h>
 #include <gtsam/inference/Symbol.h>
 
-#include <boost/bind/bind.hpp>
+#include <functional>
+#include <optional>
 
 #include "coug_fgo/factors/constant_velocity_factor.hpp"
 
@@ -84,40 +85,26 @@ TEST(ConstantVelocityFactorTest, Jacobians) {
   gtsam::Pose3 pose2(gtsam::Rot3::Ypr(0.4, -0.1, 0.2), gtsam::Point3(2, 3, 4));
   gtsam::Vector3 vel2(1.1, 0.4, 0.1);
 
+  auto evalFunc = [&](
+    const gtsam::Pose3 & p1, const gtsam::Vector3 & v1,
+    const gtsam::Pose3 & p2, const gtsam::Vector3 & v2) {
+      return factor.evaluateError(p1, v1, p2, v2, nullptr, nullptr, nullptr, nullptr);
+    };
+
   gtsam::Matrix expectedH1 = gtsam::numericalDerivative41<gtsam::Vector, gtsam::Pose3,
-      gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>(
-    boost::bind(
-      &coug_fgo::factors::ConstantVelocityFactor::evaluateError, &factor,
-      boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3,
-      boost::placeholders::_4, boost::none, boost::none, boost::none, boost::none),
-    pose1, vel1, pose2, vel2, 1e-5);
+      gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>(evalFunc, pose1, vel1, pose2, vel2, 1e-5);
 
   gtsam::Matrix expectedH2 = gtsam::numericalDerivative42<gtsam::Vector, gtsam::Pose3,
-      gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>(
-    boost::bind(
-      &coug_fgo::factors::ConstantVelocityFactor::evaluateError, &factor,
-      boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3,
-      boost::placeholders::_4, boost::none, boost::none, boost::none, boost::none),
-    pose1, vel1, pose2, vel2, 1e-5);
+      gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>(evalFunc, pose1, vel1, pose2, vel2, 1e-5);
 
   gtsam::Matrix expectedH3 = gtsam::numericalDerivative43<gtsam::Vector, gtsam::Pose3,
-      gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>(
-    boost::bind(
-      &coug_fgo::factors::ConstantVelocityFactor::evaluateError, &factor,
-      boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3,
-      boost::placeholders::_4, boost::none, boost::none, boost::none, boost::none),
-    pose1, vel1, pose2, vel2, 1e-5);
+      gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>(evalFunc, pose1, vel1, pose2, vel2, 1e-5);
 
   gtsam::Matrix expectedH4 = gtsam::numericalDerivative44<gtsam::Vector, gtsam::Pose3,
-      gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>(
-    boost::bind(
-      &coug_fgo::factors::ConstantVelocityFactor::evaluateError, &factor,
-      boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3,
-      boost::placeholders::_4, boost::none, boost::none, boost::none, boost::none),
-    pose1, vel1, pose2, vel2, 1e-5);
+      gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>(evalFunc, pose1, vel1, pose2, vel2, 1e-5);
 
   gtsam::Matrix actualH1, actualH2, actualH3, actualH4;
-  factor.evaluateError(pose1, vel1, pose2, vel2, actualH1, actualH2, actualH3, actualH4);
+  factor.evaluateError(pose1, vel1, pose2, vel2, &actualH1, &actualH2, &actualH3, &actualH4);
 
   EXPECT_TRUE(gtsam::assert_equal(expectedH1, actualH1, 1e-5));
   EXPECT_TRUE(gtsam::assert_equal(expectedH2, actualH2, 1e-5));

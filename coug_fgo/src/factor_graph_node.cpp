@@ -302,7 +302,7 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions & options)
   RCLCPP_INFO(get_logger(), "Startup complete! Waiting for sensor messages...");
 }
 
-boost::shared_ptr<gtsam::PreintegratedCombinedMeasurements::Params>
+std::shared_ptr<gtsam::PreintegratedCombinedMeasurements::Params>
 FactorGraphNode::configureImuPreintegration()
 {
   auto imu_params = gtsam::PreintegratedCombinedMeasurements::Params::MakeSharedU();

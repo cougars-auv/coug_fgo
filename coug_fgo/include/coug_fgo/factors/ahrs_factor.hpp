@@ -76,7 +76,7 @@ public:
    */
   gtsam::Vector evaluateError(
     const gtsam::Pose3 & pose,
-    boost::optional<gtsam::Matrix &> H = boost::none) const override
+    gtsam::OptionalMatrixType H = nullptr) const override
   {
     // Predict the yaw measurement
     const gtsam::Rot3 & R_est_base = pose.rotation();

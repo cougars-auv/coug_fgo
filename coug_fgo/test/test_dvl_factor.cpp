@@ -23,7 +23,8 @@
 #include <gtsam/base/numericalDerivative.h>
 #include <gtsam/inference/Symbol.h>
 
-#include <boost/bind/bind.hpp>
+#include <functional>
+#include <optional>
 
 #include "coug_fgo/factors/dvl_factor.hpp"
 
@@ -71,19 +72,19 @@ TEST(DvlFactorTest, Jacobians) {
 
   gtsam::Matrix expectedH1 = gtsam::numericalDerivative21<gtsam::Vector, gtsam::Pose3,
       gtsam::Vector3>(
-    boost::bind(
-      &coug_fgo::factors::DvlFactor::evaluateError, &factor,
-      boost::placeholders::_1, boost::placeholders::_2, boost::none, boost::none),
+    [&](const gtsam::Pose3 & p, const gtsam::Vector3 & v) {
+      return factor.evaluateError(p, v, nullptr, nullptr);
+    },
     pose, vel_world, 1e-5);
   gtsam::Matrix expectedH2 = gtsam::numericalDerivative22<gtsam::Vector, gtsam::Pose3,
       gtsam::Vector3>(
-    boost::bind(
-      &coug_fgo::factors::DvlFactor::evaluateError, &factor,
-      boost::placeholders::_1, boost::placeholders::_2, boost::none, boost::none),
+    [&](const gtsam::Pose3 & p, const gtsam::Vector3 & v) {
+      return factor.evaluateError(p, v, nullptr, nullptr);
+    },
     pose, vel_world, 1e-5);
 
   gtsam::Matrix actualH1, actualH2;
-  factor.evaluateError(pose, vel_world, actualH1, actualH2);
+  factor.evaluateError(pose, vel_world, &actualH1, &actualH2);
   EXPECT_TRUE(gtsam::assert_equal(expectedH1, actualH1, 1e-5));
   EXPECT_TRUE(gtsam::assert_equal(expectedH2, actualH2, 1e-5));
 }

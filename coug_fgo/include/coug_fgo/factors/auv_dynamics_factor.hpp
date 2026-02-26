@@ -107,17 +107,17 @@ public:
   gtsam::Vector evaluateError(
     const gtsam::Pose3 & pose1, const gtsam::Vector3 & vel1,
     const gtsam::Pose3 & pose2, const gtsam::Vector3 & vel2,
-    boost::optional<gtsam::Matrix &> H_pose1 = boost::none,
-    boost::optional<gtsam::Matrix &> H_vel1 = boost::none,
-    boost::optional<gtsam::Matrix &> H_pose2 = boost::none,
-    boost::optional<gtsam::Matrix &> H_vel2 = boost::none) const override
+    gtsam::OptionalMatrixType H_pose1 = nullptr,
+    gtsam::OptionalMatrixType H_vel1 = nullptr,
+    gtsam::OptionalMatrixType H_pose2 = nullptr,
+    gtsam::OptionalMatrixType H_vel2 = nullptr) const override
   {
     // Predict the velocity measurements
     gtsam::Matrix33 J_vb1_R1, J_vb1_v1, J_vb2_R2, J_vb2_v2;
     gtsam::Vector3 v_body1 =
-      pose1.rotation().unrotate(vel1, H_pose1 ? &J_vb1_R1 : 0, H_vel1 ? &J_vb1_v1 : 0);
+      pose1.rotation().unrotate(vel1, H_pose1 ? &J_vb1_R1 : nullptr, H_vel1 ? &J_vb1_v1 : nullptr);
     gtsam::Vector3 v_body2 =
-      pose2.rotation().unrotate(vel2, H_pose2 ? &J_vb2_R2 : 0, H_vel2 ? &J_vb2_v2 : 0);
+      pose2.rotation().unrotate(vel2, H_pose2 ? &J_vb2_R2 : nullptr, H_vel2 ? &J_vb2_v2 : nullptr);
 
     gtsam::Vector3 abs_v_body1 = v_body1.cwiseAbs();
     gtsam::Matrix33 J_drag_v = gtsam::Matrix33::Zero();

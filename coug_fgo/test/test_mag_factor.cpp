@@ -23,7 +23,8 @@
 #include <gtsam/base/numericalDerivative.h>
 #include <gtsam/inference/Symbol.h>
 
-#include <boost/bind/bind.hpp>
+#include <functional>
+#include <optional>
 
 #include "coug_fgo/factors/mag_factor.hpp"
 
@@ -97,12 +98,11 @@ TEST(MagFactorArmTest, Jacobians) {
   gtsam::Pose3 pose = gtsam::Pose3(gtsam::Rot3::Ypr(0.1, -0.2, 0.3), gtsam::Point3(1, 2, 3));
 
   gtsam::Matrix expectedH = gtsam::numericalDerivative11<gtsam::Vector, gtsam::Pose3>(
-    boost::bind(
-      &coug_fgo::factors::MagFactorArm::evaluateError, &factor,
-      boost::placeholders::_1, boost::none), pose, 1e-5);
+    [&](const gtsam::Pose3 & p) {return factor.evaluateError(p, nullptr);},
+    pose, 1e-5);
 
   gtsam::Matrix actualH;
-  factor.evaluateError(pose, actualH);
+  factor.evaluateError(pose, &actualH);
   EXPECT_TRUE(gtsam::assert_equal(expectedH, actualH, 1e-5));
   EXPECT_EQ(actualH.rows(), 3);
   EXPECT_EQ(actualH.cols(), 6);
