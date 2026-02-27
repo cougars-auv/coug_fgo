@@ -79,7 +79,6 @@ public:
   enum class State
   {
     WAITING_FOR_SENSORS,
-    INITIALIZING,
     RUNNING
   };
 

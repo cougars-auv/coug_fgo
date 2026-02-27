@@ -48,10 +48,8 @@ public:
   void reset(const gtsam::Rot3 & initial_orientation)
   {
     world_R_i_ = initial_orientation;
-    i_R_k_ = gtsam::Rot3();
     i_p_k_ = gtsam::Vector3::Zero();
     covariance_ = gtsam::Matrix3::Zero();
-    dt_sum_ = 0.0;
   }
 
   /**
@@ -68,7 +66,6 @@ public:
   {
     // Relative rotation from the integration start frame
     gtsam::Rot3 i_R_k = world_R_i_.inverse() * measured_orientation;
-    i_R_k_ = i_R_k;
 
     // Accumulate the position change in the start frame
     gtsam::Vector3 p_i = i_R_k.rotate(measured_vel);
@@ -77,8 +74,6 @@ public:
     // Propagate measurement uncertainty into the covariance
     gtsam::Matrix3 J = i_R_k.matrix() * dt;
     covariance_ += J * measured_cov * J.transpose();
-
-    dt_sum_ += dt;
   }
 
   /**
@@ -95,10 +90,8 @@ public:
 
 private:
   gtsam::Rot3 world_R_i_;
-  gtsam::Rot3 i_R_k_;
   gtsam::Vector3 i_p_k_;
   gtsam::Matrix3 covariance_;
-  double dt_sum_;
 };
 
 }  // namespace coug_fgo::utils

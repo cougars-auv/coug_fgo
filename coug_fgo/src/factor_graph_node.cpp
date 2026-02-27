@@ -1416,9 +1416,6 @@ void FactorGraphNode::checkGraphState(diagnostic_updater::DiagnosticStatusWrappe
     case State::RUNNING:
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Optimizing factor graph.");
       break;
-    case State::INITIALIZING:
-      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "Initializing factor graph.");
-      break;
     case State::WAITING_FOR_SENSORS:
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "Waiting for sensor data.");
       break;
