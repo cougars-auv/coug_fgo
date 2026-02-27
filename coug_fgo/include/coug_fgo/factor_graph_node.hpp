@@ -299,7 +299,7 @@ protected:
   std::atomic<size_t> new_factors_{0};
   std::atomic<size_t> total_factors_{0};
   std::atomic<size_t> total_variables_{0};
-  std::map<rclcpp::Time, gtsam::Key> time_to_key_;
+  std::map<double, gtsam::Key> time_to_key_;
 
   // --- GTSAM Objects ---
   std::unique_ptr<gtsam::IncrementalFixedLagSmoother> inc_smoother_;
@@ -314,9 +314,9 @@ protected:
 
   gtsam::Vector3 last_dvl_velocity_ = gtsam::Vector3::Zero();
   gtsam::Matrix3 last_dvl_covariance_ = gtsam::Matrix3::Zero();
-  geometry_msgs::msg::WrenchStamped::SharedPtr last_wrench_msg_;
   gtsam::Vector3 last_imu_acc_ = gtsam::Vector3::Zero();
   gtsam::Vector3 last_imu_gyr_ = gtsam::Vector3::Zero();
+  geometry_msgs::msg::WrenchStamped::SharedPtr last_wrench_msg_;
 
   // --- Message Queues ---
   utils::ThreadSafeQueue<sensor_msgs::msg::Imu::SharedPtr> imu_queue_;

@@ -126,10 +126,8 @@ public:
     bias_ = computeInitialBias();
     if (params_.experimental.enable_dvl_preintegration) {
       time_ = initial_depth_->header.stamp.sec + initial_depth_->header.stamp.nanosec * 1e-9;
-      stamp_ = initial_depth_->header.stamp;
     } else {
       time_ = initial_dvl_->header.stamp.sec + initial_dvl_->header.stamp.nanosec * 1e-9;
-      stamp_ = initial_dvl_->header.stamp;
     }
   }
 
@@ -137,7 +135,6 @@ public:
   gtsam::Vector3 velocity_;
   gtsam::imuBias::ConstantBias bias_;
   double time_ = 0.0;
-  rclcpp::Time stamp_;
 
   sensor_msgs::msg::Imu::SharedPtr initial_imu_;
   nav_msgs::msg::Odometry::SharedPtr initial_gps_;

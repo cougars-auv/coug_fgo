@@ -22,6 +22,8 @@
 #include <gtest/gtest.h>
 #include <thread>
 #include <vector>
+#include <cmath>
+#include <atomic>
 
 #include "coug_fgo/utils/thread_safe_queue.hpp"
 #include "sensor_msgs/msg/imu.hpp"
@@ -41,7 +43,7 @@ protected:
   {
     auto msg = std::make_shared<sensor_msgs::msg::Imu>();
     msg->header.stamp.sec = static_cast<int32_t>(t);
-    msg->header.stamp.nanosec = static_cast<uint32_t>((t - floor(t)) * 1e9);
+    msg->header.stamp.nanosec = static_cast<uint32_t>((t - std::floor(t)) * 1e9);
     return msg;
   }
 };
@@ -82,9 +84,9 @@ TEST_F(ThreadSafeQueueTest, Drain) {
   EXPECT_TRUE(queue.empty());
   EXPECT_EQ(queue.size(), 0u);
 
-  EXPECT_DOUBLE_EQ(rclcpp::Time(drained[0]->header.stamp).seconds(), 1.0);
-  EXPECT_DOUBLE_EQ(rclcpp::Time(drained[1]->header.stamp).seconds(), 2.0);
-  EXPECT_DOUBLE_EQ(rclcpp::Time(drained[2]->header.stamp).seconds(), 3.0);
+  EXPECT_DOUBLE_EQ(drained[0]->header.stamp.sec + drained[0]->header.stamp.nanosec * 1e-9, 1.0);
+  EXPECT_DOUBLE_EQ(drained[1]->header.stamp.sec + drained[1]->header.stamp.nanosec * 1e-9, 2.0);
+  EXPECT_DOUBLE_EQ(drained[2]->header.stamp.sec + drained[2]->header.stamp.nanosec * 1e-9, 3.0);
 }
 
 /**
@@ -101,9 +103,9 @@ TEST_F(ThreadSafeQueueTest, Restore) {
   EXPECT_EQ(queue.size(), 3u);
 
   auto drained = queue.drain();
-  EXPECT_DOUBLE_EQ(rclcpp::Time(drained[0]->header.stamp).seconds(), 1.0);
-  EXPECT_DOUBLE_EQ(rclcpp::Time(drained[1]->header.stamp).seconds(), 2.0);
-  EXPECT_DOUBLE_EQ(rclcpp::Time(drained[2]->header.stamp).seconds(), 3.0);
+  EXPECT_DOUBLE_EQ(drained[0]->header.stamp.sec + drained[0]->header.stamp.nanosec * 1e-9, 1.0);
+  EXPECT_DOUBLE_EQ(drained[1]->header.stamp.sec + drained[1]->header.stamp.nanosec * 1e-9, 2.0);
+  EXPECT_DOUBLE_EQ(drained[2]->header.stamp.sec + drained[2]->header.stamp.nanosec * 1e-9, 3.0);
 }
 
 /**
@@ -113,11 +115,11 @@ TEST_F(ThreadSafeQueueTest, BackAndPopBack) {
   queue.push(createMsg(1.0));
   queue.push(createMsg(2.0));
 
-  EXPECT_DOUBLE_EQ(rclcpp::Time(queue.back()->header.stamp).seconds(), 2.0);
+  EXPECT_DOUBLE_EQ(queue.back()->header.stamp.sec + queue.back()->header.stamp.nanosec * 1e-9, 2.0);
 
   queue.pop_back();
   EXPECT_EQ(queue.size(), 1u);
-  EXPECT_DOUBLE_EQ(rclcpp::Time(queue.back()->header.stamp).seconds(), 1.0);
+  EXPECT_DOUBLE_EQ(queue.back()->header.stamp.sec + queue.back()->header.stamp.nanosec * 1e-9, 1.0);
 
   queue.pop_back();
   EXPECT_TRUE(queue.empty());

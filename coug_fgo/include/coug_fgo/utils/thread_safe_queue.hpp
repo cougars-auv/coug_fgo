@@ -26,8 +26,6 @@
 #include <stdexcept>
 #include <utility>
 
-#include <rclcpp/rclcpp.hpp>
-
 namespace coug_fgo::utils
 {
 
@@ -47,7 +45,7 @@ public:
   {
     std::scoped_lock lock(mutex_);
     queue_.push_back(value);
-    last_msg_time_ = rclcpp::Time(value->header.stamp).seconds();
+    last_msg_time_ = value->header.stamp.sec + value->header.stamp.nanosec * 1e-9;
   }
 
   /**

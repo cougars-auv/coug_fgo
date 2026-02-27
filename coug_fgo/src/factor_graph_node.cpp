@@ -479,7 +479,7 @@ void FactorGraphNode::initializeGraph()
   gtsam::Values initial_values;
   addPriorFactors(initial_graph, initial_values);
 
-  time_to_key_[state_initializer_->stamp_] = X(0);
+  time_to_key_[state_initializer_->time_] = X(0);
 
   // --- Initialize Preintegrators ---
   imu_preintegrator_ = std::make_unique<gtsam::PreintegratedCombinedMeasurements>(
@@ -1026,7 +1026,7 @@ void FactorGraphNode::publishSmoothedPath(
     if (results.exists(pair.second)) {
       geometry_msgs::msg::PoseStamped ps;
       ps.header.frame_id = params_.map_frame;
-      ps.header.stamp = pair.first;
+      ps.header.stamp = rclcpp::Time(static_cast<uint64_t>(pair.first * 1e9));
       ps.pose = toPoseMsg(results.at<gtsam::Pose3>(pair.second) * T_dvl_base);
       path_msg.poses.push_back(ps);
     }
@@ -1093,7 +1093,7 @@ void FactorGraphNode::optimizeGraph()
   if (!opt_lock.owns_lock()) {return;}
 
   auto opt_start = std::chrono::high_resolution_clock::now();
-  rclcpp::Time target_stamp;
+  double target_time = 0.0;
   bool should_abort = false;
 
   if (imu_queue_.empty()) {
@@ -1102,18 +1102,21 @@ void FactorGraphNode::optimizeGraph()
 
   if (params_.experimental.enable_dvl_preintegration) {
     if (depth_queue_.empty()) {return;}
-    target_stamp = depth_queue_.back()->header.stamp;
+    target_time = depth_queue_.back()->header.stamp.sec +
+      depth_queue_.back()->header.stamp.nanosec * 1e-9;
   } else {
     if (dvl_queue_.empty() && depth_queue_.empty()) {return;}
 
     if (!dvl_queue_.empty()) {
-      target_stamp = dvl_queue_.back()->header.stamp;
+      target_time = dvl_queue_.back()->header.stamp.sec +
+        dvl_queue_.back()->header.stamp.nanosec * 1e-9;
     } else {
-      target_stamp = depth_queue_.back()->header.stamp;
+      target_time = depth_queue_.back()->header.stamp.sec +
+        depth_queue_.back()->header.stamp.nanosec * 1e-9;
     }
   }
 
-  if (target_stamp.seconds() <= prev_time_ + 1e-6) {
+  if (target_time <= prev_time_ + 1e-6) {
     RCLCPP_DEBUG(get_logger(), "Duplicate or out-of-order timestamp detected. Skipping.");
     if (params_.experimental.enable_dvl_preintegration) {
       depth_queue_.pop_back();
@@ -1125,7 +1128,7 @@ void FactorGraphNode::optimizeGraph()
 
   if (!should_abort && params_.max_keyframe_rate > 0.0) {
     double min_period = 1.0 / params_.max_keyframe_rate;
-    if (target_stamp.seconds() - prev_time_ < min_period) {
+    if (target_time - prev_time_ < min_period) {
       RCLCPP_DEBUG(get_logger(), "Limiting keyframe rate. Skipping.");
       if (params_.experimental.enable_dvl_preintegration) {
         depth_queue_.pop_back();
@@ -1177,8 +1180,6 @@ void FactorGraphNode::optimizeGraph()
   if (params_.experimental.enable_dvl_preintegration) {
     std::sort(dvl_msgs.begin(), dvl_msgs.end(), by_time);
   }
-
-  double target_time = target_stamp.seconds();
 
   // --- Create Factor Graph ---
   gtsam::NonlinearFactorGraph new_graph;
@@ -1280,13 +1281,11 @@ void FactorGraphNode::optimizeGraph()
 
     imu_preintegrator_->resetIntegrationAndSetBias(prev_imu_bias_);
 
-    time_to_key_[target_stamp] = X(current_step_);
+    time_to_key_[target_time] = X(current_step_);
     if (!isam_) {
       time_to_key_.erase(
         time_to_key_.begin(),
-        time_to_key_.lower_bound(
-          target_stamp -
-          rclcpp::Duration::from_seconds(params_.smoother_lag)));
+        time_to_key_.lower_bound(target_time - params_.smoother_lag));
     }
 
     // --- Calculate Covariances ---
@@ -1323,35 +1322,36 @@ void FactorGraphNode::optimizeGraph()
 
     // --- Publish Global Odometry ---
     gtsam::Pose3 T_base_dvl = toGtsam(base_T_dvl_tf_.transform);
-    publishGlobalOdom(prev_pose_ * T_base_dvl.inverse(), new_pose_cov, target_stamp);
+    rclcpp::Time ros_target_time(static_cast<int64_t>(target_time * 1e9));
+    publishGlobalOdom(prev_pose_ * T_base_dvl.inverse(), new_pose_cov, ros_target_time);
 
     // --- Publish Global TF ---
     if (params_.publish_global_tf) {
-      broadcastGlobalTf(prev_pose_ * T_base_dvl.inverse(), target_stamp);
+      broadcastGlobalTf(prev_pose_ * T_base_dvl.inverse(), ros_target_time);
     }
 
     // --- Publish Smoothed Path ---
     if (params_.publish_smoothed_path) {
       if (inc_smoother_) {
-        publishSmoothedPath(inc_smoother_->calculateEstimate(), target_stamp);
+        publishSmoothedPath(inc_smoother_->calculateEstimate(), ros_target_time);
       } else if (isam_) {
-        publishSmoothedPath(isam_->calculateEstimate(), target_stamp);
+        publishSmoothedPath(isam_->calculateEstimate(), ros_target_time);
       }
     }
 
     // --- Publish Velocity ---
     if (params_.publish_velocity) {
-      publishVelocity(prev_vel_, vel_cov, target_stamp);
+      publishVelocity(prev_vel_, vel_cov, ros_target_time);
     }
 
     // --- Publish IMU Bias ---
     if (params_.publish_imu_bias) {
-      publishImuBias(prev_imu_bias_, bias_cov, target_stamp);
+      publishImuBias(prev_imu_bias_, bias_cov, ros_target_time);
     }
 
     // --- Publish Graph Metrics ---
     if (params_.publish_graph_metrics) {
-      publishGraphMetrics(target_stamp);
+      publishGraphMetrics(ros_target_time);
     }
 
     prev_time_ = target_time;
