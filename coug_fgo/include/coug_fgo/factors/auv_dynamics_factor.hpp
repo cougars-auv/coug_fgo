@@ -43,7 +43,7 @@ class AuvDynamicsFactorArm : public gtsam::NoiseModelFactor4<gtsam::Pose3,
 {
 private:
   double dt_;
-  gtsam::Vector3 force_body_;
+  gtsam::Vector3 body_f_;
   gtsam::Matrix33 mass_;
   gtsam::Matrix33 linear_drag_;
   gtsam::Matrix33 quad_drag_;
@@ -81,7 +81,7 @@ public:
     linear_drag_(linear_drag),
     quad_drag_(quad_drag)
   {
-    force_body_ = body_T_sensor.rotation() * control_force;
+    body_f_ = body_T_sensor.rotation() * control_force;
     mass_inv_ = mass_.inverse();
   }
 
@@ -126,7 +126,7 @@ public:
       J_drag_v = -(linear_drag_ + 2.0 * quad_drag_ * abs_v_body1.asDiagonal());
     }
 
-    gtsam::Vector3 accel_body = mass_inv_ * (force_body_ + drag_force);
+    gtsam::Vector3 accel_body = mass_inv_ * (body_f_ + drag_force);
     gtsam::Vector3 v_body_pred = v_body1 + accel_body * dt_;
 
     // 3D velocity residual

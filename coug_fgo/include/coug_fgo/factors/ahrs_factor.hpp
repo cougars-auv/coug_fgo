@@ -39,9 +39,9 @@ namespace coug_fgo::factors
  */
 class AhrsYawFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3>
 {
-  gtsam::Rot3 measured_rot_sensor_;
+  gtsam::Rot3 world_R_sensor_measured_;
   gtsam::Rot3 base_R_sensor_;
-  double measured_yaw_base_;
+  double yaw_base_measured_;
 
 public:
   /**
@@ -57,12 +57,12 @@ public:
     const gtsam::Rot3 & base_R_sensor, double mag_declination,
     const gtsam::SharedNoiseModel & noise_model)
   : NoiseModelFactor1<gtsam::Pose3>(noise_model, pose_key),
-    measured_rot_sensor_(measured_rot_sensor),
+    world_R_sensor_measured_(measured_rot_sensor),
     base_R_sensor_(base_R_sensor)
   {
-    gtsam::Rot3 R_decl = gtsam::Rot3::Yaw(mag_declination);
-    gtsam::Rot3 measured_rot_base = (R_decl * measured_rot_sensor) * base_R_sensor.inverse();
-    measured_yaw_base_ = measured_rot_base.yaw();
+    gtsam::Rot3 world_R_base_measured = (gtsam::Rot3::Yaw(mag_declination) * measured_rot_sensor) *
+      base_R_sensor.inverse();
+    yaw_base_measured_ = world_R_base_measured.yaw();
   }
 
   /**
@@ -80,7 +80,7 @@ public:
     double yaw_est = R_est_base.yaw();
 
     // 1D yaw residual
-    double error = yaw_est - measured_yaw_base_;
+    double error = yaw_est - yaw_base_measured_;
     while (error > M_PI) {
       error -= 2.0 * M_PI;
     }

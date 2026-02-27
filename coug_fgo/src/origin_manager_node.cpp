@@ -66,8 +66,6 @@ OriginManagerNode::OriginManagerNode(const rclcpp::NodeOptions & options)
       origin_navsat_.longitude = params_.parameter_origin.longitude;
       origin_navsat_.altitude = params_.parameter_origin.altitude;
 
-      origin_set_ = true;
-
       RCLCPP_INFO(
         get_logger(), "Parameter Origin Set: Lat %.6f, Lon %.6f (UTM Zone %d%c)",
         origin_navsat_.latitude, origin_navsat_.longitude, origin_utm_.zone,
@@ -85,7 +83,7 @@ OriginManagerNode::OriginManagerNode(const rclcpp::NodeOptions & options)
     origin_timer_ = create_wall_timer(
       std::chrono::milliseconds(static_cast<int>(1000.0 / params_.origin_pub_rate)),
       [this]() {
-        if (origin_set_) {origin_pub_->publish(origin_navsat_);}
+        if (!origin_navsat_.header.frame_id.empty()) {origin_pub_->publish(origin_navsat_);}
       });
   }
 
@@ -109,7 +107,9 @@ OriginManagerNode::OriginManagerNode(const rclcpp::NodeOptions & options)
 
 void OriginManagerNode::originCallback(const sensor_msgs::msg::NavSatFix::SharedPtr msg)
 {
-  if (!origin_set_ && msg->status.status >= sensor_msgs::msg::NavSatStatus::STATUS_FIX) {
+  if (origin_navsat_.header.frame_id.empty() &&
+    msg->status.status >= sensor_msgs::msg::NavSatStatus::STATUS_FIX)
+  {
     try {
       geographic_msgs::msg::GeoPoint pt;
       pt.latitude = msg->latitude;
@@ -117,7 +117,6 @@ void OriginManagerNode::originCallback(const sensor_msgs::msg::NavSatFix::Shared
       pt.altitude = msg->altitude;
       origin_utm_ = geodesy::UTMPoint(pt);
       origin_navsat_ = *msg;
-      origin_set_ = true;
 
       RCLCPP_INFO(
         get_logger(), "GPS Origin Received: Lat %.6f, Lon %.6f (UTM Zone %d%c)",
@@ -150,7 +149,7 @@ void OriginManagerNode::navsatCallback(const sensor_msgs::msg::NavSatFix::Shared
     return;
   }
 
-  if (!origin_set_) {
+  if (origin_navsat_.header.frame_id.empty()) {
     if (!params_.set_origin) {
       RCLCPP_WARN_THROTTLE(
         get_logger(), *get_clock(), 5000,
@@ -158,8 +157,7 @@ void OriginManagerNode::navsatCallback(const sensor_msgs::msg::NavSatFix::Shared
       return;
     }
 
-    if (!collecting_samples_) {
-      collecting_samples_ = true;
+    if (gps_samples_.empty()) {
       start_collection_time_ = this->get_clock()->now().seconds();
       gps_samples_.clear();
       RCLCPP_INFO(
@@ -200,7 +198,6 @@ void OriginManagerNode::navsatCallback(const sensor_msgs::msg::NavSatFix::Shared
       origin_navsat_.latitude = pt.latitude;
       origin_navsat_.longitude = pt.longitude;
       origin_navsat_.altitude = pt.altitude;
-      origin_set_ = true;
 
       RCLCPP_INFO(
         get_logger(),
@@ -209,7 +206,7 @@ void OriginManagerNode::navsatCallback(const sensor_msgs::msg::NavSatFix::Shared
         origin_utm_.band);
     } catch (const std::exception & e) {
       RCLCPP_ERROR(get_logger(), "Origin set failed: %s", e.what());
-      collecting_samples_ = false;
+      gps_samples_.clear();
     }
     return;
   }
@@ -289,7 +286,7 @@ bool OriginManagerNode::convertToEnu(
 
 void OriginManagerNode::checkOriginStatus(diagnostic_updater::DiagnosticStatusWrapper & stat)
 {
-  if (origin_set_) {
+  if (!origin_navsat_.header.frame_id.empty()) {
     stat.add("Origin Zone", std::to_string(origin_utm_.zone) + origin_utm_.band);
     stat.add("Origin Latitude", origin_navsat_.latitude);
     stat.add("Origin Longitude", origin_navsat_.longitude);

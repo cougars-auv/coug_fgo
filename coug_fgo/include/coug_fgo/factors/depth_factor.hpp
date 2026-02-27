@@ -38,7 +38,7 @@ namespace coug_fgo::factors
  */
 class DepthFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3>
 {
-  double measured_depth_;
+  double depth_measured_;
   gtsam::Point3 base_p_sensor_;
 
 public:
@@ -53,7 +53,7 @@ public:
     gtsam::Key pose_key, double measured_depth,
     const gtsam::Pose3 & base_T_sensor, const gtsam::SharedNoiseModel & noise_model)
   : NoiseModelFactor1<gtsam::Pose3>(noise_model, pose_key),
-    measured_depth_(measured_depth)
+    depth_measured_(measured_depth)
   {
     base_p_sensor_ = base_T_sensor.translation();
   }
@@ -73,7 +73,7 @@ public:
     gtsam::Point3 p_sensor_est = pose.transformFrom(base_p_sensor_, H ? &H_full : nullptr);
 
     // 1D depth residual
-    double error = p_sensor_est.z() - measured_depth_;
+    double error = p_sensor_est.z() - depth_measured_;
 
     if (H) {
       // Jacobian with respect to pose (1x6)

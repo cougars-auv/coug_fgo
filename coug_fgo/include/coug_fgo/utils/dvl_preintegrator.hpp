@@ -47,9 +47,9 @@ public:
    */
   void reset(const gtsam::Rot3 & initial_orientation)
   {
-    initial_orientation_ = initial_orientation;
-    delta_rotation_ = gtsam::Rot3();
-    integrated_translation_ = gtsam::Vector3::Zero();
+    world_R_i_ = initial_orientation;
+    i_R_k_ = gtsam::Rot3();
+    i_p_k_ = gtsam::Vector3::Zero();
     covariance_ = gtsam::Matrix3::Zero();
     dt_sum_ = 0.0;
   }
@@ -67,15 +67,15 @@ public:
     const gtsam::Matrix3 & measured_cov)
   {
     // Relative rotation from the integration start frame
-    gtsam::Rot3 R_ik = initial_orientation_.inverse() * measured_orientation;
-    delta_rotation_ = R_ik;
+    gtsam::Rot3 i_R_k = world_R_i_.inverse() * measured_orientation;
+    i_R_k_ = i_R_k;
 
     // Accumulate the position change in the start frame
-    gtsam::Vector3 vel_i = R_ik.rotate(measured_vel);
-    integrated_translation_ += vel_i * dt;
+    gtsam::Vector3 p_i = i_R_k.rotate(measured_vel);
+    i_p_k_ += p_i * dt;
 
     // Propagate measurement uncertainty into the covariance
-    gtsam::Matrix3 J = R_ik.matrix() * dt;
+    gtsam::Matrix3 J = i_R_k.matrix() * dt;
     covariance_ += J * measured_cov * J.transpose();
 
     dt_sum_ += dt;
@@ -85,7 +85,7 @@ public:
    * @brief Gets the preintegrated translation delta.
    * @return The translation delta in the starting frame.
    */
-  gtsam::Vector3 delta() const {return integrated_translation_;}
+  gtsam::Vector3 delta() const {return i_p_k_;}
 
   /**
    * @brief Gets the accumulated translation covariance.
@@ -94,9 +94,9 @@ public:
   gtsam::Matrix3 covariance() const {return covariance_;}
 
 private:
-  gtsam::Rot3 initial_orientation_;
-  gtsam::Rot3 delta_rotation_;
-  gtsam::Vector3 integrated_translation_;
+  gtsam::Rot3 world_R_i_;
+  gtsam::Rot3 i_R_k_;
+  gtsam::Vector3 i_p_k_;
   gtsam::Matrix3 covariance_;
   double dt_sum_;
 };

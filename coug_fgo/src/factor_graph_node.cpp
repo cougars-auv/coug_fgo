@@ -95,15 +95,14 @@ void FactorGraphNode::setupRosInterfaces()
   imu_sub_ = create_subscription<sensor_msgs::msg::Imu>(
     params_.imu_topic, 200,
     [this](const sensor_msgs::msg::Imu::SharedPtr msg) {
-      if (!have_imu_to_dvl_tf_) {
+      if (dvl_T_imu_tf_.header.frame_id.empty()) {
         try {
           std::string parent = params_.dvl.use_parameter_frame ?
           params_.dvl.parameter_frame : dvl_frame_;
           std::string child = params_.imu.use_parameter_frame ?
           params_.imu.parameter_frame : msg->header.frame_id;
           if (!parent.empty()) {
-            imu_to_dvl_tf_ = tf_buffer_->lookupTransform(parent, child, tf2::TimePointZero);
-            have_imu_to_dvl_tf_ = true;
+            dvl_T_imu_tf_ = tf_buffer_->lookupTransform(parent, child, tf2::TimePointZero);
             imu_frame_ = child;
           }
         } catch (const tf2::TransformException & ex) {
@@ -114,18 +113,19 @@ void FactorGraphNode::setupRosInterfaces()
     },
     sensor_options);
 
-  gps_odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
+  gps_sub_ = create_subscription<nav_msgs::msg::Odometry>(
     params_.gps_odom_topic, 20,
     [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
-      if ((params_.gps.enable_gps || params_.gps.enable_gps_init_only) && !have_gps_to_dvl_tf_) {
+      if ((params_.gps.enable_gps || params_.gps.enable_gps_init_only) &&
+      dvl_T_gps_tf_.header.frame_id.empty())
+      {
         try {
           std::string parent = params_.dvl.use_parameter_frame ?
           params_.dvl.parameter_frame : dvl_frame_;
           std::string child = params_.gps.use_parameter_frame ?
           params_.gps.parameter_frame : msg->child_frame_id;
           if (!parent.empty()) {
-            gps_to_dvl_tf_ = tf_buffer_->lookupTransform(parent, child, tf2::TimePointZero);
-            have_gps_to_dvl_tf_ = true;
+            dvl_T_gps_tf_ = tf_buffer_->lookupTransform(parent, child, tf2::TimePointZero);
           }
         } catch (const tf2::TransformException & ex) {
           RCLCPP_ERROR(get_logger(), "Failed to lookup GPS to DVL transform: %s", ex.what());
@@ -135,18 +135,17 @@ void FactorGraphNode::setupRosInterfaces()
     },
     sensor_options);
 
-  depth_odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
+  depth_sub_ = create_subscription<nav_msgs::msg::Odometry>(
     params_.depth_odom_topic, 20,
     [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
-      if (!have_depth_to_dvl_tf_) {
+      if (dvl_T_depth_tf_.header.frame_id.empty()) {
         try {
           std::string parent = params_.dvl.use_parameter_frame ?
           params_.dvl.parameter_frame : dvl_frame_;
           std::string child = params_.depth.use_parameter_frame ?
           params_.depth.parameter_frame : msg->child_frame_id;
           if (!parent.empty()) {
-            depth_to_dvl_tf_ = tf_buffer_->lookupTransform(parent, child, tf2::TimePointZero);
-            have_depth_to_dvl_tf_ = true;
+            dvl_T_depth_tf_ = tf_buffer_->lookupTransform(parent, child, tf2::TimePointZero);
           }
         } catch (const tf2::TransformException & ex) {
           RCLCPP_ERROR(get_logger(), "Failed to lookup depth to DVL transform: %s", ex.what());
@@ -178,15 +177,16 @@ void FactorGraphNode::setupRosInterfaces()
   mag_sub_ = create_subscription<sensor_msgs::msg::MagneticField>(
     params_.mag_topic, 20,
     [this](const sensor_msgs::msg::MagneticField::SharedPtr msg) {
-      if ((params_.mag.enable_mag || params_.mag.enable_mag_init_only) && !have_mag_to_dvl_tf_) {
+      if ((params_.mag.enable_mag || params_.mag.enable_mag_init_only) &&
+      dvl_T_mag_tf_.header.frame_id.empty())
+      {
         try {
           std::string parent = params_.dvl.use_parameter_frame ?
           params_.dvl.parameter_frame : dvl_frame_;
           std::string child = params_.mag.use_parameter_frame ?
           params_.mag.parameter_frame : msg->header.frame_id;
           if (!parent.empty()) {
-            mag_to_dvl_tf_ = tf_buffer_->lookupTransform(parent, child, tf2::TimePointZero);
-            have_mag_to_dvl_tf_ = true;
+            dvl_T_mag_tf_ = tf_buffer_->lookupTransform(parent, child, tf2::TimePointZero);
           }
         } catch (const tf2::TransformException & ex) {
           RCLCPP_ERROR(get_logger(), "Failed to lookup mag to DVL transform: %s", ex.what());
@@ -200,7 +200,7 @@ void FactorGraphNode::setupRosInterfaces()
     params_.ahrs_topic, 20,
     [this](const sensor_msgs::msg::Imu::SharedPtr msg) {
       if ((params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) &&
-      !have_ahrs_to_dvl_tf_)
+      dvl_T_ahrs_tf_.header.frame_id.empty())
       {
         try {
           std::string parent = params_.dvl.use_parameter_frame ?
@@ -208,8 +208,7 @@ void FactorGraphNode::setupRosInterfaces()
           std::string child = params_.ahrs.use_parameter_frame ?
           params_.ahrs.parameter_frame : msg->header.frame_id;
           if (!parent.empty()) {
-            ahrs_to_dvl_tf_ = tf_buffer_->lookupTransform(parent, child, tf2::TimePointZero);
-            have_ahrs_to_dvl_tf_ = true;
+            dvl_T_ahrs_tf_ = tf_buffer_->lookupTransform(parent, child, tf2::TimePointZero);
           }
         } catch (const tf2::TransformException & ex) {
           RCLCPP_ERROR(get_logger(), "Failed to lookup AHRS to DVL transform: %s", ex.what());
@@ -222,14 +221,13 @@ void FactorGraphNode::setupRosInterfaces()
   dvl_sub_ = create_subscription<geometry_msgs::msg::TwistWithCovarianceStamped>(
     params_.dvl_topic, 20,
     [this](const geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr msg) {
-      if (!have_dvl_to_base_tf_) {
+      if (base_T_dvl_tf_.header.frame_id.empty()) {
         try {
           std::string frame = params_.dvl.use_parameter_frame ?
           params_.dvl.parameter_frame : msg->header.frame_id;
-          dvl_to_base_tf_ = tf_buffer_->lookupTransform(
+          base_T_dvl_tf_ = tf_buffer_->lookupTransform(
             params_.base_frame, frame,
             tf2::TimePointZero);
-          have_dvl_to_base_tf_ = true;
           dvl_frame_ = frame;
         } catch (const tf2::TransformException & ex) {
           RCLCPP_ERROR(get_logger(), "Failed to lookup DVL to base transform: %s", ex.what());
@@ -250,15 +248,14 @@ void FactorGraphNode::setupRosInterfaces()
   wrench_sub_ = create_subscription<geometry_msgs::msg::WrenchStamped>(
     params_.wrench_topic, 20,
     [this](const geometry_msgs::msg::WrenchStamped::SharedPtr msg) {
-      if (params_.dynamics.enable_dynamics && !have_com_to_dvl_tf_) {
+      if (params_.dynamics.enable_dynamics && dvl_T_com_tf_.header.frame_id.empty()) {
         try {
           std::string parent = params_.dvl.use_parameter_frame ?
           params_.dvl.parameter_frame : dvl_frame_;
           std::string child = params_.dynamics.use_parameter_frame ?
           params_.dynamics.parameter_frame : msg->header.frame_id;
           if (!parent.empty()) {
-            com_to_dvl_tf_ = tf_buffer_->lookupTransform(parent, child, tf2::TimePointZero);
-            have_com_to_dvl_tf_ = true;
+            dvl_T_com_tf_ = tf_buffer_->lookupTransform(parent, child, tf2::TimePointZero);
           }
         } catch (const tf2::TransformException & ex) {
           RCLCPP_ERROR(get_logger(), "Failed to lookup COM to DVL transform: %s", ex.what());
@@ -312,14 +309,14 @@ FactorGraphNode::configureImuPreintegration()
   auto imu_params = gtsam::PreintegratedCombinedMeasurements::Params::MakeSharedU();
   imu_params->n_gravity =
     gtsam::Vector3(params_.imu.gravity[0], params_.imu.gravity[1], params_.imu.gravity[2]);
-  imu_params->body_P_sensor = toGtsam(imu_to_dvl_tf_.transform);
+  imu_params->body_P_sensor = toGtsam(dvl_T_imu_tf_.transform);
 
   if (params_.imu.use_parameter_covariance) {
     imu_params->accelerometerCovariance = toGtsamSquaredDiagonal(
       params_.imu.parameter_covariance.accel_noise_sigmas).block<3, 3>(0, 0);
   } else {
     imu_params->accelerometerCovariance = toGtsam(
-      state_initializer_->initial_imu->linear_acceleration_covariance);
+      state_initializer_->initial_imu_->linear_acceleration_covariance);
   }
 
   if (params_.imu.use_parameter_covariance) {
@@ -327,7 +324,7 @@ FactorGraphNode::configureImuPreintegration()
       params_.imu.parameter_covariance.gyro_noise_sigmas).block<3, 3>(0, 0);
   } else {
     imu_params->gyroscopeCovariance = toGtsam(
-      state_initializer_->initial_imu->angular_velocity_covariance);
+      state_initializer_->initial_imu_->angular_velocity_covariance);
   }
   imu_params->biasAccCovariance = toGtsamSquaredDiagonal(params_.imu.accel_bias_rw_sigmas);
   imu_params->biasOmegaCovariance = toGtsamSquaredDiagonal(params_.imu.gyro_bias_rw_sigmas);
@@ -354,19 +351,19 @@ void FactorGraphNode::addPriorFactors(gtsam::NonlinearFactorGraph & graph, gtsam
     if (params_.gps.enable_gps) {
       prior_pose_sigmas(3) = params_.gps.use_parameter_covariance ?
         params_.gps.parameter_covariance.position_noise_sigmas[0] :
-        std::sqrt(toGtsam(state_initializer_->initial_gps->pose.covariance)(0, 0));
+        std::sqrt(toGtsam(state_initializer_->initial_gps_->pose.covariance)(0, 0));
       prior_pose_sigmas(4) = params_.gps.use_parameter_covariance ?
         params_.gps.parameter_covariance.position_noise_sigmas[1] :
-        std::sqrt(toGtsam(state_initializer_->initial_gps->pose.covariance)(1, 1));
+        std::sqrt(toGtsam(state_initializer_->initial_gps_->pose.covariance)(1, 1));
     }
     prior_pose_sigmas(5) = params_.depth.use_parameter_covariance ?
       params_.depth.parameter_covariance.position_z_noise_sigma :
-      std::sqrt(state_initializer_->initial_depth->pose.covariance[14]);
+      std::sqrt(state_initializer_->initial_depth_->pose.covariance[14]);
 
     if (params_.ahrs.enable_ahrs) {
       prior_pose_sigmas(2) = params_.ahrs.use_parameter_covariance ?
         params_.ahrs.parameter_covariance.yaw_noise_sigma :
-        std::sqrt(toGtsam(state_initializer_->initial_ahrs->orientation_covariance)(2, 2));
+        std::sqrt(toGtsam(state_initializer_->initial_ahrs_->orientation_covariance)(2, 2));
     } else if (params_.mag.enable_mag) {
       double h_mag = std::sqrt(
         params_.mag.reference_field[0] * params_.mag.reference_field[0] +
@@ -374,16 +371,16 @@ void FactorGraphNode::addPriorFactors(gtsam::NonlinearFactorGraph & graph, gtsam
 
       double mag_sigma_norm = params_.mag.use_parameter_covariance ?
         params_.mag.parameter_covariance.magnetic_field_noise_sigmas[0] :
-        std::sqrt(toGtsam(state_initializer_->initial_mag->magnetic_field_covariance)(0, 0));
+        std::sqrt(toGtsam(state_initializer_->initial_mag_->magnetic_field_covariance)(0, 0));
 
       prior_pose_sigmas(2) = mag_sigma_norm / h_mag;
     }
     prior_pose_sigmas(0) = params_.imu.use_parameter_covariance ?
       params_.imu.parameter_covariance.gyro_noise_sigmas[0] :
-      std::sqrt(toGtsam(state_initializer_->initial_imu->angular_velocity_covariance)(0, 0));
+      std::sqrt(toGtsam(state_initializer_->initial_imu_->angular_velocity_covariance)(0, 0));
     prior_pose_sigmas(1) = params_.imu.use_parameter_covariance ?
       params_.imu.parameter_covariance.gyro_noise_sigmas[1] :
-      std::sqrt(toGtsam(state_initializer_->initial_imu->angular_velocity_covariance)(1, 1));
+      std::sqrt(toGtsam(state_initializer_->initial_imu_->angular_velocity_covariance)(1, 1));
   }
 
   graph.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(
@@ -400,7 +397,7 @@ void FactorGraphNode::addPriorFactors(gtsam::NonlinearFactorGraph & graph, gtsam
       auto & sigmas = params_.dvl.parameter_covariance.velocity_noise_sigmas;
       prior_vel_noise = gtsam::noiseModel::Diagonal::Sigmas(toGtsam(sigmas));
     } else {
-      gtsam::Matrix33 dvl_cov = toGtsam3x3(state_initializer_->initial_dvl->twist.covariance);
+      gtsam::Matrix33 dvl_cov = toGtsam3x3(state_initializer_->initial_dvl_->twist.covariance);
       prior_vel_noise = gtsam::noiseModel::Diagonal::Covariance(dvl_cov);
     }
   }
@@ -432,15 +429,15 @@ void FactorGraphNode::initializeGraph()
   }
 
   // --- Wait for Sensor TFs ---
-  bool imu_ok = have_imu_to_dvl_tf_;
+  bool imu_ok = !dvl_T_imu_tf_.header.frame_id.empty();
   bool gps_ok = !(params_.gps.enable_gps || params_.gps.enable_gps_init_only) ||
-    have_gps_to_dvl_tf_;
-  bool depth_ok = have_depth_to_dvl_tf_;
+    !dvl_T_gps_tf_.header.frame_id.empty();
+  bool depth_ok = !dvl_T_depth_tf_.header.frame_id.empty();
   bool mag_ok = !(params_.mag.enable_mag || params_.mag.enable_mag_init_only) ||
-    have_mag_to_dvl_tf_;
+    !dvl_T_mag_tf_.header.frame_id.empty();
   bool ahrs_ok = !(params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) ||
-    have_ahrs_to_dvl_tf_;
-  bool dvl_ok = have_dvl_to_base_tf_;
+    !dvl_T_ahrs_tf_.header.frame_id.empty();
+  bool dvl_ok = !base_T_dvl_tf_.header.frame_id.empty();
 
   if (!(imu_ok && gps_ok && depth_ok && mag_ok && ahrs_ok && dvl_ok)) {
     RCLCPP_WARN_THROTTLE(
@@ -463,26 +460,26 @@ void FactorGraphNode::initializeGraph()
 
   // --- Compute Initial States ---
   utils::TfBundle tfs{
-    toGtsam(imu_to_dvl_tf_.transform), toGtsam(gps_to_dvl_tf_.transform),
-    toGtsam(depth_to_dvl_tf_.transform), toGtsam(mag_to_dvl_tf_.transform),
-    toGtsam(ahrs_to_dvl_tf_.transform), toGtsam(dvl_to_base_tf_.transform)};
+    toGtsam(dvl_T_imu_tf_.transform), toGtsam(dvl_T_gps_tf_.transform),
+    toGtsam(dvl_T_depth_tf_.transform), toGtsam(dvl_T_mag_tf_.transform),
+    toGtsam(dvl_T_ahrs_tf_.transform), toGtsam(base_T_dvl_tf_.transform)};
 
   state_initializer_->compute(tfs);
 
-  prev_pose_ = state_initializer_->pose;
-  prev_vel_ = state_initializer_->velocity;
-  prev_imu_bias_ = state_initializer_->bias;
-  prev_time_ = state_initializer_->time;
+  prev_pose_ = state_initializer_->pose_;
+  prev_vel_ = state_initializer_->velocity_;
+  prev_imu_bias_ = state_initializer_->bias_;
+  prev_time_ = state_initializer_->time_;
 
-  last_imu_acc_ = toGtsam(state_initializer_->initial_imu->linear_acceleration);
-  last_imu_gyr_ = toGtsam(state_initializer_->initial_imu->angular_velocity);
+  last_imu_acc_ = toGtsam(state_initializer_->initial_imu_->linear_acceleration);
+  last_imu_gyr_ = toGtsam(state_initializer_->initial_imu_->angular_velocity);
 
   // --- Create Initial Graph ---
   gtsam::NonlinearFactorGraph initial_graph;
   gtsam::Values initial_values;
   addPriorFactors(initial_graph, initial_values);
 
-  time_to_key_[state_initializer_->stamp] = X(0);
+  time_to_key_[state_initializer_->stamp_] = X(0);
 
   // --- Initialize Preintegrators ---
   imu_preintegrator_ = std::make_unique<gtsam::PreintegratedCombinedMeasurements>(
@@ -491,12 +488,12 @@ void FactorGraphNode::initializeGraph()
     dvl_preintegrator_ = std::make_unique<utils::DvlPreintegrator>();
     dvl_preintegrator_->reset(prev_pose_.rotation());
 
-    last_dvl_velocity_ = toGtsam(state_initializer_->initial_dvl->twist.twist.linear);
+    last_dvl_velocity_ = toGtsam(state_initializer_->initial_dvl_->twist.twist.linear);
     if (params_.dvl.use_parameter_covariance) {
       last_dvl_covariance_ = toGtsamSquaredDiagonal(
         params_.dvl.parameter_covariance.velocity_noise_sigmas).block<3, 3>(0, 0);
     } else {
-      last_dvl_covariance_ = toGtsam3x3(state_initializer_->initial_dvl->twist.covariance);
+      last_dvl_covariance_ = toGtsam3x3(state_initializer_->initial_dvl_->twist.covariance);
     }
   }
 
@@ -527,7 +524,7 @@ void FactorGraphNode::addGpsFactor(
   gtsam::NonlinearFactorGraph & graph,
   const std::deque<nav_msgs::msg::Odometry::SharedPtr> & gps_msgs)
 {
-  if (!have_gps_to_dvl_tf_ || gps_msgs.empty()) {return;}
+  if (dvl_T_gps_tf_.header.frame_id.empty() || gps_msgs.empty()) {return;}
 
   const auto & gps_msg = gps_msgs.back();
 
@@ -552,14 +549,14 @@ void FactorGraphNode::addGpsFactor(
 
   graph.emplace_shared<Gps2dFactorArm>(
     X(current_step_), toGtsam(gps_msg->pose.pose.position),
-    toGtsam(gps_to_dvl_tf_.transform), gps_noise);
+    toGtsam(dvl_T_gps_tf_.transform), gps_noise);
 }
 
 void FactorGraphNode::addDepthFactor(
   gtsam::NonlinearFactorGraph & graph,
   const std::deque<nav_msgs::msg::Odometry::SharedPtr> & depth_msgs)
 {
-  if (!have_depth_to_dvl_tf_ || depth_msgs.empty()) {return;}
+  if (dvl_T_depth_tf_.header.frame_id.empty() || depth_msgs.empty()) {return;}
 
   const auto & depth_msg = depth_msgs.back();
 
@@ -585,14 +582,14 @@ void FactorGraphNode::addDepthFactor(
 
   graph.emplace_shared<DepthFactorArm>(
     X(current_step_), depth_msg->pose.pose.position.z,
-    toGtsam(depth_to_dvl_tf_.transform), depth_noise);
+    toGtsam(dvl_T_depth_tf_.transform), depth_noise);
 }
 
 void FactorGraphNode::addAhrsFactor(
   gtsam::NonlinearFactorGraph & graph,
   const std::deque<sensor_msgs::msg::Imu::SharedPtr> & ahrs_msgs)
 {
-  if (!have_ahrs_to_dvl_tf_ || ahrs_msgs.empty()) {return;}
+  if (dvl_T_ahrs_tf_.header.frame_id.empty() || ahrs_msgs.empty()) {return;}
 
   const auto & ahrs_msg = ahrs_msgs.back();
 
@@ -619,7 +616,7 @@ void FactorGraphNode::addAhrsFactor(
 
   graph.emplace_shared<AhrsYawFactorArm>(
     X(current_step_), toGtsam(ahrs_msg->orientation),
-    toGtsam(ahrs_to_dvl_tf_.transform.rotation),
+    toGtsam(dvl_T_ahrs_tf_.transform.rotation),
     params_.ahrs.mag_declination_radians,
     ahrs_noise);
 }
@@ -628,7 +625,7 @@ void FactorGraphNode::addMagFactor(
   gtsam::NonlinearFactorGraph & graph,
   const std::deque<sensor_msgs::msg::MagneticField::SharedPtr> & mag_msgs)
 {
-  if (!have_mag_to_dvl_tf_ || mag_msgs.empty()) {return;}
+  if (dvl_T_mag_tf_.header.frame_id.empty() || mag_msgs.empty()) {return;}
 
   const auto & mag_msg = mag_msgs.back();
 
@@ -659,7 +656,7 @@ void FactorGraphNode::addMagFactor(
 
   graph.emplace_shared<MagFactorArm>(
     X(current_step_), toGtsam(mag_msg->magnetic_field), ref_vec,
-    toGtsam(mag_to_dvl_tf_.transform.rotation), mag_noise);
+    toGtsam(dvl_T_mag_tf_.transform.rotation), mag_noise);
 }
 
 void FactorGraphNode::addDvlFactor(
@@ -719,7 +716,7 @@ void FactorGraphNode::addAuvDynamicsFactor(
   const std::deque<geometry_msgs::msg::WrenchStamped::SharedPtr> & wrench_msgs,
   double target_time)
 {
-  if (!have_com_to_dvl_tf_) {return;}
+  if (dvl_T_com_tf_.header.frame_id.empty()) {return;}
 
   // Implement a zero-order hold (ZOH) for wrench commands
   if (!wrench_msgs.empty()) {
@@ -747,7 +744,7 @@ void FactorGraphNode::addAuvDynamicsFactor(
     X(prev_step_), V(prev_step_),
     X(current_step_), V(current_step_),
     dt, toGtsam(wrench_msg->wrench.force),
-    toGtsam(com_to_dvl_tf_.transform),
+    toGtsam(dvl_T_com_tf_.transform),
     toGtsamDiagonal(params_.dynamics.mass).block<3, 3>(0, 0),
     toGtsamDiagonal(params_.dynamics.linear_drag).block<3, 3>(0, 0),
     toGtsamDiagonal(params_.dynamics.quad_drag).block<3, 3>(0, 0),
@@ -758,7 +755,7 @@ void FactorGraphNode::addPreintegratedImuFactor(
   gtsam::NonlinearFactorGraph & graph,
   const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs, double target_time)
 {
-  if (!have_imu_to_dvl_tf_ || !imu_preintegrator_ || imu_msgs.empty()) {return;}
+  if (dvl_T_imu_tf_.header.frame_id.empty() || !imu_preintegrator_ || imu_msgs.empty()) {return;}
 
   double last_imu_time = prev_time_;
   std::deque<sensor_msgs::msg::Imu::SharedPtr> unused_imu_msgs;
@@ -846,7 +843,7 @@ void FactorGraphNode::addPreintegratedDvlFactor(
   const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & dvl_msgs,
   const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs, double target_time)
 {
-  if (!have_imu_to_dvl_tf_ || !dvl_preintegrator_ || imu_msgs.empty()) {return;}
+  if (dvl_T_imu_tf_.header.frame_id.empty() || !dvl_preintegrator_ || imu_msgs.empty()) {return;}
 
   if (imu_msgs.empty()) {
     dvl_queue_.restore(dvl_msgs);
@@ -856,10 +853,10 @@ void FactorGraphNode::addPreintegratedDvlFactor(
   double last_dvl_time = prev_time_;
   std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> unused_dvl_msgs;
 
-  gtsam::Rot3 R_dvl_to_imu = toGtsam(imu_to_dvl_tf_.transform.rotation);
-  gtsam::Rot3 R_imu_to_dvl = R_dvl_to_imu.inverse();
-  gtsam::Rot3 prev_imu_att = getInterpolatedOrientation(imu_msgs, prev_time_);
-  dvl_preintegrator_->reset(prev_imu_att * R_imu_to_dvl);
+  gtsam::Rot3 dvl_R_imu = toGtsam(dvl_T_imu_tf_.transform.rotation);
+  gtsam::Rot3 imu_R_dvl = dvl_R_imu.inverse();
+  gtsam::Rot3 world_R_imu_prev = getInterpolatedOrientation(imu_msgs, prev_time_);
+  dvl_preintegrator_->reset(world_R_imu_prev * imu_R_dvl);
 
   for (const auto & dvl_msg : dvl_msgs) {
     double current_dvl_time = rclcpp::Time(dvl_msg->header.stamp).seconds();
@@ -885,11 +882,11 @@ void FactorGraphNode::addPreintegratedDvlFactor(
       }
 
       // Integrate DVL measurement alongside interpolated IMU attitude
-      gtsam::Rot3 cur_imu_att = getInterpolatedOrientation(imu_msgs, current_dvl_time);
-      gtsam::Rot3 cur_dvl_att = cur_imu_att * R_imu_to_dvl;
+      gtsam::Rot3 world_R_imu_cur = getInterpolatedOrientation(imu_msgs, current_dvl_time);
+      gtsam::Rot3 world_R_dvl_cur = world_R_imu_cur * imu_R_dvl;
 
       dvl_preintegrator_->integrateMeasurement(
-        last_dvl_velocity_, cur_dvl_att, dt,
+        last_dvl_velocity_, world_R_dvl_cur, dt,
         last_dvl_covariance_);
     }
     last_dvl_time = current_dvl_time;
@@ -929,13 +926,13 @@ void FactorGraphNode::addPreintegratedDvlFactor(
       gtsam::NavState predicted_state = pim.predict(
         gtsam::NavState(
           gtsam::Pose3(start_imu_rot, gtsam::Point3::Zero()),
-          (start_imu_rot * R_imu_to_dvl).rotate(last_dvl_velocity_)),
+          (start_imu_rot * imu_R_dvl).rotate(last_dvl_velocity_)),
         prev_imu_bias_);
 
-      gtsam::Vector3 dvl_body_vel = R_dvl_to_imu.unrotate(predicted_state.bodyVelocity());
+      gtsam::Vector3 dvl_body_vel = dvl_R_imu.unrotate(predicted_state.bodyVelocity());
 
       dvl_preintegrator_->integrateMeasurement(
-        dvl_body_vel, predicted_state.attitude() * R_imu_to_dvl, target_time - last_dvl_time,
+        dvl_body_vel, predicted_state.attitude() * imu_R_dvl, target_time - last_dvl_time,
         gtsam::I_3x3 * 0.02);  // Hard-coded TURTLMap covariance
 
       last_dvl_velocity_ = dvl_body_vel;
@@ -943,7 +940,7 @@ void FactorGraphNode::addPreintegratedDvlFactor(
       double dt = target_time - last_dvl_time;
       if (dt > 1e-6) {
         gtsam::Rot3 cur_imu_att = getInterpolatedOrientation(imu_msgs, target_time);
-        gtsam::Rot3 cur_dvl_att = cur_imu_att * R_imu_to_dvl;
+        gtsam::Rot3 cur_dvl_att = cur_imu_att * imu_R_dvl;
         dvl_preintegrator_->integrateMeasurement(
           last_dvl_velocity_, cur_dvl_att, dt, last_dvl_covariance_);
       }
@@ -1023,7 +1020,7 @@ void FactorGraphNode::publishSmoothedPath(
   path_msg.header.stamp = timestamp;
   path_msg.header.frame_id = params_.map_frame;
 
-  gtsam::Pose3 T_dvl_base = toGtsam(dvl_to_base_tf_.transform).inverse();
+  gtsam::Pose3 T_dvl_base = toGtsam(base_T_dvl_tf_.transform).inverse();
 
   for (const auto & pair : time_to_key_) {
     if (results.exists(pair.second)) {
@@ -1325,7 +1322,7 @@ void FactorGraphNode::optimizeGraph()
     last_opt_duration_ = std::chrono::duration<double>(opt_end - opt_start).count();
 
     // --- Publish Global Odometry ---
-    gtsam::Pose3 T_base_dvl = toGtsam(dvl_to_base_tf_.transform);
+    gtsam::Pose3 T_base_dvl = toGtsam(base_T_dvl_tf_.transform);
     publishGlobalOdom(prev_pose_ * T_base_dvl.inverse(), new_pose_cov, target_stamp);
 
     // --- Publish Global TF ---

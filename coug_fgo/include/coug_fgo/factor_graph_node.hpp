@@ -336,21 +336,13 @@ protected:
   std::string dvl_frame_;
   std::string imu_frame_;
 
-  bool have_dvl_to_base_tf_ = false;
-  bool have_imu_to_dvl_tf_ = false;
-  bool have_gps_to_dvl_tf_ = false;
-  bool have_depth_to_dvl_tf_ = false;
-  bool have_mag_to_dvl_tf_ = false;
-  bool have_ahrs_to_dvl_tf_ = false;
-  bool have_com_to_dvl_tf_ = false;
-
-  geometry_msgs::msg::TransformStamped dvl_to_base_tf_;
-  geometry_msgs::msg::TransformStamped imu_to_dvl_tf_;
-  geometry_msgs::msg::TransformStamped gps_to_dvl_tf_;
-  geometry_msgs::msg::TransformStamped depth_to_dvl_tf_;
-  geometry_msgs::msg::TransformStamped mag_to_dvl_tf_;
-  geometry_msgs::msg::TransformStamped ahrs_to_dvl_tf_;
-  geometry_msgs::msg::TransformStamped com_to_dvl_tf_;
+  geometry_msgs::msg::TransformStamped base_T_dvl_tf_;
+  geometry_msgs::msg::TransformStamped dvl_T_imu_tf_;
+  geometry_msgs::msg::TransformStamped dvl_T_gps_tf_;
+  geometry_msgs::msg::TransformStamped dvl_T_depth_tf_;
+  geometry_msgs::msg::TransformStamped dvl_T_mag_tf_;
+  geometry_msgs::msg::TransformStamped dvl_T_ahrs_tf_;
+  geometry_msgs::msg::TransformStamped dvl_T_com_tf_;
 
   // --- ROS Interfaces ---
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr global_odom_pub_;
@@ -360,8 +352,8 @@ protected:
   rclcpp::Publisher<coug_fgo_msgs::msg::GraphMetrics>::SharedPtr graph_metrics_pub_;
 
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
-  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr gps_odom_sub_;
-  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr depth_odom_sub_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr gps_sub_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr depth_sub_;
   rclcpp::Subscription<sensor_msgs::msg::MagneticField>::SharedPtr mag_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr ahrs_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr dvl_sub_;

@@ -90,14 +90,12 @@ protected:
   void checkNavSatFix(diagnostic_updater::DiagnosticStatusWrapper & stat);
 
   // --- State ---
-  std::atomic<bool> origin_set_{false};
   sensor_msgs::msg::NavSatFix origin_navsat_;
   geodesy::UTMPoint origin_utm_;
 
   std::atomic<double> last_navsat_time_{0.0};
   std::atomic<int> last_fix_status_{-1};
 
-  bool collecting_samples_ = false;
   double start_collection_time_ = 0.0;
   std::vector<sensor_msgs::msg::NavSatFix> gps_samples_;
 

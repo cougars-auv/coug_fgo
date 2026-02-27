@@ -39,7 +39,7 @@ namespace coug_fgo::factors
  */
 class Gps2dFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3>
 {
-  gtsam::Point3 measured_position_;
+  gtsam::Point3 world_p_sensor_measured_;
   gtsam::Point3 base_p_sensor_;
 
 public:
@@ -54,7 +54,7 @@ public:
     gtsam::Key pose_key, const gtsam::Point3 & measured_position,
     const gtsam::Pose3 & base_T_sensor, const gtsam::SharedNoiseModel & noise_model)
   : NoiseModelFactor1<gtsam::Pose3>(noise_model, pose_key),
-    measured_position_(measured_position)
+    world_p_sensor_measured_(measured_position)
   {
     base_p_sensor_ = base_T_sensor.translation();
   }
@@ -74,7 +74,7 @@ public:
     gtsam::Point3 p_sensor_est = pose.transformFrom(base_p_sensor_, H ? &H_full : nullptr);
 
     // 2D position residual (ignore Z)
-    gtsam::Vector2 error = (p_sensor_est - measured_position_).head<2>();
+    gtsam::Vector2 error = (p_sensor_est - world_p_sensor_measured_).head<2>();
 
     if (H) {
       // Jacobian with respect to pose (2x6)

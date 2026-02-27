@@ -41,7 +41,6 @@ public:
   using OriginManagerNode::convertToEnu;
 
   // Expose protected state
-  using OriginManagerNode::origin_set_;
   using OriginManagerNode::origin_navsat_;
   using OriginManagerNode::origin_utm_;
   using OriginManagerNode::params_;
@@ -92,7 +91,7 @@ TEST_F(OriginManagerNodeTest, OriginCallback) {
   auto msg = createNavSatMsg(40.2444, -111.6608, 1400.0);
   node->originCallback(msg);
 
-  EXPECT_TRUE(node->origin_set_);
+  EXPECT_FALSE(node->origin_navsat_.header.frame_id.empty());
   EXPECT_NEAR(node->origin_navsat_.latitude, 40.2444, 1e-6);
 
   auto msg2 = createNavSatMsg(45.0, -120.0, 1000.0);
@@ -106,7 +105,7 @@ TEST_F(OriginManagerNodeTest, OriginCallback) {
 TEST_F(OriginManagerNodeTest, NavsatCallback) {
   node->params_.set_origin = true;
   node->params_.initialization_duration = 0.5;
-  node->origin_set_ = false;
+  node->origin_navsat_.header.frame_id = "";
 
   node->navsatCallback(createNavSatMsg(40.0, -111.0, 1000.0));
   node->navsatCallback(createNavSatMsg(40.2, -111.2, 1010.0));
@@ -115,7 +114,7 @@ TEST_F(OriginManagerNodeTest, NavsatCallback) {
 
   node->navsatCallback(createNavSatMsg(40.1, -111.1, 1005.0));
 
-  EXPECT_TRUE(node->origin_set_);
+  EXPECT_FALSE(node->origin_navsat_.header.frame_id.empty());
   EXPECT_NEAR(node->origin_navsat_.latitude, 40.1, 1e-6);
 }
 

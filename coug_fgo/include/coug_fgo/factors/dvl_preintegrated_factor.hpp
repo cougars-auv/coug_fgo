@@ -37,7 +37,7 @@ namespace coug_fgo::factors
  */
 class DvlPreintegratedFactor : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>
 {
-  gtsam::Vector3 measured_translation_;
+  gtsam::Vector3 i_p_j_measured_;
 
 public:
   /**
@@ -52,7 +52,7 @@ public:
     const gtsam::Vector3 & measured_translation,
     gtsam::SharedNoiseModel noise_model)
   : gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>(noise_model, pose_key_i, pose_key_j),
-    measured_translation_(measured_translation) {}
+    i_p_j_measured_(measured_translation) {}
 
   /**
    * @brief Evaluates the error and Jacobians for the factor.
@@ -79,7 +79,7 @@ public:
       H_pose_j ? &H_pij_tj : nullptr);
 
     // 3D translation residual
-    gtsam::Vector3 error = p_ij - measured_translation_;
+    gtsam::Vector3 error = p_ij - i_p_j_measured_;
 
     if (H_pose_i) {
       // Jacobian with respect to starting pose (3x6)

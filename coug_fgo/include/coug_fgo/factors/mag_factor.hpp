@@ -40,8 +40,8 @@ namespace coug_fgo::factors
  */
 class MagFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3>
 {
-  gtsam::Point3 measured_field_sensor_;
-  gtsam::Point3 reference_field_world_;
+  gtsam::Point3 sensor_B_measured_;
+  gtsam::Point3 world_B_ref_;
   gtsam::Rot3 base_R_sensor_;
 
 public:
@@ -58,8 +58,8 @@ public:
     const gtsam::Point3 & reference_field,
     const gtsam::Rot3 & base_R_sensor, const gtsam::SharedNoiseModel & noise_model)
   : NoiseModelFactor1<gtsam::Pose3>(noise_model, pose_key),
-    measured_field_sensor_(measured_field),
-    reference_field_world_(reference_field),
+    sensor_B_measured_(measured_field),
+    world_B_ref_(reference_field),
     base_R_sensor_(base_R_sensor)
   {
   }
@@ -77,11 +77,11 @@ public:
     // Predict the magnetic field in the body and sensor frames
     gtsam::Matrix33 H_unrotate_body = gtsam::Matrix33::Zero();
     gtsam::Point3 predicted_field_body =
-      pose.rotation().unrotate(reference_field_world_, H ? &H_unrotate_body : nullptr);
+      pose.rotation().unrotate(world_B_ref_, H ? &H_unrotate_body : nullptr);
     gtsam::Point3 predicted_field_sensor = base_R_sensor_.unrotate(predicted_field_body);
 
     // 3D magnetic field residual
-    gtsam::Vector3 error = predicted_field_sensor - measured_field_sensor_;
+    gtsam::Vector3 error = predicted_field_sensor - sensor_B_measured_;
 
     if (H) {
       // Jacobian with respect to pose (3x6)

@@ -43,7 +43,7 @@ namespace coug_fgo::factors
  */
 class DvlFactor : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Vector3>
 {
-  gtsam::Vector3 measured_velocity_base_;
+  gtsam::Vector3 base_v_measured_;
 
 public:
   /**
@@ -58,7 +58,7 @@ public:
     const gtsam::Vector3 & measured_velocity_base,
     const gtsam::SharedNoiseModel & noise_model)
   : NoiseModelFactor2<gtsam::Pose3, gtsam::Vector3>(noise_model, pose_key, vel_key),
-    measured_velocity_base_(measured_velocity_base) {}
+    base_v_measured_(measured_velocity_base) {}
 
   /**
    * @brief Evaluates the error and Jacobians for the factor.
@@ -81,7 +81,7 @@ public:
       vel_world, H_pose ? &H_unrotate_R : nullptr, H_vel ? &H_unrotate_v : nullptr);
 
     // 3D velocity residual
-    gtsam::Vector3 error = predicted_vel_base - measured_velocity_base_;
+    gtsam::Vector3 error = predicted_vel_base - base_v_measured_;
 
     if (H_pose) {
       // Jacobian with respect to pose (3x6)
