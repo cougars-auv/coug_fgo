@@ -67,9 +67,6 @@ struct QueueBundle
 /**
  * @class StateInitializer
  * @brief Utility for initializing state priors from sensor data.
- *
- * This class processes incoming sensor data to compute initial estimates of the AUV's
- * pose, velocity, and IMU bias for use as priors in the factor graph.
  */
 class StateInitializer
 {

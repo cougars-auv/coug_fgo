@@ -36,10 +36,7 @@ namespace coug_fgo::factors
 
 /**
  * @class ConstantVelocityFactor
- * @brief GTSAM factor for enforcing constant body velocity between two poses.
- *
- * This factor constrains the body-frame velocity of the AUV to be constant
- * between two consecutive keyframes.
+ * @brief GTSAM factor for enforcing constant body-frame velocity.
  */
 class ConstantVelocityFactor : public gtsam::NoiseModelFactor4<gtsam::Pose3, gtsam::Vector3,
     gtsam::Pose3, gtsam::Vector3>
@@ -47,10 +44,10 @@ class ConstantVelocityFactor : public gtsam::NoiseModelFactor4<gtsam::Pose3, gts
 public:
   /**
    * @brief Constructor for ConstantVelocityFactor.
-   * @param pose_key1 GTSAM key for the first pose (state i).
-   * @param vel_key1 GTSAM key for the first velocity (state i).
-   * @param pose_key2 GTSAM key for the second pose (state j).
-   * @param vel_key2 GTSAM key for the second velocity (state j).
+   * @param pose_key1 GTSAM key for the starting pose (state i).
+   * @param vel_key1 GTSAM key for the starting velocity (state i).
+   * @param pose_key2 GTSAM key for the ending pose (state j).
+   * @param vel_key2 GTSAM key for the ending velocity (state j).
    * @param noise_model The noise model for the constraint.
    */
   ConstantVelocityFactor(

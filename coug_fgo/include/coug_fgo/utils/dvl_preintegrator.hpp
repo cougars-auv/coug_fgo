@@ -32,9 +32,6 @@ namespace coug_fgo::utils
 /**
  * @class DvlPreintegrator
  * @brief Utility for preintegrating DVL velocity measurements into relative translation.
- *
- * This class accumulates body-frame velocity measurements over time to compute
- * a relative translation between two timestamps, accounting for changes in orientation.
  */
 class DvlPreintegrator
 {

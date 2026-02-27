@@ -36,10 +36,7 @@ namespace coug_fgo::factors
 
 /**
  * @class MagFactorArm
- * @brief GTSAM factor for 3D magnetometer measurements with a lever arm.
- *
- * This factor constrains the 3D orientation of the AUV based on magnetometer measurements,
- * accounting for the rotation between the AUV base and the sensor.
+ * @brief GTSAM factor for magnetometer measurements with a lever arm.
  */
 class MagFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3>
 {
@@ -71,7 +68,7 @@ public:
    * @brief Evaluates the error and Jacobians for the factor.
    * @param pose The AUV pose estimate.
    * @param H Optional Jacobian matrix.
-   * @return The 3D error vector (predicted - measured) in the sensor frame.
+   * @return The 3D error vector (predicted - measured).
    */
   gtsam::Vector evaluateError(
     const gtsam::Pose3 & pose,

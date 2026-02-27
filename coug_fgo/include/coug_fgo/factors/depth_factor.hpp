@@ -34,10 +34,7 @@ namespace coug_fgo::factors
 
 /**
  * @class DepthFactorArm
- * @brief GTSAM factor for depth (Z) measurements with a lever arm.
- *
- * This factor constrains the Z position of the AUV based on depth sensor measurements,
- * accounting for the lever arm between the AUV base and the sensor.
+ * @brief GTSAM factor for depth measurements (Z-axis) with a lever arm.
  */
 class DepthFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3>
 {
@@ -49,7 +46,7 @@ public:
    * @brief Constructor for DepthFactorArm.
    * @param pose_key GTSAM key for the AUV pose.
    * @param measured_depth The depth measurement (Z-axis).
-   * @param base_T_sensor The static transform from base to sensor.
+   * @param base_T_sensor The static transformation from base to sensor.
    * @param noise_model The noise model for the measurement.
    */
   DepthFactorArm(

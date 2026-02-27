@@ -14,7 +14,7 @@
 
 /**
  * @file auv_dynamics_factor.hpp
- * @brief GTSAM factor for enforcing a simplified version of Fossen's equations with lever arm.
+ * @brief GTSAM factor for enforcing a simplified version of Fossen's equations with a lever arm.
  * @author Nelson Durrant
  * @date Jan 2026
  */
@@ -36,12 +36,7 @@ namespace coug_fgo::factors
 
 /**
  * @class AuvDynamicsFactorArm
- * @brief GTSAM factor for enforcing simplified AUV dynamics between two poses.
- *
- * This factor constrains the velocity evolution of the AUV based on a simplified
- * Fossen model, accounting for thruster inputs and drag.
- *
- * Model: V_next = V_curr + (dt/m) * (F_thrust - (linear_drag * V + quad_drag * |V| * V))
+ * @brief GTSAM factor for enforcing a simplified version of Fossen's equations with a lever arm.
  */
 class AuvDynamicsFactorArm : public gtsam::NoiseModelFactor4<gtsam::Pose3,
     gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>

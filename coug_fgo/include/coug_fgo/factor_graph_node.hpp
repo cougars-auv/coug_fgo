@@ -65,11 +65,7 @@ namespace coug_fgo
 
 /**
  * @class FactorGraphNode
- * @brief Performs factor graph optimization for robust AUV odometry.
- *
- * This node integrates data from IMU, DVL, GPS, depth, magnetometer, and AHRS sensors
- * alongside actuator wrenches into a global factor graph. It uses ISAM2 (fixed-lag or full)
- * to estimate the AUV's pose, velocity, and IMU biases in real-time.
+ * @brief ROS 2 node for AUV factor graph optimization using GTSAM.
  */
 class FactorGraphNode : public rclcpp::Node
 {
@@ -141,7 +137,7 @@ protected:
   /**
    * @brief Adds a magnetic orientation factor to the graph.
    * @param graph The target factor graph.
-   * @param mag_msgs Queue of Mag messages.
+   * @param mag_msgs Queue of magnetometer messages to process.
    */
   void addMagFactor(
     gtsam::NonlinearFactorGraph & graph,
@@ -168,7 +164,7 @@ protected:
   /**
    * @brief Adds a constant velocity factor to the graph.
    * @param graph The target factor graph.
-   * @param target_time The timestamp for the new pose key.
+   * @param target_time The timestamp in seconds for the new state key.
    */
   void addConstantVelocityFactor(
     gtsam::NonlinearFactorGraph & graph,
@@ -177,8 +173,8 @@ protected:
   /**
    * @brief Adds an AUV dynamics factor to the graph.
    * @param graph The target factor graph.
-   * @param wrench_msgs Queue of wrench messages.
-   * @param target_time The timestamp for the new pose key.
+   * @param wrench_msgs Queue of wrench messages to process.
+   * @param target_time The timestamp in seconds for the new state key.
    */
   void addAuvDynamicsFactor(
     gtsam::NonlinearFactorGraph & graph,
@@ -188,8 +184,8 @@ protected:
   /**
    * @brief Integrates and adds a combined IMU factor to the graph.
    * @param graph The target factor graph.
-   * @param imu_msgs Queue of IMU messages since the last pose.
-   * @param target_time The timestamp for the new pose key.
+   * @param imu_msgs Queue of IMU messages to process.
+   * @param target_time The timestamp in seconds for the new state key.
    */
   void addPreintegratedImuFactor(
     gtsam::NonlinearFactorGraph & graph,

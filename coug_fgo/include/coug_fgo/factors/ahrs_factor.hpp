@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /**
- * @file ahrs_factor_arm.hpp
+ * @file ahrs_factor.hpp
  * @brief GTSAM factor for AHRS/orientation yaw-only measurements with a lever arm.
  * @author Nelson Durrant
  * @date Jan 2026
@@ -36,9 +36,6 @@ namespace coug_fgo::factors
 /**
  * @class AhrsYawFactorArm
  * @brief GTSAM factor for AHRS/orientation yaw-only measurements with a lever arm.
- *
- * This factor constrains the yaw orientation of the AUV based on AHRS/IMU measurements,
- * accounting for the rotation between the AUV base and the sensor.
  */
 class AhrsYawFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3>
 {

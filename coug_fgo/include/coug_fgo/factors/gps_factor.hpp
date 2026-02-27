@@ -35,10 +35,7 @@ namespace coug_fgo::factors
 
 /**
  * @class Gps2dFactorArm
- * @brief GTSAM factor for 2D GPS position measurements with a lever arm.
- *
- * This factor constrains the 2D (horizontal) position of the AUV based on GPS,
- * accounting for the lever arm between the AUV base and the sensor.
+ * @brief GTSAM factor for GPS position measurements with a lever arm.
  */
 class Gps2dFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3>
 {
@@ -50,7 +47,7 @@ public:
    * @brief Constructor for Gps2dFactorArm.
    * @param pose_key GTSAM key for the AUV pose.
    * @param measured_position The measured 3D position (Z is ignored).
-   * @param base_T_sensor The static transform from base to sensor.
+   * @param base_T_sensor The static transformation from base to sensor.
    * @param noise_model The noise model for the measurement (model dimension must be 2).
    */
   Gps2dFactorArm(

@@ -41,11 +41,7 @@ namespace coug_fgo
 
 /**
  * @class OriginManagerNode
- * @brief Manages the geographic origin of the AUV fleet.
- *
- * This node converts global geographic coordinates (latitude, longitude, altitude)
- * into a local East-North-Up (ENU) frame relative to a set origin. It also handles
- * origin handshakes in multi-agent fleet scenarios.
+ * @brief ROS 2 node for AUV fleet origin management.
  */
 class OriginManagerNode : public rclcpp::Node
 {

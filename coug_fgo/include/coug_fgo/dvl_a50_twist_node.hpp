@@ -37,10 +37,7 @@ namespace coug_fgo
 
 /**
  * @class DvlA50TwistNode
- * @brief Converts DVL messages to TwistWithCovarianceStamped messages.
- *
- * This node subscribes to DVL messages from a Waterlinked A50 DVL and
- * republishes the velocity data as a standard ROS 2 twist message.
+ * @brief ROS 2 node that converts raw DVL velocity data to a twist message.
  */
 class DvlA50TwistNode : public rclcpp::Node
 {

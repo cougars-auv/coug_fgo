@@ -34,9 +34,6 @@ namespace coug_fgo::utils
 /**
  * @class ThreadSafeQueue
  * @brief Utility for thread-safe queue operations.
- *
- * This class wraps a std::deque with a mutex to provide thread-safe access
- * for pushing, draining, and inspecting elements.
  */
 template<typename T>
 class ThreadSafeQueue
