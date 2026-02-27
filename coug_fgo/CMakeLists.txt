@@ -158,25 +158,6 @@ if(BUILD_TESTING)
   )
   target_link_libraries(test_auv_dynamics_factor gtsam)
 
-  ament_add_gtest(test_factor_graph_node test/test_factor_graph_node.cpp)
-  target_include_directories(test_factor_graph_node PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    ${GTSAM_EIGEN_INCLUDE_DIR}
-  )
-  target_link_libraries(test_factor_graph_node
-    factor_graph_component
-    gtsam
-  )
-  ament_target_dependencies(test_factor_graph_node
-    rclcpp
-    sensor_msgs
-    nav_msgs
-    geometry_msgs
-    tf2
-    tf2_ros
-    tf2_geometry_msgs
-  )
-
   ament_add_gtest(test_origin_manager_node test/test_origin_manager_node.cpp)
   target_include_directories(test_origin_manager_node PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

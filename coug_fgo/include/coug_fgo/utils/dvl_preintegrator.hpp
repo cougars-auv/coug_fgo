@@ -40,7 +40,7 @@ class DvlPreintegrator
 {
 public:
   /**
-   * @brief Default constructor for DvlPreintegrator.
+   * @brief Constructor for DvlPreintegrator.
    */
   DvlPreintegrator() {reset(gtsam::Rot3());}
 

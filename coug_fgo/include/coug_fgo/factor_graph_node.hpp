@@ -54,6 +54,7 @@
 
 #include "coug_fgo/utils/conversion_utils.hpp"
 #include "coug_fgo/utils/dvl_preintegrator.hpp"
+#include "coug_fgo/utils/state_initializer.hpp"
 #include "coug_fgo/utils/thread_safe_queue.hpp"
 #include <coug_fgo/factor_graph_parameters.hpp>
 #include <coug_fgo_msgs/msg/graph_metrics.hpp>
@@ -110,37 +111,6 @@ protected:
    */
   std::shared_ptr<gtsam::PreintegratedCombinedMeasurements::Params>
   configureImuPreintegration();
-
-  /**
-   * @brief Updates the running averages with new data from the sensor queues.
-   */
-  void incrementAverages();
-
-  /**
-   * @brief Computes initial orientation using IMU, magnetometer, and AHRS sensor data.
-   * @return The initial GTSAM rotation.
-   */
-  gtsam::Rot3 computeInitialOrientation();
-
-  /**
-   * @brief Computes initial position using GPS and depth sensor data.
-   * @param initial_orientation The previously computed initial orientation.
-   * @return The initial GTSAM translation.
-   */
-  gtsam::Point3 computeInitialPosition(const gtsam::Rot3 & initial_orientation);
-
-  /**
-   * @brief Computes initial velocity using DVL sensor data.
-   * @param initial_orientation The previously computed initial orientation.
-   * @return The initial GTSAM velocity.
-   */
-  gtsam::Vector3 computeInitialVelocity(const gtsam::Rot3 & initial_orientation);
-
-  /**
-   * @brief Computes initial IMU biases from averaged data or parameters.
-   * @return The initial GTSAM bias estimate.
-   */
-  gtsam::imuBias::ConstantBias computeInitialBias();
 
   // --- Factor Management ---
   /**
@@ -319,7 +289,7 @@ protected:
 
   // --- Graph State ---
   std::atomic<State> state_{State::WAITING_FOR_SENSORS};
-  double start_avg_time_ = 0.0;
+  std::unique_ptr<utils::StateInitializer> state_initializer_;
 
   size_t prev_step_ = 0;
   size_t current_step_ = 1;
@@ -348,26 +318,9 @@ protected:
 
   gtsam::Vector3 last_dvl_velocity_ = gtsam::Vector3::Zero();
   gtsam::Matrix3 last_dvl_covariance_ = gtsam::Matrix3::Zero();
-
-  // --- Averaged Measurements ---
-  sensor_msgs::msg::Imu::SharedPtr initial_imu_;
-  nav_msgs::msg::Odometry::SharedPtr initial_gps_;
-  nav_msgs::msg::Odometry::SharedPtr initial_depth_;
-  sensor_msgs::msg::Imu::SharedPtr initial_ahrs_;
-  sensor_msgs::msg::MagneticField::SharedPtr initial_mag_;
-  geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr initial_dvl_;
-  geometry_msgs::msg::WrenchStamped::SharedPtr initial_wrench_;
-  geometry_msgs::msg::WrenchStamped::SharedPtr latest_wrench_msg_;
-
-  size_t initial_imu_count_ = 0;
-  size_t initial_gps_count_ = 0;
-  size_t initial_depth_count_ = 0;
-  size_t initial_ahrs_count_ = 0;
-  size_t initial_mag_count_ = 0;
-  size_t initial_dvl_count_ = 0;
-
-  gtsam::Rot3 initial_ahrs_ref_;
-  gtsam::Vector3 initial_ahrs_log_sum_ = gtsam::Vector3::Zero();
+  geometry_msgs::msg::WrenchStamped::SharedPtr last_wrench_msg_;
+  gtsam::Vector3 last_imu_acc_ = gtsam::Vector3::Zero();
+  gtsam::Vector3 last_imu_gyr_ = gtsam::Vector3::Zero();
 
   // --- Message Queues ---
   utils::ThreadSafeQueue<sensor_msgs::msg::Imu::SharedPtr> imu_queue_;

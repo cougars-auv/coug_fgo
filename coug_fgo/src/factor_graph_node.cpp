@@ -265,6 +265,9 @@ void FactorGraphNode::setupRosInterfaces()
         }
       }
       wrench_queue_.push(msg);
+      if (params_.dynamics.enable_dynamics) {
+        last_wrench_msg_ = msg;
+      }
     },
     sensor_options);
 
@@ -299,6 +302,7 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions & options)
   params_ = param_listener_->get_params();
 
   setupRosInterfaces();
+  state_initializer_ = std::make_unique<utils::StateInitializer>(params_);
   RCLCPP_INFO(get_logger(), "Startup complete! Waiting for sensor messages...");
 }
 
@@ -314,14 +318,16 @@ FactorGraphNode::configureImuPreintegration()
     imu_params->accelerometerCovariance = toGtsamSquaredDiagonal(
       params_.imu.parameter_covariance.accel_noise_sigmas).block<3, 3>(0, 0);
   } else {
-    imu_params->accelerometerCovariance = toGtsam(initial_imu_->linear_acceleration_covariance);
+    imu_params->accelerometerCovariance = toGtsam(
+      state_initializer_->initial_imu->linear_acceleration_covariance);
   }
 
   if (params_.imu.use_parameter_covariance) {
     imu_params->gyroscopeCovariance = toGtsamSquaredDiagonal(
       params_.imu.parameter_covariance.gyro_noise_sigmas).block<3, 3>(0, 0);
   } else {
-    imu_params->gyroscopeCovariance = toGtsam(initial_imu_->angular_velocity_covariance);
+    imu_params->gyroscopeCovariance = toGtsam(
+      state_initializer_->initial_imu->angular_velocity_covariance);
   }
   imu_params->biasAccCovariance = toGtsamSquaredDiagonal(params_.imu.accel_bias_rw_sigmas);
   imu_params->biasOmegaCovariance = toGtsamSquaredDiagonal(params_.imu.gyro_bias_rw_sigmas);
@@ -332,259 +338,6 @@ FactorGraphNode::configureImuPreintegration()
   return imu_params;
 }
 
-void FactorGraphNode::incrementAverages()
-{
-  // Average IMU
-  auto imu_msgs = imu_queue_.drain();
-  for (const auto & msg : imu_msgs) {
-    if (initial_imu_count_ == 0) {
-      initial_imu_ = msg;
-    } else {
-      double n = static_cast<double>(initial_imu_count_ + 1);
-      initial_imu_->linear_acceleration.x +=
-        (msg->linear_acceleration.x - initial_imu_->linear_acceleration.x) / n;
-      initial_imu_->linear_acceleration.y +=
-        (msg->linear_acceleration.y - initial_imu_->linear_acceleration.y) / n;
-      initial_imu_->linear_acceleration.z +=
-        (msg->linear_acceleration.z - initial_imu_->linear_acceleration.z) / n;
-      initial_imu_->angular_velocity.x +=
-        (msg->angular_velocity.x - initial_imu_->angular_velocity.x) / n;
-      initial_imu_->angular_velocity.y +=
-        (msg->angular_velocity.y - initial_imu_->angular_velocity.y) / n;
-      initial_imu_->angular_velocity.z +=
-        (msg->angular_velocity.z - initial_imu_->angular_velocity.z) / n;
-      initial_imu_->header.stamp = msg->header.stamp;
-    }
-    initial_imu_count_++;
-  }
-
-  // Average GPS
-  if (params_.gps.enable_gps || params_.gps.enable_gps_init_only) {
-    auto gps_msgs = gps_queue_.drain();
-    for (const auto & msg : gps_msgs) {
-      if (initial_gps_count_ == 0) {
-        initial_gps_ = msg;
-      } else {
-        double n = static_cast<double>(initial_gps_count_ + 1);
-        initial_gps_->pose.pose.position.x +=
-          (msg->pose.pose.position.x - initial_gps_->pose.pose.position.x) / n;
-        initial_gps_->pose.pose.position.y +=
-          (msg->pose.pose.position.y - initial_gps_->pose.pose.position.y) / n;
-        initial_gps_->pose.pose.position.z +=
-          (msg->pose.pose.position.z - initial_gps_->pose.pose.position.z) / n;
-        initial_gps_->header.stamp = msg->header.stamp;
-      }
-      initial_gps_count_++;
-    }
-  }
-
-  // Average Depth
-  auto depth_msgs = depth_queue_.drain();
-  for (const auto & msg : depth_msgs) {
-    if (initial_depth_count_ == 0) {
-      initial_depth_ = msg;
-    } else {
-      double n = static_cast<double>(initial_depth_count_ + 1);
-      initial_depth_->pose.pose.position.z +=
-        (msg->pose.pose.position.z - initial_depth_->pose.pose.position.z) / n;
-      initial_depth_->header.stamp = msg->header.stamp;
-    }
-    initial_depth_count_++;
-  }
-
-  // Average DVL
-  auto dvl_msgs = dvl_queue_.drain();
-  for (const auto & msg : dvl_msgs) {
-    if (initial_dvl_count_ == 0) {
-      initial_dvl_ = msg;
-    } else {
-      double n = static_cast<double>(initial_dvl_count_ + 1);
-      initial_dvl_->twist.twist.linear.x +=
-        (msg->twist.twist.linear.x - initial_dvl_->twist.twist.linear.x) / n;
-      initial_dvl_->twist.twist.linear.y +=
-        (msg->twist.twist.linear.y - initial_dvl_->twist.twist.linear.y) / n;
-      initial_dvl_->twist.twist.linear.z +=
-        (msg->twist.twist.linear.z - initial_dvl_->twist.twist.linear.z) / n;
-      initial_dvl_->header.stamp = msg->header.stamp;
-    }
-    initial_dvl_count_++;
-  }
-
-  // Average Magnetometer
-  if (params_.mag.enable_mag || params_.mag.enable_mag_init_only) {
-    auto mag_msgs = mag_queue_.drain();
-    for (const auto & msg : mag_msgs) {
-      if (initial_mag_count_ == 0) {
-        initial_mag_ = msg;
-      } else {
-        double n = static_cast<double>(initial_mag_count_ + 1);
-        initial_mag_->magnetic_field.x +=
-          (msg->magnetic_field.x - initial_mag_->magnetic_field.x) / n;
-        initial_mag_->magnetic_field.y +=
-          (msg->magnetic_field.y - initial_mag_->magnetic_field.y) / n;
-        initial_mag_->magnetic_field.z +=
-          (msg->magnetic_field.z - initial_mag_->magnetic_field.z) / n;
-        initial_mag_->header.stamp = msg->header.stamp;
-      }
-      initial_mag_count_++;
-    }
-  }
-
-  // Average AHRS
-  if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) {
-    auto ahrs_msgs = ahrs_queue_.drain();
-    for (const auto & msg : ahrs_msgs) {
-      if (initial_ahrs_count_ == 0) {
-        initial_ahrs_ = msg;
-        initial_ahrs_ref_ = toGtsam(msg->orientation);
-        initial_ahrs_log_sum_ = gtsam::Vector3::Zero();
-      } else {
-        initial_ahrs_log_sum_ +=
-          gtsam::Rot3::Logmap(initial_ahrs_ref_.between(toGtsam(msg->orientation)));
-
-        gtsam::Vector3 log_avg = initial_ahrs_log_sum_ /
-          static_cast<double>(initial_ahrs_count_ + 1);
-        initial_ahrs_->orientation =
-          toQuatMsg(initial_ahrs_ref_.compose(gtsam::Rot3::Expmap(log_avg)));
-        initial_ahrs_->header.stamp = msg->header.stamp;
-      }
-      initial_ahrs_count_++;
-    }
-  }
-
-  // Set initial wrench
-  if (params_.dynamics.enable_dynamics) {
-    auto wrench_msgs = wrench_queue_.drain();
-    if (!wrench_msgs.empty()) {
-      initial_wrench_ = wrench_msgs.back();
-      latest_wrench_msg_ = initial_wrench_;
-    }
-  }
-}
-
-gtsam::Rot3 FactorGraphNode::computeInitialOrientation()
-{
-  double roll = params_.prior.parameter_priors.initial_orientation[0];
-  double pitch = params_.prior.parameter_priors.initial_orientation[1];
-  double yaw = params_.prior.parameter_priors.initial_orientation[2];
-  gtsam::Rot3 R_base_dvl = toGtsam(dvl_to_base_tf_.transform.rotation);
-
-  if (params_.prior.use_parameter_priors) {
-    // Account for DVL rotation
-    gtsam::Rot3 R_world_base = gtsam::Rot3::Ypr(yaw, pitch, roll);
-    return R_world_base * R_base_dvl;
-  }
-
-  // Account for IMU rotation
-  gtsam::Vector3 accel_imu = toGtsam(initial_imu_->linear_acceleration);
-  gtsam::Pose3 T_dvl_imu = toGtsam(imu_to_dvl_tf_.transform);
-  gtsam::Pose3 T_base_dvl = toGtsam(dvl_to_base_tf_.transform);
-  gtsam::Vector3 accel_base = T_base_dvl.rotation() * (T_dvl_imu.rotation() * accel_imu);
-
-  roll = std::atan2(accel_base.y(), accel_base.z());
-  pitch = std::atan2(
-    -accel_base.x(), std::sqrt(
-      accel_base.y() * accel_base.y() +
-      accel_base.z() * accel_base.z()));
-
-  if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) {
-    // Account for AHRS sensor rotation
-    gtsam::Rot3 R_dvl_sensor = toGtsam(ahrs_to_dvl_tf_.transform.rotation);
-    gtsam::Rot3 R_base_sensor = R_base_dvl * R_dvl_sensor;
-    gtsam::Rot3 R_world_sensor = toGtsam(initial_ahrs_->orientation);
-    gtsam::Rot3 R_world_base_measured = R_world_sensor * R_base_sensor.inverse();
-    yaw = R_world_base_measured.yaw() + params_.ahrs.mag_declination_radians;
-  } else if (params_.mag.enable_mag || params_.mag.enable_mag_init_only) {
-    // Account for magnetometer rotation
-    gtsam::Rot3 R_dvl_sensor = toGtsam(mag_to_dvl_tf_.transform.rotation);
-
-    gtsam::Rot3 R_base_sensor = R_base_dvl * R_dvl_sensor;
-    gtsam::Vector3 mag_sensor = toGtsam(initial_mag_->magnetic_field);
-    gtsam::Vector3 mag_base = R_base_sensor * mag_sensor;
-
-    // Use the tilt-compensated magnetic vector to calculate yaw
-    gtsam::Rot3 R_rp = gtsam::Rot3::Ypr(0.0, pitch, roll);
-    gtsam::Vector3 mag_horizontal = R_rp.unrotate(mag_base);
-
-    double measured_yaw = std::atan2(mag_horizontal.y(), mag_horizontal.x());
-    double ref_yaw = std::atan2(
-      params_.mag.reference_field[1],
-      params_.mag.reference_field[0]);
-
-    yaw = ref_yaw - measured_yaw;
-  }
-
-  RCLCPP_DEBUG(get_logger(), "Initial orientation: %f %f %f", roll, pitch, yaw);
-
-  return gtsam::Rot3::Ypr(yaw, pitch, roll) * R_base_dvl;
-}
-
-gtsam::Point3 FactorGraphNode::computeInitialPosition(const gtsam::Rot3 & initial_orientation_dvl)
-{
-  gtsam::Point3 P_world_base(
-    params_.prior.parameter_priors.initial_position[0],
-    params_.prior.parameter_priors.initial_position[1],
-    params_.prior.parameter_priors.initial_position[2]);
-  gtsam::Pose3 T_base_dvl = toGtsam(dvl_to_base_tf_.transform);
-  gtsam::Rot3 R_world_base = initial_orientation_dvl * T_base_dvl.rotation().inverse();
-  gtsam::Point3 P_world_dvl_param = P_world_base + R_world_base.rotate(T_base_dvl.translation());
-
-  if (params_.prior.use_parameter_priors) {
-    // Account for DVL lever arm
-    return P_world_dvl_param;
-  }
-
-  gtsam::Point3 initial_position_dvl = P_world_dvl_param;
-  if (params_.gps.enable_gps || params_.gps.enable_gps_init_only) {
-    // Account for GPS lever arm
-    gtsam::Pose3 T_dvl_gps = toGtsam(gps_to_dvl_tf_.transform);
-    gtsam::Point3 world_t_dvl_gps = initial_orientation_dvl.rotate(T_dvl_gps.translation());
-    initial_position_dvl = toGtsam(initial_gps_->pose.pose.position) - world_t_dvl_gps;
-  }
-  // Account for depth lever arm
-  gtsam::Pose3 T_dvl_depth = toGtsam(depth_to_dvl_tf_.transform);
-  gtsam::Point3 world_t_dvl_depth = initial_orientation_dvl.rotate(T_dvl_depth.translation());
-  initial_position_dvl.z() = initial_depth_->pose.pose.position.z - world_t_dvl_depth.z();
-
-  RCLCPP_DEBUG(
-    get_logger(), "Initial position: %f %f %f", initial_position_dvl.x(),
-    initial_position_dvl.y(), initial_position_dvl.z());
-
-  return initial_position_dvl;
-}
-
-gtsam::Vector3 FactorGraphNode::computeInitialVelocity(const gtsam::Rot3 & initial_orientation_dvl)
-{
-  if (params_.prior.use_parameter_priors) {
-    // Account for DVL rotation (in world frame)
-    return initial_orientation_dvl.rotate(
-      toGtsam(params_.prior.parameter_priors.initial_velocity));
-  }
-
-  RCLCPP_DEBUG(
-    get_logger(), "Initial velocity: %f %f %f", initial_dvl_->twist.twist.linear.x,
-    initial_dvl_->twist.twist.linear.y, initial_dvl_->twist.twist.linear.z);
-
-  // Account for DVL rotation (in world frame)
-  return initial_orientation_dvl.rotate(toGtsam(initial_dvl_->twist.twist.linear));
-}
-
-gtsam::imuBias::ConstantBias FactorGraphNode::computeInitialBias()
-{
-  gtsam::Vector3 init_gyro_bias = gtsam::Vector3::Zero();
-  if (params_.prior.use_parameter_priors) {
-    init_gyro_bias = toGtsam(params_.prior.parameter_priors.initial_gyro_bias);
-  } else {
-    init_gyro_bias = toGtsam(initial_imu_->angular_velocity);
-  }
-  gtsam::Vector3 init_accel_bias = toGtsam(params_.prior.parameter_priors.initial_accel_bias);
-
-  RCLCPP_DEBUG(
-    get_logger(), "Initial accel bias: %f %f %f", init_accel_bias.x(), init_accel_bias.y(),
-    init_accel_bias.z());
-
-  return gtsam::imuBias::ConstantBias(init_accel_bias, init_gyro_bias);
-}
 
 void FactorGraphNode::addPriorFactors(gtsam::NonlinearFactorGraph & graph, gtsam::Values & values)
 {
@@ -601,19 +354,19 @@ void FactorGraphNode::addPriorFactors(gtsam::NonlinearFactorGraph & graph, gtsam
     if (params_.gps.enable_gps) {
       prior_pose_sigmas(3) = params_.gps.use_parameter_covariance ?
         params_.gps.parameter_covariance.position_noise_sigmas[0] :
-        std::sqrt(toGtsam(initial_gps_->pose.covariance)(0, 0));
+        std::sqrt(toGtsam(state_initializer_->initial_gps->pose.covariance)(0, 0));
       prior_pose_sigmas(4) = params_.gps.use_parameter_covariance ?
         params_.gps.parameter_covariance.position_noise_sigmas[1] :
-        std::sqrt(toGtsam(initial_gps_->pose.covariance)(1, 1));
+        std::sqrt(toGtsam(state_initializer_->initial_gps->pose.covariance)(1, 1));
     }
     prior_pose_sigmas(5) = params_.depth.use_parameter_covariance ?
       params_.depth.parameter_covariance.position_z_noise_sigma :
-      std::sqrt(initial_depth_->pose.covariance[14]);
+      std::sqrt(state_initializer_->initial_depth->pose.covariance[14]);
 
     if (params_.ahrs.enable_ahrs) {
       prior_pose_sigmas(2) = params_.ahrs.use_parameter_covariance ?
         params_.ahrs.parameter_covariance.yaw_noise_sigma :
-        std::sqrt(toGtsam(initial_ahrs_->orientation_covariance)(2, 2));
+        std::sqrt(toGtsam(state_initializer_->initial_ahrs->orientation_covariance)(2, 2));
     } else if (params_.mag.enable_mag) {
       double h_mag = std::sqrt(
         params_.mag.reference_field[0] * params_.mag.reference_field[0] +
@@ -621,16 +374,16 @@ void FactorGraphNode::addPriorFactors(gtsam::NonlinearFactorGraph & graph, gtsam
 
       double mag_sigma_norm = params_.mag.use_parameter_covariance ?
         params_.mag.parameter_covariance.magnetic_field_noise_sigmas[0] :
-        std::sqrt(toGtsam(initial_mag_->magnetic_field_covariance)(0, 0));
+        std::sqrt(toGtsam(state_initializer_->initial_mag->magnetic_field_covariance)(0, 0));
 
       prior_pose_sigmas(2) = mag_sigma_norm / h_mag;
     }
     prior_pose_sigmas(0) = params_.imu.use_parameter_covariance ?
       params_.imu.parameter_covariance.gyro_noise_sigmas[0] :
-      std::sqrt(toGtsam(initial_imu_->angular_velocity_covariance)(0, 0));
+      std::sqrt(toGtsam(state_initializer_->initial_imu->angular_velocity_covariance)(0, 0));
     prior_pose_sigmas(1) = params_.imu.use_parameter_covariance ?
       params_.imu.parameter_covariance.gyro_noise_sigmas[1] :
-      std::sqrt(toGtsam(initial_imu_->angular_velocity_covariance)(1, 1));
+      std::sqrt(toGtsam(state_initializer_->initial_imu->angular_velocity_covariance)(1, 1));
   }
 
   graph.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(
@@ -647,7 +400,7 @@ void FactorGraphNode::addPriorFactors(gtsam::NonlinearFactorGraph & graph, gtsam
       auto & sigmas = params_.dvl.parameter_covariance.velocity_noise_sigmas;
       prior_vel_noise = gtsam::noiseModel::Diagonal::Sigmas(toGtsam(sigmas));
     } else {
-      gtsam::Matrix33 dvl_cov = toGtsam3x3(initial_dvl_->twist.covariance);
+      gtsam::Matrix33 dvl_cov = toGtsam3x3(state_initializer_->initial_dvl->twist.covariance);
       prior_vel_noise = gtsam::noiseModel::Diagonal::Covariance(dvl_cov);
     }
   }
@@ -678,137 +431,96 @@ void FactorGraphNode::initializeGraph()
     return;
   }
 
-  bool perform_initialization = false;
+  // --- Wait for Sensor TFs ---
+  bool imu_ok = have_imu_to_dvl_tf_;
+  bool gps_ok = !(params_.gps.enable_gps || params_.gps.enable_gps_init_only) ||
+    have_gps_to_dvl_tf_;
+  bool depth_ok = have_depth_to_dvl_tf_;
+  bool mag_ok = !(params_.mag.enable_mag || params_.mag.enable_mag_init_only) ||
+    have_mag_to_dvl_tf_;
+  bool ahrs_ok = !(params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) ||
+    have_ahrs_to_dvl_tf_;
+  bool dvl_ok = have_dvl_to_base_tf_;
 
-  // --- Wait for Sensor Data ---
-  if (state_ == State::WAITING_FOR_SENSORS) {
-    bool imu_ok = !imu_queue_.empty() && have_imu_to_dvl_tf_;
-    bool gps_ok = !(params_.gps.enable_gps || params_.gps.enable_gps_init_only) ||
-      (!gps_queue_.empty() && have_gps_to_dvl_tf_);
-    bool depth_ok = !depth_queue_.empty() && have_depth_to_dvl_tf_;
-    bool mag_ok = !(params_.mag.enable_mag || params_.mag.enable_mag_init_only) ||
-      (!mag_queue_.empty() && have_mag_to_dvl_tf_);
-    bool ahrs_ok = !(params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) ||
-      (!ahrs_queue_.empty() && have_ahrs_to_dvl_tf_);
-    bool dvl_ok = !dvl_queue_.empty() && have_dvl_to_base_tf_;
-    bool wrench_ok = !params_.dynamics.enable_dynamics ||
-      (!wrench_queue_.empty() && have_com_to_dvl_tf_);
-
-    if (imu_ok && gps_ok && depth_ok && mag_ok && ahrs_ok && dvl_ok && wrench_ok) {
-      if (params_.prior.use_parameter_priors) {
-        RCLCPP_INFO(
-          get_logger(),
-          "Required sensor messages received! Skipping averaging...");
-        initial_imu_ = imu_queue_.back();
-        if (params_.gps.enable_gps || params_.gps.enable_gps_init_only) {
-          initial_gps_ = gps_queue_.back();
-        }
-        initial_depth_ = depth_queue_.back();
-        if (params_.mag.enable_mag || params_.mag.enable_mag_init_only) {
-          initial_mag_ = mag_queue_.back();
-        }
-        if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) {
-          initial_ahrs_ = ahrs_queue_.back();
-        }
-        initial_dvl_ = dvl_queue_.back();
-        if (params_.dynamics.enable_dynamics) {
-          initial_wrench_ = wrench_queue_.back();
-          latest_wrench_msg_ = initial_wrench_;
-        }
-
-        perform_initialization = true;
-      } else {
-        RCLCPP_INFO(get_logger(), "Required sensor messages received! Averaging...");
-        start_avg_time_ = this->get_clock()->now().seconds();
-        state_ = State::INITIALIZING;
-      }
-    } else {
-      RCLCPP_WARN_THROTTLE(
-        get_logger(), *get_clock(), 5000, "Waiting for sensors: %s%s%s%s%s%s%s",
-        !imu_ok ? "[IMU] " : "",
-        (!gps_ok && params_.gps.enable_gps) ? "[GPS] " : "",
-        (!mag_ok && params_.mag.enable_mag) ? "[Magnetometer] " : "",
-        (!ahrs_ok && params_.ahrs.enable_ahrs) ? "[AHRS] " : "",
-        !depth_ok ? "[Depth] " : "", !dvl_ok ? "[DVL] " : "",
-        (!wrench_ok && params_.dynamics.enable_dynamics) ? "[Wrench]" : "");
-      return;
-    }
+  if (!(imu_ok && gps_ok && depth_ok && mag_ok && ahrs_ok && dvl_ok)) {
+    RCLCPP_WARN_THROTTLE(
+      get_logger(), *get_clock(), 5000, "Waiting for sensor TFs: %s%s%s%s%s%s",
+      !imu_ok ? "[IMU] " : "",
+      (!gps_ok && params_.gps.enable_gps) ? "[GPS] " : "",
+      (!mag_ok && params_.mag.enable_mag) ? "[Magnetometer] " : "",
+      (!ahrs_ok && params_.ahrs.enable_ahrs) ? "[AHRS] " : "",
+      !depth_ok ? "[Depth] " : "", !dvl_ok ? "[DVL] " : "");
+    return;
   }
 
-  // --- Average Initial Measurements ---
-  if (state_ == State::INITIALIZING) {
-    incrementAverages();
+  // --- Update State Initializer ---
+  utils::QueueBundle queues{
+    imu_queue_, gps_queue_, depth_queue_, mag_queue_, ahrs_queue_, dvl_queue_};
 
-    double duration = this->get_clock()->now().seconds() - start_avg_time_;
-    if (duration < params_.prior.initialization_duration) {
-      RCLCPP_INFO_THROTTLE(
-        get_logger(), *get_clock(), 1000,
-        "Averaging sensor data (%.2fs / %.2fs)...", duration,
-        params_.prior.initialization_duration);
-      return;
-    } else {
-      RCLCPP_INFO(get_logger(), "Sensor data averaged successfully! Initializing graph...");
-      perform_initialization = true;
-    }
+  if (!state_initializer_->update(get_clock()->now().seconds(), queues)) {
+    return;
   }
+
+  // --- Compute Initial States ---
+  utils::TfBundle tfs{
+    toGtsam(imu_to_dvl_tf_.transform), toGtsam(gps_to_dvl_tf_.transform),
+    toGtsam(depth_to_dvl_tf_.transform), toGtsam(mag_to_dvl_tf_.transform),
+    toGtsam(ahrs_to_dvl_tf_.transform), toGtsam(dvl_to_base_tf_.transform)};
+
+  state_initializer_->compute(tfs);
+
+  prev_pose_ = state_initializer_->pose;
+  prev_vel_ = state_initializer_->velocity;
+  prev_imu_bias_ = state_initializer_->bias;
+  prev_time_ = state_initializer_->time;
+
+  last_imu_acc_ = toGtsam(state_initializer_->initial_imu->linear_acceleration);
+  last_imu_gyr_ = toGtsam(state_initializer_->initial_imu->angular_velocity);
 
   // --- Create Initial Graph ---
-  if (perform_initialization) {
-    gtsam::NonlinearFactorGraph initial_graph;
-    gtsam::Values initial_values;
+  gtsam::NonlinearFactorGraph initial_graph;
+  gtsam::Values initial_values;
+  addPriorFactors(initial_graph, initial_values);
 
-    gtsam::Rot3 initial_orientation_dvl = computeInitialOrientation();
-    gtsam::Point3 initial_position_dvl = computeInitialPosition(initial_orientation_dvl);
-    prev_pose_ = gtsam::Pose3(initial_orientation_dvl, initial_position_dvl);
-    prev_vel_ = computeInitialVelocity(initial_orientation_dvl);
-    prev_imu_bias_ = computeInitialBias();
+  time_to_key_[state_initializer_->stamp] = X(0);
 
-    addPriorFactors(initial_graph, initial_values);
+  // --- Initialize Preintegrators ---
+  imu_preintegrator_ = std::make_unique<gtsam::PreintegratedCombinedMeasurements>(
+    configureImuPreintegration(), prev_imu_bias_);
+  if (params_.experimental.enable_dvl_preintegration) {
+    dvl_preintegrator_ = std::make_unique<utils::DvlPreintegrator>();
+    dvl_preintegrator_->reset(prev_pose_.rotation());
 
-    rclcpp::Time init_stamp = params_.experimental.enable_dvl_preintegration ?
-      initial_depth_->header.stamp :
-      initial_dvl_->header.stamp;
-    prev_time_ = init_stamp.seconds();
-    time_to_key_[init_stamp] = X(0);
-
-    // --- Initialize Preintegrators ---
-    imu_preintegrator_ = std::make_unique<gtsam::PreintegratedCombinedMeasurements>(
-      configureImuPreintegration(), prev_imu_bias_);
-    if (params_.experimental.enable_dvl_preintegration) {
-      dvl_preintegrator_ = std::make_unique<DvlPreintegrator>();
-      dvl_preintegrator_->reset(initial_orientation_dvl);
-
-      last_dvl_velocity_ = toGtsam(initial_dvl_->twist.twist.linear);
-      if (params_.dvl.use_parameter_covariance) {
-        last_dvl_covariance_ = toGtsamSquaredDiagonal(
-          params_.dvl.parameter_covariance.velocity_noise_sigmas).block<3, 3>(0, 0);
-      } else {
-        last_dvl_covariance_ = toGtsam(initial_dvl_->twist.covariance).block<3, 3>(0, 0);
-      }
-    }
-
-    // --- Initialize Smoother ---
-    gtsam::IncrementalFixedLagSmoother::KeyTimestampMap initial_timestamps;
-    initial_timestamps[X(0)] = prev_time_;
-    initial_timestamps[V(0)] = prev_time_;
-    initial_timestamps[B(0)] = prev_time_;
-
-    gtsam::ISAM2Params isam2_params;
-    isam2_params.relinearizeThreshold = params_.relinearize_threshold;
-    isam2_params.relinearizeSkip = params_.relinearize_skip;
-    if (params_.solver_type == "ISAM2") {
-      isam_ = std::make_unique<gtsam::ISAM2>(isam2_params);
-      isam_->update(initial_graph, initial_values);
+    last_dvl_velocity_ = toGtsam(state_initializer_->initial_dvl->twist.twist.linear);
+    if (params_.dvl.use_parameter_covariance) {
+      last_dvl_covariance_ = toGtsamSquaredDiagonal(
+        params_.dvl.parameter_covariance.velocity_noise_sigmas).block<3, 3>(0, 0);
     } else {
-      inc_smoother_ = std::make_unique<gtsam::IncrementalFixedLagSmoother>(
-        params_.smoother_lag,
-        isam2_params);
-      inc_smoother_->update(initial_graph, initial_values, initial_timestamps);
+      last_dvl_covariance_ = toGtsam3x3(state_initializer_->initial_dvl->twist.covariance);
     }
-
-    state_ = State::RUNNING;
-    RCLCPP_INFO(get_logger(), "Graph initialized successfully!");
   }
+
+  // --- Initialize Smoother ---
+  gtsam::IncrementalFixedLagSmoother::KeyTimestampMap initial_timestamps;
+  initial_timestamps[X(0)] = prev_time_;
+  initial_timestamps[V(0)] = prev_time_;
+  initial_timestamps[B(0)] = prev_time_;
+
+  gtsam::ISAM2Params isam2_params;
+  isam2_params.relinearizeThreshold = params_.relinearize_threshold;
+  isam2_params.relinearizeSkip = params_.relinearize_skip;
+
+  if (params_.solver_type == "ISAM2") {
+    isam_ = std::make_unique<gtsam::ISAM2>(isam2_params);
+    isam_->update(initial_graph, initial_values);
+  } else {
+    inc_smoother_ = std::make_unique<gtsam::IncrementalFixedLagSmoother>(
+      params_.smoother_lag, isam2_params);
+    inc_smoother_->update(initial_graph, initial_values, initial_timestamps);
+  }
+
+  state_ = State::RUNNING;
+  RCLCPP_INFO(get_logger(), "Graph initialized successfully!");
 }
 
 void FactorGraphNode::addGpsFactor(
@@ -1011,12 +723,12 @@ void FactorGraphNode::addAuvDynamicsFactor(
 
   // Implement a zero-order hold (ZOH) for wrench commands
   if (!wrench_msgs.empty()) {
-    latest_wrench_msg_ = wrench_msgs.back();
+    last_wrench_msg_ = wrench_msgs.back();
   }
 
-  if (!latest_wrench_msg_) {return;}
+  if (!last_wrench_msg_) {return;}
 
-  const auto & wrench_msg = latest_wrench_msg_;
+  const auto & wrench_msg = last_wrench_msg_;
 
   gtsam::Vector3 dynamics_sigmas = toGtsam(params_.dynamics.prediction_noise_sigmas);
   gtsam::SharedNoiseModel dynamics_noise = gtsam::noiseModel::Diagonal::Sigmas(dynamics_sigmas);
@@ -1051,9 +763,6 @@ void FactorGraphNode::addPreintegratedImuFactor(
   double last_imu_time = prev_time_;
   std::deque<sensor_msgs::msg::Imu::SharedPtr> unused_imu_msgs;
 
-  gtsam::Vector3 last_acc = gtsam::Vector3::Zero();
-  gtsam::Vector3 last_gyr = gtsam::Vector3::Zero();
-
   for (const auto & imu_msg : imu_msgs) {
     double current_imu_time = rclcpp::Time(imu_msg->header.stamp).seconds();
     if (current_imu_time > target_time) {
@@ -1066,25 +775,22 @@ void FactorGraphNode::addPreintegratedImuFactor(
       continue;
     }
 
-    last_acc = toGtsam(imu_msg->linear_acceleration);
-    last_gyr = toGtsam(imu_msg->angular_velocity);
-
     double dt = current_imu_time - last_imu_time;
     if (dt > 1e-9) {
-      imu_preintegrator_->integrateMeasurement(last_acc, last_gyr, dt);
+      imu_preintegrator_->integrateMeasurement(last_imu_acc_, last_imu_gyr_, dt);
     }
-    last_imu_time = current_imu_time;
-  }
 
-  if (last_imu_time < prev_time_) {
-    RCLCPP_DEBUG(get_logger(), "No valid IMU measurements found. Skipping.");
-    return;
+    last_imu_acc_ = toGtsam(imu_msg->linear_acceleration);
+    last_imu_gyr_ = toGtsam(imu_msg->angular_velocity);
+    last_imu_time = current_imu_time;
   }
 
   // Extra measurement to reach exact target time
   if (last_imu_time < target_time) {
     double dt = target_time - last_imu_time;
-    if (dt > 1e-6) {imu_preintegrator_->integrateMeasurement(last_acc, last_gyr, dt);}
+    if (dt > 1e-6) {
+      imu_preintegrator_->integrateMeasurement(last_imu_acc_, last_imu_gyr_, dt);
+    }
     last_imu_time = target_time;
   }
 
