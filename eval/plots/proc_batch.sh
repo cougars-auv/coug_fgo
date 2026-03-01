@@ -22,9 +22,9 @@ print_info "Evaluating all bags..."
 
 cd "$script_dir"
 for d in ../../bags/*/; do
-    bag=$(basename "$d")
-    print_info "Selecting ${bag}..."
-    ./evo_eval.sh "$bag" "$@"
+  bag=$(basename "$d")
+  print_info "Selecting ${bag}..."
+  ./evo_eval.sh "$bag" "$@"
 done
 
 print_info "Generating plots..."
