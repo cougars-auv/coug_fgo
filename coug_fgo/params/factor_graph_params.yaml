@@ -239,7 +239,7 @@ factor_graph_node:
       default_value: 0.0
     timeout_threshold:
       type: double
-      default_value: 0.25
+      default_value: 1.0
     robust_kernel:
       type: string
       default_value: "None"
@@ -263,7 +263,7 @@ factor_graph_node:
         default_value: [0.02, 0.02, 0.02]
     timeout_threshold:
       type: double
-      default_value: 1.0
+      default_value: 0.25
     robust_kernel:
       type: string
       default_value: "None"
@@ -277,7 +277,7 @@ factor_graph_node:
       default_value: false
     enable_const_vel_dropout_only:
       type: bool
-      default_value: true
+      default_value: false
     velocity_sigma:
       type: double_array
       default_value: [0.1, 0.1, 0.1]
@@ -300,13 +300,13 @@ factor_graph_node:
       default_value: [0.1, 0.1, 0.1]
     mass:
       type: double_array
-      default_value: [32.0, 62.0, 62.0]
+      default_value: [31.87, 60.46, 60.46]
     linear_drag:
       type: double_array
-      default_value: [6.1, 154.0, 154.0]
+      default_value: [1.59, 3.02, 3.02]
     quad_drag:
       type: double_array
-      default_value: [1.8, 1.8, 1.8]
+      default_value: [6.11, 154.0, 154.0]
     timeout_threshold:
       type: double
       default_value: 1.0

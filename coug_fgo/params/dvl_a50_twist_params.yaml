@@ -24,7 +24,7 @@ dvl_a50_twist_node:
     default_value: false
   dropout_frequency:
     type: double
-    default_value: 0.0333333
+    default_value: 0.033
   dropout_duration:
     type: double
     default_value: 5.0
