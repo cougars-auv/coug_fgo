@@ -32,6 +32,7 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
+#include <sensor_msgs/msg/imu.hpp>
 #include <diagnostic_updater/diagnostic_updater.hpp>
 
 #include <coug_fgo/origin_manager_parameters.hpp>
@@ -76,6 +77,12 @@ protected:
     const sensor_msgs::msg::NavSatFix::SharedPtr & msg,
     nav_msgs::msg::Odometry & odom_msg);
 
+  /**
+   * @brief Callback for incoming IMU/AHRS messages.
+   * @param msg The incoming Imu message.
+   */
+  void ahrsCallback(const sensor_msgs::msg::Imu::SharedPtr msg);
+
   // --- Diagnostics ---
   /**
    * @brief Diagnostic task to report the status of the GPS origin.
@@ -99,11 +106,14 @@ protected:
   double start_collection_time_ = 0.0;
   std::vector<sensor_msgs::msg::NavSatFix> gps_samples_;
 
+  sensor_msgs::msg::Imu::SharedPtr latest_ahrs_msg_;
+
   // --- ROS Interfaces ---
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr origin_pub_;
   rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr navsat_sub_;
   rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr origin_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr ahrs_sub_;
   rclcpp::TimerBase::SharedPtr origin_timer_;
   diagnostic_updater::Updater diagnostic_updater_;
 

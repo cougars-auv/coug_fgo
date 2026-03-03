@@ -42,7 +42,7 @@ OriginManagerNode::OriginManagerNode(const rclcpp::NodeOptions & options)
   params_ = param_listener_->get_params();
 
   // --- ROS Interfaces ---
-  odom_pub_ = create_publisher<nav_msgs::msg::Odometry>(params_.odom_output_topic, 10);
+  odom_pub_ = create_publisher<nav_msgs::msg::Odometry>(params_.gps_odom_topic, 10);
 
   if (params_.set_origin) {
     origin_pub_ = create_publisher<sensor_msgs::msg::NavSatFix>(params_.origin_topic, 10);
@@ -76,7 +76,7 @@ OriginManagerNode::OriginManagerNode(const rclcpp::NodeOptions & options)
   }
 
   navsat_sub_ = create_subscription<sensor_msgs::msg::NavSatFix>(
-    params_.input_topic, 10,
+    params_.navsat_topic, 10,
     [this](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {navsatCallback(msg);});
 
   if (params_.set_origin) {
@@ -86,6 +86,10 @@ OriginManagerNode::OriginManagerNode(const rclcpp::NodeOptions & options)
         if (!origin_navsat_.header.frame_id.empty()) {origin_pub_->publish(origin_navsat_);}
       });
   }
+
+  ahrs_sub_ = create_subscription<sensor_msgs::msg::Imu>(
+    params_.ahrs_topic, 10,
+    [this](const sensor_msgs::msg::Imu::SharedPtr msg) {ahrsCallback(msg);});
 
   // --- ROS Diagnostics ---
   if (params_.publish_diagnostics) {
@@ -103,6 +107,11 @@ OriginManagerNode::OriginManagerNode(const rclcpp::NodeOptions & options)
   }
 
   RCLCPP_INFO(get_logger(), "Startup complete! Waiting for fix...");
+}
+
+void OriginManagerNode::ahrsCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
+{
+  latest_ahrs_msg_ = msg;
 }
 
 void OriginManagerNode::originCallback(const sensor_msgs::msg::NavSatFix::SharedPtr msg)
@@ -222,6 +231,10 @@ void OriginManagerNode::navsatCallback(const sensor_msgs::msg::NavSatFix::Shared
   }
 
   if (convertToEnu(msg, odom_msg)) {
+    if (latest_ahrs_msg_) {
+      odom_msg.pose.pose.orientation = latest_ahrs_msg_->orientation;
+    }
+
     odom_pub_->publish(odom_msg);
   }
 }

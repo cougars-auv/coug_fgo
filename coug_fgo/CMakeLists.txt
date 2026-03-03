@@ -38,11 +38,17 @@ generate_parameter_library(
   "params/dvl_a50_twist_params.yaml"
 )
 
+generate_parameter_library(
+  dvl_a50_odom_parameters
+  "params/dvl_a50_odom_params.yaml"
+)
+
 # --- Component Library ---
 ament_auto_add_library(factor_graph_component SHARED
   src/factor_graph_node.cpp
   src/origin_manager_node.cpp
   src/dvl_a50_twist_node.cpp
+  src/dvl_a50_odom_node.cpp
 )
 
 target_include_directories(factor_graph_component PUBLIC
@@ -56,12 +62,14 @@ target_link_libraries(factor_graph_component
   factor_graph_parameters
   origin_manager_parameters
   dvl_a50_twist_parameters
+  dvl_a50_odom_parameters
 )
 
 rclcpp_components_register_nodes(factor_graph_component
   "coug_fgo::FactorGraphNode"
   "coug_fgo::OriginManagerNode"
   "coug_fgo::DvlA50TwistNode"
+  "coug_fgo::DvlA50OdomNode"
 )
 
 # --- Executables ---
@@ -73,6 +81,9 @@ target_link_libraries(origin_manager factor_graph_component)
 
 ament_auto_add_executable(dvl_a50_twist src/dvl_a50_twist_main.cpp)
 target_link_libraries(dvl_a50_twist factor_graph_component)
+
+ament_auto_add_executable(dvl_a50_odom src/dvl_a50_odom_main.cpp)
+target_link_libraries(dvl_a50_odom factor_graph_component)
 
 # --- Testing ---
 if(BUILD_TESTING)

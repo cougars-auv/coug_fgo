@@ -48,6 +48,16 @@ def generate_launch_description():
         ["'", auv_ns, "/odom' if '", auv_ns, "' != '' else 'odom'"]
     )
 
+    dvl_odom_frame = PythonExpression(
+        [
+            "'",
+            auv_ns,
+            "/dvl_odom' if '",
+            auv_ns,
+            "' != '' else 'dvl_odom'",
+        ]
+    )
+
     base_link_frame = PythonExpression(
         [
             "'",
@@ -218,6 +228,45 @@ def generate_launch_description():
                         "parameter_frame": dvl_link_frame,
                     },
                 ],
+            ),
+            Node(
+                package="coug_fgo",
+                executable="dvl_a50_odom",
+                name="dvl_a50_odom_node",
+                parameters=[
+                    fleet_params,
+                    auv_params,
+                    {
+                        "use_sim_time": use_sim_time,
+                        "dvl_odom_frame": dvl_odom_frame,
+                        "base_frame": base_link_frame,
+                        "parameter_frame": dvl_link_frame,
+                    },
+                ],
+            ),
+            Node(
+                package="tf2_ros",
+                executable="static_transform_publisher",
+                name="map_to_dvl_odom_transform",
+                arguments=[
+                    "--x",
+                    "0",
+                    "--y",
+                    "0",
+                    "--z",
+                    "0",
+                    "--yaw",
+                    "1.57079632679",
+                    "--pitch",
+                    "0",
+                    "--roll",
+                    "3.14159265359",
+                    "--frame-id",
+                    "map",
+                    "--child-frame-id",
+                    dvl_odom_frame,
+                ],
+                parameters=[{"use_sim_time": use_sim_time}],
             ),
             # --- Robot Localization Pipeline ---
             # https://github.com/CCNYRoboticsLab/imu_tools/tree/humble/imu_filter_madgwick

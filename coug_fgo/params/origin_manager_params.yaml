@@ -5,10 +5,13 @@ origin_manager_node:
   set_origin:
     type: bool
     default_value: true
-  input_topic:
+  navsat_topic:
     type: string
     default_value: "gps/fix"
-  odom_output_topic:
+  ahrs_topic:
+    type: string
+    default_value: "imu/data"
+  gps_odom_topic:
     type: string
     default_value: "odometry/gps"
   origin_topic:
