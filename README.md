@@ -10,6 +10,8 @@
 
 - **Make Changes:** Develop and debug your new feature. Add good documentation.
 
+  > If you need to add dependencies, update the `package.xml`, `Dockerfile`, `cougars.repos`, or `dependencies.repos` in your branch and test building the image locally. The CI will automatically build and push the new image to Docker Hub upon merge.
+
 - **Sync Frequently:** Regularly rebase your branch against `main` (or merge `main` into your branch) to prevent conflicts.
 
 - **Submit a PR:** Open a pull request, ensure required tests pass, and merge once approved.
