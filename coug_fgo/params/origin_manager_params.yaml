@@ -10,7 +10,7 @@ origin_manager_node:
     default_value: "gps/fix"
   ahrs_topic:
     type: string
-    default_value: "imu/data"
+    default_value: "imu/ahrs"
   gps_odom_topic:
     type: string
     default_value: "odometry/gps"

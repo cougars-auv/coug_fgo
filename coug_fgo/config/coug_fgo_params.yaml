@@ -175,7 +175,7 @@
     # --- ROS Topics and Frames ---
     navsat_topic: "gps/fix"
     gps_odom_topic: "odometry/gps"
-    ahrs_topic: "imu/data"
+    ahrs_topic: "imu/ahrs"
     origin_topic: "/origin"
 
     use_parameter_child_frame: false
