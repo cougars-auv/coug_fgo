@@ -215,7 +215,7 @@
     input_topic: "dvl/position"
     output_topic: "odometry/dvl"
 
-    use_parameter_frame: true
+    use_parameter_frame: false
     publish_local_tf: false
 
 # --- Robot Localization Pipeline ---
