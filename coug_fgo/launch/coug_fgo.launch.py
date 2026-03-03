@@ -219,30 +219,78 @@ def generate_launch_description():
                     },
                 ],
             ),
-            # Published by local EKF instead
-            # Node(
-            #     package="tf2_ros",
-            #     executable="static_transform_publisher",
-            #     name="odom_to_base_transform",
-            #     arguments=[
-            #         "--x",
-            #         "0",
-            #         "--y",
-            #         "0",
-            #         "--z",
-            #         "0",
-            #         "--yaw",
-            #         "0",
-            #         "--pitch",
-            #         "0",
-            #         "--roll",
-            #         "0",
-            #         "--frame-id",
-            #         odom_frame,
-            #         "--child-frame-id",
-            #         base_link_frame,
-            #     ],
-            #     parameters=[{"use_sim_time": use_sim_time}],
-            # ),
+            # --- Robot Localization Pipeline ---
+            # https://github.com/CCNYRoboticsLab/imu_tools/tree/humble/imu_filter_madgwick
+            Node(
+                package="imu_filter_madgwick",
+                executable="imu_filter_madgwick_node",
+                name="imu_filter_madgwick_node",
+                parameters=[
+                    fleet_params,
+                    auv_params,
+                    {
+                        "use_sim_time": use_sim_time,
+                    },
+                ],
+                remappings=[
+                    ("imu/data_raw", "imu/data_raw"),
+                    ("imu/data", "imu/data"),
+                ],
+            ),
+            # https://docs.ros.org/en/melodic/api/robot_localization/html/state_estimation_nodes.html
+            Node(
+                package="robot_localization",
+                executable="ekf_node",
+                name="ekf_filter_node_odom",
+                parameters=[
+                    fleet_params,
+                    auv_params,
+                    {
+                        "use_sim_time": use_sim_time,
+                        "odom_frame": odom_frame,
+                        "base_link_frame": base_link_frame,
+                        "world_frame": odom_frame,
+                    },
+                ],
+                remappings=[("odometry/filtered", "odometry/local")],
+            ),
+            # https://docs.ros.org/en/melodic/api/robot_localization/html/state_estimation_nodes.html
+            Node(
+                package="robot_localization",
+                executable="ekf_node",
+                name="ekf_filter_node_map",
+                condition=IfCondition(LaunchConfiguration("compare")),
+                parameters=[
+                    fleet_params,
+                    auv_params,
+                    {
+                        "use_sim_time": use_sim_time,
+                        "map_frame": "map",
+                        "odom_frame": odom_frame,
+                        "base_link_frame": base_link_frame,
+                        "world_frame": "map",
+                    },
+                ],
+                remappings=[("odometry/filtered", "odometry/global_ekf")],
+            ),
+            # https://docs.ros.org/en/melodic/api/robot_localization/html/state_estimation_nodes.html
+            Node(
+                package="robot_localization",
+                executable="ukf_node",
+                name="ukf_filter_node_map",
+                condition=IfCondition(LaunchConfiguration("compare")),
+                parameters=[
+                    fleet_params,
+                    auv_params,
+                    {
+                        "use_sim_time": use_sim_time,
+                        "map_frame": "map",
+                        "odom_frame": odom_frame,
+                        "base_link_frame": base_link_frame,
+                        "world_frame": "map",
+                    },
+                ],
+                remappings=[("odometry/filtered", "odometry/global_ukf")],
+            ),
         ]
     )

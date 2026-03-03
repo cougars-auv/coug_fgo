@@ -25,6 +25,9 @@
   <depend>diagnostic_updater</depend>
   <depend>coug_fgo_msgs</depend>
 
+  <exec_depend>robot_localization</exec_depend>
+  <exec_depend>imu_filter_madgwick</exec_depend>
+
   <!-- Using a custom GTSAM build for unstable lib -->
   <!-- <depend>gtsam</depend> -->
   <!-- <depend>eigen</depend> -->
