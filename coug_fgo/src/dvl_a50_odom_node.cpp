@@ -69,7 +69,8 @@ void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg)
 {
   last_dvl_time_ = this->get_clock()->now().seconds();
 
-  std::string current_dvl_frame = params_.use_parameter_frame ? params_.parameter_frame : msg->header.frame_id;
+  std::string current_dvl_frame =
+    params_.use_parameter_frame ? params_.parameter_frame : msg->header.frame_id;
 
   geometry_msgs::msg::TransformStamped dvl_T_base_tf;
   try {
@@ -99,9 +100,9 @@ void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg)
 
   tf2::Quaternion q;
   q.setRPY(
-      msg->roll * M_PI / 180.0,
-      msg->pitch * M_PI / 180.0,
-      msg->yaw * M_PI / 180.0);
+    msg->roll * M_PI / 180.0,
+    msg->pitch * M_PI / 180.0,
+    msg->yaw * M_PI / 180.0);
   odom_T_dvl_tf.transform.rotation = tf2::toMsg(q);
 
   geometry_msgs::msg::Pose p_base_in_odom;
