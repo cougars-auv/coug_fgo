@@ -21,13 +21,13 @@
 
 #pragma once
 
-#include <atomic>
-#include <memory>
-#include <string>
-
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
+
+#include <atomic>
+#include <memory>
+#include <string>
 
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <dvl_msgs/msg/dvldr.hpp>
