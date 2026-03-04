@@ -34,6 +34,8 @@
 #include <coug_fgo/factor_graph_parameters.hpp>
 #include <coug_fgo/utils/conversion_utils.hpp>
 
+#include <memory>
+
 namespace coug_fgo::utils
 {
 
@@ -328,7 +330,8 @@ private:
     gtsam::Point3 initial_position_target = P_world_base;
     if (params_.gps.enable_gps || params_.gps.enable_gps_init_only) {
       // Account for GPS lever arm
-      gtsam::Point3 world_p_target_gps = initial_orientation_target.rotate(tfs.target_T_gps.translation());
+      gtsam::Point3 world_p_target_gps = initial_orientation_target.rotate(
+        tfs.target_T_gps.translation());
       initial_position_target = toGtsam(initial_gps_->pose.pose.position) - world_p_target_gps;
     }
 
@@ -340,7 +343,9 @@ private:
     return initial_position_target;
   }
 
-  gtsam::Vector3 computeInitialVelocity(const gtsam::Rot3 & initial_orientation_target, const TfBundle & tfs)
+  gtsam::Vector3 computeInitialVelocity(
+    const gtsam::Rot3 & initial_orientation_target,
+    const TfBundle & tfs)
   {
     if (params_.prior.use_parameter_priors) {
       gtsam::Vector3 v_base = toGtsam(params_.prior.parameter_priors.initial_velocity);
@@ -349,7 +354,8 @@ private:
     }
 
     // Account for DVL lever arm
-    gtsam::Vector3 target_v_dvl = tfs.target_T_dvl.rotation() * toGtsam(initial_dvl_->twist.twist.linear);
+    gtsam::Vector3 target_v_dvl = tfs.target_T_dvl.rotation() * toGtsam(
+      initial_dvl_->twist.twist.linear);
 
     return initial_orientation_target.rotate(target_v_dvl);
   }

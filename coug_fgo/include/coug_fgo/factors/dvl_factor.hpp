@@ -79,11 +79,11 @@ public:
     // Predict the velocity measurement
     gtsam::Matrix33 H_unrotate_R = gtsam::Matrix33::Zero();
     gtsam::Matrix33 H_unrotate_v = gtsam::Matrix33::Zero();
-    
+
     // Unrotate from world to target frame
     gtsam::Vector3 vel_target = pose.rotation().unrotate(
       vel_world, H_pose ? &H_unrotate_R : nullptr, H_vel ? &H_unrotate_v : nullptr);
-      
+
     // Unrotate from target frame to sensor frame
     gtsam::Rot3 R_target_sensor = target_P_sensor_.rotation();
     gtsam::Vector3 predicted_vel_sensor = R_target_sensor.unrotate(vel_target);

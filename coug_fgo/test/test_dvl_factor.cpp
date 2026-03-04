@@ -54,7 +54,8 @@ TEST(DvlFactorArmTest, ErrorEvaluation) {
 
   // Case 3: Mounting/Lever Arm
   gtsam::Pose3 target_P_sensor_arm(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(0, 0, 1));
-  coug_fgo::factors::DvlFactorArm factor_arm(poseKey, velKey, target_P_sensor_arm, gtsam::Vector3(0, -1, 0), model);
+  coug_fgo::factors::DvlFactorArm factor_arm(poseKey, velKey, target_P_sensor_arm,
+    gtsam::Vector3(0, -1, 0), model);
   EXPECT_TRUE(
     gtsam::assert_equal(
       gtsam::Vector3::Zero(),
@@ -64,7 +65,9 @@ TEST(DvlFactorArmTest, ErrorEvaluation) {
   EXPECT_TRUE(
     gtsam::assert_equal(
       gtsam::Vector3::Zero(),
-      factor_arm.evaluateError(gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(0, 0, 0)), gtsam::Vector3(0, 1, 0)), 1e-9));
+      factor_arm.evaluateError(
+        gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(0, 0, 0)),
+        gtsam::Vector3(0, 1, 0)), 1e-9));
 
   // Case 5: Error Check
   EXPECT_TRUE(
@@ -80,7 +83,8 @@ TEST(DvlFactorArmTest, Jacobians) {
   gtsam::Key poseKey = gtsam::symbol_shorthand::X(1);
   gtsam::Key velKey = gtsam::symbol_shorthand::V(1);
   gtsam::Pose3 target_P_sensor_2(gtsam::Rot3::Ypr(0.1, 0, 0), gtsam::Point3(0.5, 0.5, 0.5));
-  coug_fgo::factors::DvlFactorArm factor(poseKey, velKey, target_P_sensor_2, gtsam::Vector3(1.0, 0.5, -0.2),
+  coug_fgo::factors::DvlFactorArm factor(poseKey, velKey, target_P_sensor_2,
+    gtsam::Vector3(1.0, 0.5, -0.2),
     gtsam::noiseModel::Isotropic::Sigma(3, 0.1));
 
   gtsam::Pose3 pose = gtsam::Pose3(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1, 2, 3));

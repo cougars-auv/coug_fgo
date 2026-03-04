@@ -293,14 +293,16 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions & options)
 
   setupRosInterfaces();
   state_initializer_ = std::make_unique<utils::StateInitializer>(params_);
-  worker_thread_ = std::thread(&FactorGraphNode::optimizationLoop, this);
+  worker_thread_ = std::thread(&FactorGraphNode::workerLoop, this);
+
   RCLCPP_INFO(get_logger(), "Startup complete! Waiting for sensor messages...");
 }
 
 FactorGraphNode::~FactorGraphNode()
 {
+  // TODO(snelsondurrant): Do we need is_running_?
   is_running_ = false;
-  optimization_cv_.notify_all();
+  cv_.notify_all();
   if (worker_thread_.joinable()) {
     worker_thread_.join();
   }
@@ -464,21 +466,18 @@ void FactorGraphNode::initializeGraph()
     }
   }
 
-  // --- Update State Initializer ---
+  // --- Compute Initial State ---
   utils::QueueBundle queues{
     imu_queue_, gps_queue_, depth_queue_, mag_queue_, ahrs_queue_, dvl_queue_};
-
   if (!state_initializer_->update(get_clock()->now(), queues)) {
     return;
   }
 
-  // --- Compute Initial States ---
   utils::TfBundle tfs{
     toGtsam(target_T_imu_tf_.transform), toGtsam(target_T_gps_tf_.transform),
     toGtsam(target_T_depth_tf_.transform), toGtsam(target_T_mag_tf_.transform),
     toGtsam(target_T_ahrs_tf_.transform), toGtsam(target_T_dvl_tf_.transform),
     toGtsam(target_T_base_tf_.transform)};
-
   state_initializer_->compute(tfs);
 
   prev_pose_ = state_initializer_->pose_;
@@ -489,7 +488,7 @@ void FactorGraphNode::initializeGraph()
   last_imu_acc_ = toGtsam(state_initializer_->initial_imu_->linear_acceleration);
   last_imu_gyr_ = toGtsam(state_initializer_->initial_imu_->angular_velocity);
 
-  // --- Create Initial Graph ---
+  // --- Build Initial Graph ---
   gtsam::NonlinearFactorGraph initial_graph;
   gtsam::Values initial_values;
   addPriorFactors(initial_graph, initial_values);
@@ -1005,7 +1004,8 @@ void FactorGraphNode::publishGlobalOdom(
     Rot.block<3, 3>(0, 0) = R_map_base.matrix();
     Rot.block<3, 3>(3, 3) = R_map_base.matrix();
 
-    gtsam::Matrix66 warped_covariance = target_T_base.inverse().AdjointMap() * pose_covariance * target_T_base.inverse().AdjointMap().transpose();
+    gtsam::Matrix66 warped_covariance = target_T_base.inverse().AdjointMap() * pose_covariance *
+      target_T_base.inverse().AdjointMap().transpose();
     cov_to_pub = Rot * warped_covariance * Rot.transpose();
   }
 
@@ -1069,7 +1069,7 @@ void FactorGraphNode::publishVelocity(
   geometry_msgs::msg::TwistWithCovarianceStamped vel_msg;
   vel_msg.header.stamp = timestamp;
 
-  // IMPORTANT! This is the velocity of the target frame with respect to the 'params_.map_frame'.
+  // IMPORTANT! This is the velocity of the target frame with respect to the map frame.
   vel_msg.header.frame_id = params_.map_frame;
   vel_msg.twist.twist.linear = toVectorMsg(current_vel);
   vel_msg.twist.covariance = toCovariance36Msg(gtsam::Matrix33(vel_covariance));
@@ -1112,11 +1112,13 @@ void FactorGraphNode::publishGraphMetrics(const rclcpp::Time & timestamp)
   graph_metrics_pub_->publish(metrics_msg);
 }
 
-void FactorGraphNode::optimizationLoop()
+void FactorGraphNode::workerLoop()
 {
   while (is_running_) {
+    // TODO(snelsondurrant): Why do we need the trigger mutex?
+    // Aren't the downstream funcitons already mutexed?
     std::unique_lock<std::mutex> lock(trigger_mutex_);
-    optimization_cv_.wait(lock);
+    cv_.wait(lock);
 
     if (!is_running_) {
       break;
@@ -1133,8 +1135,6 @@ void FactorGraphNode::optimizationLoop()
 void FactorGraphNode::updateGraph()
 {
   std::scoped_lock update_lock(update_mutex_);
-
-  // --- Determine Target Time ---
   rclcpp::Time target_time{0, 0, RCL_ROS_TIME};
 
   if (imu_queue_.empty()) {
@@ -1154,17 +1154,24 @@ void FactorGraphNode::updateGraph()
     }
   }
 
-  // --- Rate Limiting & Duplicate Detection ---
+  // TODO(snelsondurrant): Can we handle this better? Maybe in the sensor callbacks? Is pop_back() safe here? Anywhere?
   if (target_time <= prev_time_ + rclcpp::Duration::from_seconds(1e-6)) {
-    RCLCPP_DEBUG(get_logger(), "Duplicate or out-of-order timestamp detected. Skipping.");
+    RCLCPP_DEBUG(
+      get_logger(),
+      "Duplicate or out-of-order timestamp detected. Skipping.");
     if (params_.experimental.enable_dvl_preintegration) {
       depth_queue_.pop_back();
     } else {
-      if (!dvl_queue_.empty()) {dvl_queue_.pop_back();} else {depth_queue_.pop_back();}
+      if (!dvl_queue_.empty()) {
+        dvl_queue_.pop_back();
+      } else {
+        depth_queue_.pop_back();
+      }
     }
     return;
   }
 
+  // TODO(snelsondurrant): Rename this max update rate and add a max optimization rate param too
   if (params_.max_keyframe_rate > 0.0) {
     rclcpp::Duration min_period = rclcpp::Duration::from_seconds(1.0 / params_.max_keyframe_rate);
     if (target_time - prev_time_ < min_period) {
@@ -1208,14 +1215,13 @@ void FactorGraphNode::updateGraph()
   if (params_.mag.enable_mag) {addMagFactor(new_graph, mag_msgs);}
   if (params_.ahrs.enable_ahrs) {addAhrsFactor(new_graph, ahrs_msgs);}
 
-  bool dvl_available = !dvl_msgs.empty();
-
+  // DVL dropout handing
   if (params_.experimental.enable_dvl_preintegration) {
-    if (!dvl_available && !params_.experimental.enable_pseudo_dvl_w_imu) {
+    if (dvl_msgs.empty() && !params_.experimental.enable_pseudo_dvl_w_imu) {
       bool use_dynamics = params_.dynamics.enable_dynamics ||
-        (params_.dynamics.enable_dynamics_dropout_only && !dvl_available);
+        (params_.dynamics.enable_dynamics_dropout_only && dvl_msgs.empty());
       bool use_const_vel = params_.const_vel.enable_const_vel ||
-        (params_.const_vel.enable_const_vel_dropout_only && !dvl_available);
+        (params_.const_vel.enable_const_vel_dropout_only && dvl_msgs.empty());
 
       if (use_dynamics) {
         addAuvDynamicsFactor(new_graph, wrench_msgs, target_time);
@@ -1226,11 +1232,11 @@ void FactorGraphNode::updateGraph()
       addPreintegratedDvlFactor(new_graph, dvl_msgs, imu_msgs, target_time);
     }
   } else {
-    if (!dvl_available) {
+    if (dvl_msgs.empty()) {
       bool use_dynamics = params_.dynamics.enable_dynamics ||
-        (params_.dynamics.enable_dynamics_dropout_only && !dvl_available);
+        (params_.dynamics.enable_dynamics_dropout_only && dvl_msgs.empty());
       bool use_const_vel = params_.const_vel.enable_const_vel ||
-        (params_.const_vel.enable_const_vel_dropout_only && !dvl_available);
+        (params_.const_vel.enable_const_vel_dropout_only && dvl_msgs.empty());
 
       if (use_dynamics) {
         addAuvDynamicsFactor(new_graph, wrench_msgs, target_time);
@@ -1272,7 +1278,7 @@ void FactorGraphNode::updateGraph()
   prev_step_ = current_step_;
   current_step_++;
 
-  // --- Accumulate Buffer ---
+  // --- Add Graph to Buffer ---
   pending_graph_ += new_graph;
   pending_values_.insert(new_values);
   pending_timestamps_.insert(new_timestamps.begin(), new_timestamps.end());
@@ -1283,11 +1289,10 @@ void FactorGraphNode::updateGraph()
 
 void FactorGraphNode::optimizeGraph()
 {
-  // --- Try to acquire optimization lock ---
   std::unique_lock<std::mutex> opt_lock(optimization_mutex_, std::try_to_lock);
   if (!opt_lock.owns_lock()) {return;}
 
-  // --- Take pending batch (briefly lock update_mutex_) ---
+  // --- Load Buffer ---
   gtsam::NonlinearFactorGraph batch_graph;
   gtsam::Values batch_values;
   gtsam::IncrementalFixedLagSmoother::KeyTimestampMap batch_timestamps;
@@ -1304,7 +1309,6 @@ void FactorGraphNode::optimizeGraph()
     batch_target_time = pending_target_time_;
     batch_last_step = pending_last_step_;
 
-    // Reset pending state
     pending_graph_ = gtsam::NonlinearFactorGraph();
     pending_values_ = gtsam::Values();
     pending_timestamps_.clear();
@@ -1312,6 +1316,7 @@ void FactorGraphNode::optimizeGraph()
   }
 
   // --- Detect Processing Overflow ---
+  // TODO(snelsondurrant): This never triggers? Is it right?
   size_t num_keyframes = batch_timestamps.size() / 3;  // 3 entries per keyframe (X, V, B)
   if (num_keyframes > 1) {
     RCLCPP_WARN_THROTTLE(
@@ -1322,6 +1327,7 @@ void FactorGraphNode::optimizeGraph()
     processing_overflow_ = false;
   }
 
+  // --- Smoother Optimization ---
   auto opt_start = std::chrono::high_resolution_clock::now();
 
   try {
@@ -1331,9 +1337,10 @@ void FactorGraphNode::optimizeGraph()
       auto smoother_start = std::chrono::high_resolution_clock::now();
       inc_smoother_->update(batch_graph, batch_values, batch_timestamps);
       auto smoother_end = std::chrono::high_resolution_clock::now();
-      last_smoother_duration_ = std::chrono::duration<double>(smoother_end - smoother_start).count();
+      last_smoother_duration_ =
+        std::chrono::duration<double>(smoother_end - smoother_start).count();
 
-      // --- Update Estimates (briefly lock update_mutex_) ---
+      // --- Update Estimates ---
       {
         std::scoped_lock update_lock(update_mutex_);
         prev_pose_ = inc_smoother_->calculateEstimate<gtsam::Pose3>(X(batch_last_step));
@@ -1351,9 +1358,10 @@ void FactorGraphNode::optimizeGraph()
       auto smoother_start = std::chrono::high_resolution_clock::now();
       isam_->update(batch_graph, batch_values);
       auto smoother_end = std::chrono::high_resolution_clock::now();
-      last_smoother_duration_ = std::chrono::duration<double>(smoother_end - smoother_start).count();
+      last_smoother_duration_ =
+        std::chrono::duration<double>(smoother_end - smoother_start).count();
 
-      // --- Update Estimates (briefly lock update_mutex_) ---
+      // --- Update Estimates ---
       {
         std::scoped_lock update_lock(update_mutex_);
         prev_pose_ = isam_->calculateEstimate<gtsam::Pose3>(X(batch_last_step));
@@ -1401,11 +1409,12 @@ void FactorGraphNode::optimizeGraph()
     last_opt_duration_ = std::chrono::duration<double>(opt_end - opt_start).count();
 
     // --- Publish Global Odometry ---
-    gtsam::Pose3 T_target_base = toGtsam(target_T_base_tf_.transform);
     publishGlobalOdom(prev_pose_, new_pose_cov, batch_target_time);
 
     // --- Publish Global TF ---
     if (params_.publish_global_tf) {
+      // TODO(snelsondurrant): Move this inside the function like the smoothed path -> current_pose instead
+      gtsam::Pose3 T_target_base = toGtsam(target_T_base_tf_.transform);
       broadcastGlobalTf(prev_pose_ * T_target_base, batch_target_time);
     }
 
@@ -1432,6 +1441,7 @@ void FactorGraphNode::optimizeGraph()
     if (params_.publish_graph_metrics) {
       publishGraphMetrics(batch_target_time);
     }
+
   } catch (const std::exception & e) {
     RCLCPP_FATAL(get_logger(), "%s", e.what());
     rclcpp::shutdown();

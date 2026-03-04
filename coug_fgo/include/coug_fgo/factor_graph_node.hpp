@@ -98,26 +98,18 @@ protected:
 
   /**
    * @brief Builds factors for one keyframe and accumulates them in the pending buffer.
-   *
-   * Always runs when called. Uses stale estimates for IMU prediction and
-   * preintegrator reset. Drains sensor queues, builds factors, and appends
-   * to the pending graph for optimizeGraph() to consume.
    */
   void updateGraph();
 
   /**
-   * @brief Consumes the pending graph batch and runs the GTSAM smoother.
-   *
-   * Uses try_to_lock on optimization_mutex_. If the previous optimization
-   * is still running, returns immediately. Otherwise, takes the accumulated
-   * pending graph and processes all keyframes in one smoother update.
+   * @brief Consumes the pending buffer and runs the GTSAM smoother.
    */
   void optimizeGraph();
 
   /**
    * @brief The background loop run by the dedicated worker thread.
    */
-  void optimizationLoop();
+  void workerLoop();
 
   // --- Setup & Helpers ---
   /**
@@ -249,7 +241,7 @@ protected:
    * @param timestamp The message timestamp.
    */
   void publishGlobalOdom(
-    const gtsam::Pose3 & current_pose, 
+    const gtsam::Pose3 & current_pose,
     const gtsam::Matrix & pose_covariance,
     const rclcpp::Time & timestamp);
 
@@ -278,7 +270,7 @@ protected:
    * @param timestamp The message timestamp.
    */
   void publishVelocity(
-    const gtsam::Vector3 & current_vel, 
+    const gtsam::Vector3 & current_vel,
     const gtsam::Matrix & vel_covariance,
     const rclcpp::Time & timestamp);
 
@@ -318,12 +310,6 @@ protected:
    */
   void checkProcessingOverflow(diagnostic_updater::DiagnosticStatusWrapper & stat);
 
-  // --- Threading & Synchronization ---
-  std::thread worker_thread_;
-  std::condition_variable optimization_cv_;
-  std::mutex trigger_mutex_;
-  std::atomic<bool> is_running_{true};
-
   // --- Graph State ---
   std::atomic<State> state_{State::WAITING_FOR_SENSORS};
   std::unique_ptr<utils::StateInitializer> state_initializer_;
@@ -340,14 +326,6 @@ protected:
   std::atomic<size_t> total_factors_{0};
   std::atomic<size_t> total_variables_{0};
   std::map<rclcpp::Time, gtsam::Key> time_to_key_;
-
-  // --- Pending Graph Buffer (updateGraph → optimizeGraph handoff) ---
-  gtsam::NonlinearFactorGraph pending_graph_;
-  gtsam::Values pending_values_;
-  gtsam::IncrementalFixedLagSmoother::KeyTimestampMap pending_timestamps_;
-  rclcpp::Time pending_target_time_{0, 0, RCL_ROS_TIME};
-  size_t pending_last_step_ = 0;
-  bool has_pending_ = false;
 
   // --- GTSAM Objects ---
   std::unique_ptr<gtsam::IncrementalFixedLagSmoother> inc_smoother_;
@@ -376,10 +354,23 @@ protected:
   utils::ThreadSafeQueue<geometry_msgs::msg::WrenchStamped::SharedPtr> wrench_queue_;
 
   // --- Multithreading ---
+  std::thread worker_thread_;
+  std::condition_variable cv_;
+  std::mutex trigger_mutex_;
+  std::atomic<bool> is_running_{true};
+
   rclcpp::CallbackGroup::SharedPtr sensor_cb_group_;
   std::mutex initialization_mutex_;
-  std::mutex update_mutex_;        ///< Serializes updateGraph; briefly locked by optimizeGraph for handoff
-  std::mutex optimization_mutex_;  ///< try_to_lock in optimizeGraph to skip if busy
+  std::mutex update_mutex_;
+  std::mutex optimization_mutex_;
+
+  // --- Graph Buffer ---
+  gtsam::NonlinearFactorGraph pending_graph_;
+  gtsam::Values pending_values_;
+  gtsam::IncrementalFixedLagSmoother::KeyTimestampMap pending_timestamps_;
+  rclcpp::Time pending_target_time_{0, 0, RCL_ROS_TIME};
+  size_t pending_last_step_ = 0;
+  bool has_pending_ = false;
 
   // --- Transformations ---
   geometry_msgs::msg::TransformStamped target_T_base_tf_;

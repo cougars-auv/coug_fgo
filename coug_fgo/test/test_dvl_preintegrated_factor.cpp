@@ -66,7 +66,7 @@ TEST(DvlPreintegratedFactorArmTest, ErrorEvaluation) {
   gtsam::Pose3 target_P_sensor_arm(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(0, 0, 1));
   coug_fgo::factors::DvlPreintegratedFactorArm factor_arm(
     poseIKey, poseJKey, target_P_sensor_arm, gtsam::Vector3(0, -1, 0), model);
-  
+
   pose_i = gtsam::Pose3::Identity();
   pose_j = gtsam::Pose3(gtsam::Rot3::Identity(), gtsam::Point3(1, 0, 0));
   EXPECT_TRUE(

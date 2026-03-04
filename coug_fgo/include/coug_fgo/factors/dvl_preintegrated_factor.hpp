@@ -77,8 +77,10 @@ public:
   {
     // Predict the translation measurement
     gtsam::Matrix66 H_posei_compose, H_posej_compose;
-    gtsam::Pose3 pose_dvl_i = pose_i.compose(target_P_sensor_, H_pose_i ? &H_posei_compose : nullptr);
-    gtsam::Pose3 pose_dvl_j = pose_j.compose(target_P_sensor_, H_pose_j ? &H_posej_compose : nullptr);
+    gtsam::Pose3 pose_dvl_i =
+      pose_i.compose(target_P_sensor_, H_pose_i ? &H_posei_compose : nullptr);
+    gtsam::Pose3 pose_dvl_j =
+      pose_j.compose(target_P_sensor_, H_pose_j ? &H_posej_compose : nullptr);
 
     gtsam::Matrix36 H_tj_posej = gtsam::Matrix36::Zero();
     gtsam::Point3 t_j = pose_dvl_j.translation(H_pose_j ? &H_tj_posej : nullptr);
