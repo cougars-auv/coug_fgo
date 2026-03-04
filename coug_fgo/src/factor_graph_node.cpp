@@ -880,6 +880,14 @@ void FactorGraphNode::addPreintegratedDvlFactor(
 
     double dt = current_dvl_time - last_dvl_time;
     if (dt > 1e-9) {
+      // Integrate DVL measurement alongside interpolated IMU attitude
+      gtsam::Rot3 world_R_imu_cur = getInterpolatedOrientation(imu_msgs, current_dvl_time);
+      gtsam::Rot3 world_R_dvl_cur = world_R_imu_cur * imu_R_dvl;
+
+      dvl_preintegrator_->integrateMeasurement(
+        last_dvl_velocity_, world_R_dvl_cur, dt,
+        last_dvl_covariance_);
+
       last_dvl_velocity_ = toGtsam(dvl_msg->twist.twist.linear);
 
       if (params_.dvl.use_parameter_covariance) {
@@ -888,14 +896,6 @@ void FactorGraphNode::addPreintegratedDvlFactor(
       } else {
         last_dvl_covariance_ = toGtsam3x3(dvl_msg->twist.covariance);
       }
-
-      // Integrate DVL measurement alongside interpolated IMU attitude
-      gtsam::Rot3 world_R_imu_cur = getInterpolatedOrientation(imu_msgs, current_dvl_time);
-      gtsam::Rot3 world_R_dvl_cur = world_R_imu_cur * imu_R_dvl;
-
-      dvl_preintegrator_->integrateMeasurement(
-        last_dvl_velocity_, world_R_dvl_cur, dt,
-        last_dvl_covariance_);
     }
     last_dvl_time = current_dvl_time;
   }
@@ -1010,7 +1010,7 @@ void FactorGraphNode::broadcastGlobalTf(
     gtsam::Pose3 T_odom_base = toGtsam(
       tf_buffer_->lookupTransform(
         params_.odom_frame, params_.base_frame,
-        tf2::TimePointZero).transform);
+        timestamp).transform);
     gtsam::Pose3 T_map_odom = pose_base * T_odom_base.inverse();
 
     geometry_msgs::msg::TransformStamped tf_msg;
@@ -1041,7 +1041,7 @@ void FactorGraphNode::publishSmoothedPath(
     if (results.exists(pair.second)) {
       geometry_msgs::msg::PoseStamped ps;
       ps.header.frame_id = params_.map_frame;
-      ps.header.stamp = rclcpp::Time(static_cast<uint64_t>(pair.first * 1e9));
+      ps.header.stamp = rclcpp::Time(static_cast<int64_t>(pair.first * 1e9));
       ps.pose = toPoseMsg(results.at<gtsam::Pose3>(pair.second) * T_target_base);
       path_msg.poses.push_back(ps);
     }
