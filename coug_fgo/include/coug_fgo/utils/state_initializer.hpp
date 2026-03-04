@@ -314,17 +314,17 @@ private:
     const gtsam::Rot3 & initial_orientation_target,
     const TfBundle & tfs)
   {
-    gtsam::Point3 P_world_target(
+    gtsam::Point3 P_world_base(
       params_.prior.parameter_priors.initial_position[0],
       params_.prior.parameter_priors.initial_position[1],
       params_.prior.parameter_priors.initial_position[2]);
 
     if (params_.prior.use_parameter_priors) {
       gtsam::Point3 target_p_base = tfs.target_T_base.translation();
-      return P_world_target - initial_orientation_target.rotate(target_p_base);
+      return P_world_base - initial_orientation_target.rotate(target_p_base);
     }
 
-    gtsam::Point3 initial_position_target = P_world_target;
+    gtsam::Point3 initial_position_target = P_world_base;
     if (params_.gps.enable_gps || params_.gps.enable_gps_init_only) {
       // Account for GPS lever arm
       gtsam::Point3 world_p_target_gps = initial_orientation_target.rotate(tfs.target_T_gps.translation());
