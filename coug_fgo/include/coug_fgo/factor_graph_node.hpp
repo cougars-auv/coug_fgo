@@ -238,7 +238,7 @@ protected:
   void publishSmoothedPath(const gtsam::Values & results, const rclcpp::Time & timestamp);
 
   /**
-   * @brief Publishes the optimized velocity (at the DVL frame in the map frame).
+   * @brief Publishes the optimized velocity (at the target frame in the map frame).
    * @param current_vel The estimated velocity.
    * @param vel_covariance The estimation error covariance.
    * @param timestamp The message timestamp.

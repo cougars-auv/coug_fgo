@@ -54,7 +54,7 @@ public:
 
   /**
    * @brief Integrates a new DVL velocity measurement.
-   * @param measured_vel The velocity measurement in the body frame.
+   * @param measured_vel The velocity measurement in the DVL sensor frame.
    * @param measured_orientation The current orientation estimate.
    * @param dt The time delta since the last measurement.
    * @param measured_cov The measurement noise covariance.

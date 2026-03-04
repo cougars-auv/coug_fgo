@@ -347,6 +347,7 @@ private:
       return initial_orientation_target.rotate(v_target);
     }
 
+    // Account for DVL lever arm
     gtsam::Vector3 target_v_dvl = tfs.target_T_dvl.rotation() * toGtsam(initial_dvl_->twist.twist.linear);
 
     return initial_orientation_target.rotate(target_v_dvl);
