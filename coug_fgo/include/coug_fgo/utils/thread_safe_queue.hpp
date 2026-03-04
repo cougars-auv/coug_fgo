@@ -23,7 +23,6 @@
 
 #include <deque>
 #include <mutex>
-#include <stdexcept>
 #include <utility>
 
 #include <rclcpp/rclcpp.hpp>
@@ -112,21 +111,7 @@ public:
   T back() const
   {
     std::scoped_lock lock(mutex_);
-    if (queue_.empty()) {
-      throw std::runtime_error("Queue is empty");
-    }
     return queue_.back();
-  }
-
-  /**
-   * @brief Removes the last item from the queue.
-   */
-  void pop_back()
-  {
-    std::scoped_lock lock(mutex_);
-    if (!queue_.empty()) {
-      queue_.pop_back();
-    }
   }
 
 private:

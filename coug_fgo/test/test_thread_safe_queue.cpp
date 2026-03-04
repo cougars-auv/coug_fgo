@@ -109,21 +109,16 @@ TEST_F(ThreadSafeQueueTest, Restore) {
 }
 
 /**
- * @brief Verify back and pop_back functionality.
+ * @brief Verify back functionality.
  */
-TEST_F(ThreadSafeQueueTest, BackAndPopBack) {
+TEST_F(ThreadSafeQueueTest, Back) {
   queue.push(createMsg(1.0));
   queue.push(createMsg(2.0));
 
   EXPECT_DOUBLE_EQ(queue.back()->header.stamp.sec + queue.back()->header.stamp.nanosec * 1e-9, 2.0);
 
-  queue.pop_back();
-  EXPECT_EQ(queue.size(), 1u);
-  EXPECT_DOUBLE_EQ(queue.back()->header.stamp.sec + queue.back()->header.stamp.nanosec * 1e-9, 1.0);
-
-  queue.pop_back();
-  EXPECT_TRUE(queue.empty());
-  EXPECT_THROW(queue.back(), std::runtime_error);
+  queue.push(createMsg(3.0));
+  EXPECT_DOUBLE_EQ(queue.back()->header.stamp.sec + queue.back()->header.stamp.nanosec * 1e-9, 3.0);
 }
 
 /**

@@ -1072,7 +1072,13 @@ void FactorGraphNode::publishSmoothedPath(
 
   gtsam::Pose3 target_T_base = toGtsam(target_T_base_tf_.transform);
 
-  for (const auto & pair : time_to_key_) {
+  std::map<rclcpp::Time, gtsam::Key> keys_snapshot;
+  {
+    std::scoped_lock lock(buffer_mutex_);
+    keys_snapshot = time_to_key_;
+  }
+
+  for (const auto & pair : keys_snapshot) {
     if (results.exists(pair.second)) {
       geometry_msgs::msg::PoseStamped ps;
       ps.header.frame_id = params_.map_frame;
@@ -1211,33 +1217,25 @@ void FactorGraphNode::updateGraph()
   rclcpp::Time target_time{0, 0, RCL_ROS_TIME};
 
   if (params_.experimental.enable_dvl_preintegration) {
-    if (depth_queue_.empty()) {return;}
-    target_time = rclcpp::Time(depth_queue_.back()->header.stamp);
+    if (!depth_queue_.empty()) {
+      target_time = rclcpp::Time(depth_queue_.back()->header.stamp);
+    } else {
+      return;
+    }
   } else {
-    if (dvl_queue_.empty() && depth_queue_.empty()) {return;}
-
     if (!dvl_queue_.empty()) {
       target_time = rclcpp::Time(dvl_queue_.back()->header.stamp);
-    } else {
+    } else if (!depth_queue_.empty()) {
       target_time = rclcpp::Time(depth_queue_.back()->header.stamp);
+    } else {
+      return;
     }
   }
 
-  // TODO(snelsondurrant): Can we handle this better? Maybe in the sensor callbacks?
-  // Is pop_back() safe here? Anywhere?
   if (target_time <= prev_time_ + rclcpp::Duration::from_seconds(1e-6)) {
     RCLCPP_DEBUG(
       get_logger(),
       "Duplicate or out-of-order timestamp detected. Skipping.");
-    if (params_.experimental.enable_dvl_preintegration) {
-      depth_queue_.pop_back();
-    } else {
-      if (!dvl_queue_.empty()) {
-        dvl_queue_.pop_back();
-      } else {
-        depth_queue_.pop_back();
-      }
-    }
     return;
   }
 
@@ -1375,9 +1373,7 @@ void FactorGraphNode::optimizeGraph()
   }
 
   // --- Detect Processing Overflow ---
-  // TODO(snelsondurrant): This never triggers? Is it right?
-  // It might just be that it is performing well
-  size_t num_keyframes = batch_timestamps.size() / 3;  // 3 entries per keyframe (X, V, B)
+  size_t num_keyframes = batch_timestamps.size() / 3;
   if (num_keyframes > 1) {
     RCLCPP_WARN_THROTTLE(
       get_logger(), *get_clock(), 5000,

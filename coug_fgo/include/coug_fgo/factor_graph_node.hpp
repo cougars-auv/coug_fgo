@@ -97,12 +97,12 @@ protected:
   void initializeGraph();
 
   /**
-   * @brief Builds factors for one keyframe and accumulates them in the buffer buffer.
+   * @brief Builds factors for one keyframe and accumulates them in the shared buffer.
    */
   void updateGraph();
 
   /**
-   * @brief Consumes the buffer buffer and runs the GTSAM smoother.
+   * @brief Consumes the shared buffer and runs the GTSAM smoother.
    */
   void optimizeGraph();
 
