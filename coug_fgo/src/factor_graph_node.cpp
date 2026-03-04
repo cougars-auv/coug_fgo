@@ -470,7 +470,8 @@ void FactorGraphNode::initializeGraph()
   utils::TfBundle tfs{
     toGtsam(target_T_imu_tf_.transform), toGtsam(target_T_gps_tf_.transform),
     toGtsam(target_T_depth_tf_.transform), toGtsam(target_T_mag_tf_.transform),
-    toGtsam(target_T_ahrs_tf_.transform), toGtsam(target_T_dvl_tf_.transform)};
+    toGtsam(target_T_ahrs_tf_.transform), toGtsam(target_T_dvl_tf_.transform),
+    toGtsam(target_T_base_tf_.transform)};
 
   state_initializer_->compute(tfs);
 

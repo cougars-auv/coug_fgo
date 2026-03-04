@@ -48,6 +48,7 @@ struct TfBundle
   gtsam::Pose3 target_T_mag;
   gtsam::Pose3 target_T_ahrs;
   gtsam::Pose3 target_T_dvl;
+  gtsam::Pose3 target_T_base;
 };
 
 /**
@@ -268,7 +269,8 @@ private:
     double yaw = params_.prior.parameter_priors.initial_orientation[2];
 
     if (params_.prior.use_parameter_priors) {
-      return gtsam::Rot3::Ypr(yaw, pitch, roll);
+      gtsam::Rot3 base_R_target = tfs.target_T_base.rotation().inverse();
+      return gtsam::Rot3::Ypr(yaw, pitch, roll) * base_R_target;
     }
 
     // Account for IMU rotation
@@ -318,7 +320,8 @@ private:
       params_.prior.parameter_priors.initial_position[2]);
 
     if (params_.prior.use_parameter_priors) {
-      return P_world_target;
+      gtsam::Point3 target_p_base = tfs.target_T_base.translation();
+      return P_world_target - initial_orientation_target.rotate(target_p_base);
     }
 
     gtsam::Point3 initial_position_target = P_world_target;
@@ -339,8 +342,9 @@ private:
   gtsam::Vector3 computeInitialVelocity(const gtsam::Rot3 & initial_orientation_target, const TfBundle & tfs)
   {
     if (params_.prior.use_parameter_priors) {
-      return initial_orientation_target.rotate(
-        toGtsam(params_.prior.parameter_priors.initial_velocity));
+      gtsam::Vector3 v_base = toGtsam(params_.prior.parameter_priors.initial_velocity);
+      gtsam::Vector3 v_target = tfs.target_T_base.rotation().rotate(v_base);
+      return initial_orientation_target.rotate(v_target);
     }
 
     gtsam::Vector3 target_v_dvl = tfs.target_T_dvl.rotation() * toGtsam(initial_dvl_->twist.twist.linear);
