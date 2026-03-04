@@ -225,10 +225,10 @@ protected:
 
   /**
    * @brief Broadcasts the map-to-odom transform.
-   * @param current_pose The estimated pose.
+   * @param pose_base The estimated base pose.
    * @param timestamp The transform timestamp.
    */
-  void broadcastGlobalTf(const gtsam::Pose3 & current_pose, const rclcpp::Time & timestamp);
+  void broadcastGlobalTf(const gtsam::Pose3 & pose_base, const rclcpp::Time & timestamp);
 
   /**
    * @brief Publishes the full optimized trajectory path.
@@ -332,16 +332,16 @@ protected:
   std::mutex optimization_mutex_;
 
   // --- Transformations ---
-  std::string dvl_frame_;
-  std::string imu_frame_;
+  geometry_msgs::msg::TransformStamped target_T_base_tf_;
+  geometry_msgs::msg::TransformStamped target_T_dvl_tf_;
+  geometry_msgs::msg::TransformStamped target_T_imu_tf_;
+  geometry_msgs::msg::TransformStamped target_T_gps_tf_;
+  geometry_msgs::msg::TransformStamped target_T_depth_tf_;
+  geometry_msgs::msg::TransformStamped target_T_mag_tf_;
+  geometry_msgs::msg::TransformStamped target_T_ahrs_tf_;
+  geometry_msgs::msg::TransformStamped target_T_com_tf_;
 
-  geometry_msgs::msg::TransformStamped base_T_dvl_tf_;
-  geometry_msgs::msg::TransformStamped dvl_T_imu_tf_;
-  geometry_msgs::msg::TransformStamped dvl_T_gps_tf_;
-  geometry_msgs::msg::TransformStamped dvl_T_depth_tf_;
-  geometry_msgs::msg::TransformStamped dvl_T_mag_tf_;
-  geometry_msgs::msg::TransformStamped dvl_T_ahrs_tf_;
-  geometry_msgs::msg::TransformStamped dvl_T_com_tf_;
+  std::string imu_frame_;
 
   // --- ROS Interfaces ---
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr global_odom_pub_;

@@ -14,23 +14,19 @@
 
 /**
  * @file dvl_factor.hpp
- * @brief GTSAM factor for DVL velocity measurements in the AUV base frame.
+ * @brief GTSAM factor for DVL velocity measurements with a lever arm.
  * @author Nelson Durrant
  * @date Jan 2026
  */
 
 #pragma once
 
-#include <gtsam/base/Lie.h>
 #include <gtsam/base/Matrix.h>
 #include <gtsam/base/Vector.h>
-#include <gtsam/geometry/Point3.h>
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/inference/Symbol.h>
-#include <gtsam/navigation/ImuBias.h>
 #include <gtsam/nonlinear/NonlinearFactor.h>
 
-using gtsam::symbol_shorthand::B;  // Bias (ax,ay,az,gx,gy,gz)
 using gtsam::symbol_shorthand::V;  // Velocity (x,y,z)
 using gtsam::symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
 
@@ -38,27 +34,33 @@ namespace coug_fgo::factors
 {
 
 /**
- * @class DvlFactor
- * @brief GTSAM factor for DVL velocity measurements in the AUV base frame.
+ * @class DvlFactorArm
+ * @brief GTSAM factor for DVL velocity measurements with a lever arm.
  */
-class DvlFactor : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Vector3>
+class DvlFactorArm : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Vector3>
 {
-  gtsam::Vector3 base_v_measured_;
+  gtsam::Pose3 target_P_sensor_;
+  gtsam::Vector3 sensor_v_measured_;
 
 public:
   /**
-   * @brief Constructor for DvlFactor.
+   * @brief Constructor for DvlFactorArm.
    * @param pose_key GTSAM key for the starting AUV pose.
    * @param vel_key GTSAM key for the AUV world-frame velocity.
-   * @param measured_velocity_base The velocity measurement in the base frame.
+   * @param target_T_sensor The static transformation from target to sensor.
+   * @param measured_velocity_sensor The velocity measurement in the sensor frame.
    * @param noise_model The noise model for the measurement.
    */
-  DvlFactor(
+  DvlFactorArm(
     gtsam::Key pose_key, gtsam::Key vel_key,
-    const gtsam::Vector3 & measured_velocity_base,
+    const gtsam::Pose3 & target_T_sensor,
+    const gtsam::Vector3 & measured_velocity_sensor,
     const gtsam::SharedNoiseModel & noise_model)
   : NoiseModelFactor2<gtsam::Pose3, gtsam::Vector3>(noise_model, pose_key, vel_key),
-    base_v_measured_(measured_velocity_base) {}
+    sensor_v_measured_(measured_velocity_sensor)
+  {
+    target_P_sensor_ = target_T_sensor;
+  }
 
   /**
    * @brief Evaluates the error and Jacobians for the factor.
@@ -77,21 +79,27 @@ public:
     // Predict the velocity measurement
     gtsam::Matrix33 H_unrotate_R = gtsam::Matrix33::Zero();
     gtsam::Matrix33 H_unrotate_v = gtsam::Matrix33::Zero();
-    gtsam::Vector3 predicted_vel_base = pose.rotation().unrotate(
+    
+    // Unrotate from world to target frame
+    gtsam::Vector3 vel_target = pose.rotation().unrotate(
       vel_world, H_pose ? &H_unrotate_R : nullptr, H_vel ? &H_unrotate_v : nullptr);
+      
+    // Unrotate from target frame to sensor frame
+    gtsam::Rot3 R_target_sensor = target_P_sensor_.rotation();
+    gtsam::Vector3 predicted_vel_sensor = R_target_sensor.unrotate(vel_target);
 
     // 3D velocity residual
-    gtsam::Vector3 error = predicted_vel_base - base_v_measured_;
+    gtsam::Vector3 error = predicted_vel_sensor - sensor_v_measured_;
 
     if (H_pose) {
       // Jacobian with respect to pose (3x6)
       H_pose->setZero(3, 6);
-      H_pose->block<3, 3>(0, 0) = H_unrotate_R;
+      H_pose->block<3, 3>(0, 0) = R_target_sensor.transpose() * H_unrotate_R;
     }
 
     if (H_vel) {
       // Jacobian with respect to velocity (3x3)
-      *H_vel = H_unrotate_v;
+      *H_vel = R_target_sensor.transpose() * H_unrotate_v;
     }
 
     return error;

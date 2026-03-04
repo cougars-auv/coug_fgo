@@ -43,11 +43,11 @@ TEST(AuvDynamicsFactorArmTest, ZeroError) {
   gtsam::Matrix33 linear_drag = gtsam::Matrix33::Zero();
   gtsam::Matrix33 quad_drag = gtsam::Matrix33::Zero();
   gtsam::Vector3 control_force = gtsam::Vector3::Zero();
-  gtsam::Pose3 body_P_sensor = gtsam::Pose3::Identity();
+  gtsam::Pose3 target_P_sensor = gtsam::Pose3::Identity();
 
   // Case 1: Identity
   coug_fgo::factors::AuvDynamicsFactorArm factor(
-    poseKey1, velKey1, poseKey2, velKey2, dt, control_force, body_P_sensor,
+    poseKey1, velKey1, poseKey2, velKey2, dt, control_force, target_P_sensor,
     mass, linear_drag, quad_drag, model);
 
   EXPECT_TRUE(
@@ -61,7 +61,7 @@ TEST(AuvDynamicsFactorArmTest, ZeroError) {
   // Subcase A: Constant Acceleration
   control_force = gtsam::Vector3(10.0, 0.0, 0.0);
   coug_fgo::factors::AuvDynamicsFactorArm factor_thrust(
-    poseKey1, velKey1, poseKey2, velKey2, dt, control_force, body_P_sensor,
+    poseKey1, velKey1, poseKey2, velKey2, dt, control_force, target_P_sensor,
     mass, linear_drag, quad_drag, model);
 
   EXPECT_TRUE(
@@ -75,7 +75,7 @@ TEST(AuvDynamicsFactorArmTest, ZeroError) {
   linear_drag = gtsam::Matrix33::Identity() * 1.0;
   control_force = gtsam::Vector3(10.0, 0.0, 0.0);
   coug_fgo::factors::AuvDynamicsFactorArm factor_drag(
-    poseKey1, velKey1, poseKey2, velKey2, dt, control_force, body_P_sensor,
+    poseKey1, velKey1, poseKey2, velKey2, dt, control_force, target_P_sensor,
     mass, linear_drag, quad_drag, model);
 
   EXPECT_TRUE(
@@ -102,10 +102,10 @@ TEST(AuvDynamicsFactorArmTest, ZeroError) {
         gtsam::Vector3(0.0, 1.0, 0.0)), 1e-9));
 
   // Case 4: Mounting/Lever Arm
-  body_P_sensor = gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3::Zero());
+  target_P_sensor = gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3::Zero());
   control_force = gtsam::Vector3(10.0, 0.0, 0.0);
   coug_fgo::factors::AuvDynamicsFactorArm factor_mount(
-    poseKey1, velKey1, poseKey2, velKey2, dt, control_force, body_P_sensor,
+    poseKey1, velKey1, poseKey2, velKey2, dt, control_force, target_P_sensor,
     mass, linear_drag, quad_drag, model);
 
   EXPECT_TRUE(
@@ -118,7 +118,7 @@ TEST(AuvDynamicsFactorArmTest, ZeroError) {
   // Case 5: Combined
   gtsam::Pose3 body_pose = gtsam::Pose3(gtsam::Rot3::Roll(M_PI_2), gtsam::Point3::Zero());
   coug_fgo::factors::AuvDynamicsFactorArm factor_comb(
-    poseKey1, velKey1, poseKey2, velKey2, dt, control_force, body_P_sensor,
+    poseKey1, velKey1, poseKey2, velKey2, dt, control_force, target_P_sensor,
     mass, linear_drag, quad_drag, model);
 
   EXPECT_TRUE(
@@ -156,10 +156,10 @@ TEST(AuvDynamicsFactorArmTest, Jacobians) {
   gtsam::Matrix33 linear_drag = gtsam::Matrix33::Identity() * 1.0;
   gtsam::Matrix33 quad_drag = gtsam::Matrix33::Identity() * 0.5;
   gtsam::Vector3 control_force(2.0, -1.0, 0.5);
-  gtsam::Pose3 body_P_sensor = gtsam::Pose3(gtsam::Rot3::Roll(0.1), gtsam::Point3(0.1, 0, 0));
+  gtsam::Pose3 target_P_sensor = gtsam::Pose3(gtsam::Rot3::Roll(0.1), gtsam::Point3(0.1, 0, 0));
 
   coug_fgo::factors::AuvDynamicsFactorArm factor(
-    poseKey1, velKey1, poseKey2, velKey2, dt, control_force, body_P_sensor,
+    poseKey1, velKey1, poseKey2, velKey2, dt, control_force, target_P_sensor,
     mass, linear_drag, quad_drag, model);
 
   gtsam::Pose3 pose1(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1, 2, 3));

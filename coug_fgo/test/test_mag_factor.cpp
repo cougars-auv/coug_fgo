@@ -55,10 +55,10 @@ TEST(MagFactorArmTest, ErrorEvaluation) {
       factor2.evaluateError(pose_90), 1e-9));
 
   // Case 3: Mounting/Lever Arm
-  gtsam::Rot3 base_R_sensor = gtsam::Rot3::Yaw(M_PI_2);
-  gtsam::Vector3 measured_mount = base_R_sensor.unrotate(reference_field_world);
+  gtsam::Rot3 target_R_sensor = gtsam::Rot3::Yaw(M_PI_2);
+  gtsam::Vector3 measured_mount = target_R_sensor.unrotate(reference_field_world);
   coug_fgo::factors::MagFactorArm factor3(poseKey, measured_mount, reference_field_world,
-    base_R_sensor, model);
+    target_R_sensor, model);
   EXPECT_TRUE(
     gtsam::assert_equal(
       gtsam::Vector3::Zero(),
@@ -66,11 +66,11 @@ TEST(MagFactorArmTest, ErrorEvaluation) {
 
   // Case 4: Combined
   gtsam::Pose3 pose_comb = gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_4), gtsam::Point3());
-  gtsam::Rot3 base_R_sensor_comb = gtsam::Rot3::Yaw(M_PI_4);
+  gtsam::Rot3 target_R_sensor_comb = gtsam::Rot3::Yaw(M_PI_4);
   gtsam::Vector3 measured_comb =
-    base_R_sensor_comb.unrotate(pose_comb.rotation().unrotate(reference_field_world));
+    target_R_sensor_comb.unrotate(pose_comb.rotation().unrotate(reference_field_world));
   coug_fgo::factors::MagFactorArm factor4(poseKey, measured_comb, reference_field_world,
-    base_R_sensor_comb, model);
+    target_R_sensor_comb, model);
   EXPECT_TRUE(
     gtsam::assert_equal(
       gtsam::Vector3::Zero(),
@@ -90,10 +90,10 @@ TEST(MagFactorArmTest, Jacobians) {
   gtsam::Key poseKey = gtsam::symbol_shorthand::X(1);
   gtsam::Vector3 reference_field(0.5, 0.8, -0.2);
   gtsam::Vector3 measured_field(0.4, 0.7, -0.1);
-  gtsam::Rot3 R_bs = gtsam::Rot3::Rx(0.1);
+  gtsam::Rot3 R_ts = gtsam::Rot3::Rx(0.1);
   gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(3, 0.1);
 
-  coug_fgo::factors::MagFactorArm factor(poseKey, measured_field, reference_field, R_bs,
+  coug_fgo::factors::MagFactorArm factor(poseKey, measured_field, reference_field, R_ts,
     model);
   gtsam::Pose3 pose = gtsam::Pose3(gtsam::Rot3::Ypr(0.1, -0.2, 0.3), gtsam::Point3(1, 2, 3));
 

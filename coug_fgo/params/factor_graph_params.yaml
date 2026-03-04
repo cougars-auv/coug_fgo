@@ -89,6 +89,9 @@ factor_graph_node:
   odom_frame:
     type: string
     default_value: "odom"
+  target_frame:
+    type: string
+    default_value: "dvl_link"
   base_frame:
     type: string
     default_value: "base_link"

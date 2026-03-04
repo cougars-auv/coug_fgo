@@ -42,12 +42,12 @@ namespace coug_fgo::utils
  */
 struct TfBundle
 {
-  gtsam::Pose3 dvl_T_imu;
-  gtsam::Pose3 dvl_T_gps;
-  gtsam::Pose3 dvl_T_depth;
-  gtsam::Pose3 dvl_T_mag;
-  gtsam::Pose3 dvl_T_ahrs;
-  gtsam::Pose3 base_T_dvl;
+  gtsam::Pose3 target_T_imu;
+  gtsam::Pose3 target_T_gps;
+  gtsam::Pose3 target_T_depth;
+  gtsam::Pose3 target_T_mag;
+  gtsam::Pose3 target_T_ahrs;
+  gtsam::Pose3 target_T_dvl;
 };
 
 /**
@@ -117,12 +117,12 @@ public:
    */
   void compute(const TfBundle & tfs)
   {
-    gtsam::Rot3 initial_orientation_dvl = computeInitialOrientation(tfs);
+    gtsam::Rot3 initial_orientation_target = computeInitialOrientation(tfs);
     pose_ = gtsam::Pose3(
-      initial_orientation_dvl, computeInitialPosition(
-        initial_orientation_dvl,
+      initial_orientation_target, computeInitialPosition(
+        initial_orientation_target,
         tfs));
-    velocity_ = computeInitialVelocity(initial_orientation_dvl);
+    velocity_ = computeInitialVelocity(initial_orientation_target, tfs);
     bias_ = computeInitialBias();
     if (params_.experimental.enable_dvl_preintegration) {
       time_ = initial_depth_->header.stamp.sec + initial_depth_->header.stamp.nanosec * 1e-9;
@@ -150,7 +150,7 @@ private:
     auto imu_msgs = queues.imu.drain();
     for (const auto & msg : imu_msgs) {
       if (imu_count_ == 0) {
-        initial_imu_ = msg;
+        initial_imu_ = std::make_shared<sensor_msgs::msg::Imu>(*msg);
       } else {
         double n = static_cast<double>(imu_count_ + 1);
         initial_imu_->linear_acceleration.x +=
@@ -175,7 +175,7 @@ private:
       auto gps_msgs = queues.gps.drain();
       for (const auto & msg : gps_msgs) {
         if (gps_count_ == 0) {
-          initial_gps_ = msg;
+          initial_gps_ = std::make_shared<nav_msgs::msg::Odometry>(*msg);
         } else {
           double n = static_cast<double>(gps_count_ + 1);
           initial_gps_->pose.pose.position.x +=
@@ -194,7 +194,7 @@ private:
     auto depth_msgs = queues.depth.drain();
     for (const auto & msg : depth_msgs) {
       if (depth_count_ == 0) {
-        initial_depth_ = msg;
+        initial_depth_ = std::make_shared<nav_msgs::msg::Odometry>(*msg);
       } else {
         double n = static_cast<double>(depth_count_ + 1);
         initial_depth_->pose.pose.position.z +=
@@ -208,7 +208,7 @@ private:
     auto dvl_msgs = queues.dvl.drain();
     for (const auto & msg : dvl_msgs) {
       if (dvl_count_ == 0) {
-        initial_dvl_ = msg;
+        initial_dvl_ = std::make_shared<geometry_msgs::msg::TwistWithCovarianceStamped>(*msg);
       } else {
         double n = static_cast<double>(dvl_count_ + 1);
         initial_dvl_->twist.twist.linear.x +=
@@ -227,7 +227,7 @@ private:
       auto mag_msgs = queues.mag.drain();
       for (const auto & msg : mag_msgs) {
         if (mag_count_ == 0) {
-          initial_mag_ = msg;
+          initial_mag_ = std::make_shared<sensor_msgs::msg::MagneticField>(*msg);
         } else {
           double n = static_cast<double>(mag_count_ + 1);
           initial_mag_->magnetic_field.x +=
@@ -247,7 +247,7 @@ private:
       auto ahrs_msgs = queues.ahrs.drain();
       for (const auto & msg : ahrs_msgs) {
         if (ahrs_count_ == 0) {
-          initial_ahrs_ = msg;
+          initial_ahrs_ = std::make_shared<sensor_msgs::msg::Imu>(*msg);
           ahrs_ref_ = toGtsam(msg->orientation);
           ahrs_log_sum_ = gtsam::Vector3::Zero();
         } else {
@@ -266,39 +266,36 @@ private:
     double roll = params_.prior.parameter_priors.initial_orientation[0];
     double pitch = params_.prior.parameter_priors.initial_orientation[1];
     double yaw = params_.prior.parameter_priors.initial_orientation[2];
-    gtsam::Rot3 R_base_dvl = tfs.base_T_dvl.rotation();
 
     if (params_.prior.use_parameter_priors) {
-      // Account for DVL rotation
-      return gtsam::Rot3::Ypr(yaw, pitch, roll) * R_base_dvl;
+      return gtsam::Rot3::Ypr(yaw, pitch, roll);
     }
 
     // Account for IMU rotation
     gtsam::Vector3 accel_imu = toGtsam(initial_imu_->linear_acceleration);
-    gtsam::Vector3 accel_base = tfs.base_T_dvl.rotation() *
-      (tfs.dvl_T_imu.rotation() * accel_imu);
+    gtsam::Vector3 accel_target = tfs.target_T_imu.rotation() * accel_imu;
 
-    roll = std::atan2(accel_base.y(), accel_base.z());
+    roll = std::atan2(accel_target.y(), accel_target.z());
     pitch = std::atan2(
-      -accel_base.x(), std::sqrt(
-        accel_base.y() * accel_base.y() +
-        accel_base.z() * accel_base.z()));
+      -accel_target.x(), std::sqrt(
+        accel_target.y() * accel_target.y() +
+        accel_target.z() * accel_target.z()));
 
     if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) {
       // Account for AHRS sensor rotation
-      gtsam::Rot3 R_base_sensor = R_base_dvl * tfs.dvl_T_ahrs.rotation();
+      gtsam::Rot3 R_target_sensor = tfs.target_T_ahrs.rotation();
       gtsam::Rot3 R_world_sensor = toGtsam(initial_ahrs_->orientation);
-      gtsam::Rot3 R_world_base_measured = R_world_sensor * R_base_sensor.inverse();
-      yaw = R_world_base_measured.yaw() + params_.ahrs.mag_declination_radians;
+      gtsam::Rot3 R_world_target_measured = R_world_sensor * R_target_sensor.inverse();
+      yaw = R_world_target_measured.yaw() + params_.ahrs.mag_declination_radians;
     } else if (params_.mag.enable_mag || params_.mag.enable_mag_init_only) {
       // Account for magnetometer rotation
-      gtsam::Rot3 R_base_sensor = R_base_dvl * tfs.dvl_T_mag.rotation();
+      gtsam::Rot3 R_target_sensor = tfs.target_T_mag.rotation();
       gtsam::Vector3 mag_sensor = toGtsam(initial_mag_->magnetic_field);
-      gtsam::Vector3 mag_base = R_base_sensor * mag_sensor;
+      gtsam::Vector3 mag_target = R_target_sensor * mag_sensor;
 
       // Use the tilt-compensated magnetic vector
       gtsam::Rot3 R_rp = gtsam::Rot3::Ypr(0.0, pitch, roll);
-      gtsam::Vector3 mag_horizontal = R_rp.unrotate(mag_base);
+      gtsam::Vector3 mag_horizontal = R_rp.unrotate(mag_target);
 
       double measured_yaw = std::atan2(mag_horizontal.y(), mag_horizontal.x());
       double ref_yaw = std::atan2(
@@ -308,50 +305,47 @@ private:
       yaw = ref_yaw - measured_yaw;
     }
 
-    return gtsam::Rot3::Ypr(yaw, pitch, roll) * R_base_dvl;
+    return gtsam::Rot3::Ypr(yaw, pitch, roll);
   }
 
   gtsam::Point3 computeInitialPosition(
-    const gtsam::Rot3 & initial_orientation_dvl,
+    const gtsam::Rot3 & initial_orientation_target,
     const TfBundle & tfs)
   {
-    gtsam::Point3 P_world_base(
+    gtsam::Point3 P_world_target(
       params_.prior.parameter_priors.initial_position[0],
       params_.prior.parameter_priors.initial_position[1],
       params_.prior.parameter_priors.initial_position[2]);
-    gtsam::Rot3 R_world_base = initial_orientation_dvl * tfs.base_T_dvl.rotation().inverse();
-    gtsam::Point3 P_world_dvl_param = P_world_base + R_world_base.rotate(
-      tfs.base_T_dvl.translation());
 
     if (params_.prior.use_parameter_priors) {
-      // Account for DVL lever arm
-      return P_world_dvl_param;
+      return P_world_target;
     }
 
-    gtsam::Point3 initial_position_dvl = P_world_dvl_param;
+    gtsam::Point3 initial_position_target = P_world_target;
     if (params_.gps.enable_gps || params_.gps.enable_gps_init_only) {
       // Account for GPS lever arm
-      gtsam::Point3 world_p_dvl_gps = initial_orientation_dvl.rotate(tfs.dvl_T_gps.translation());
-      initial_position_dvl = toGtsam(initial_gps_->pose.pose.position) - world_p_dvl_gps;
+      gtsam::Point3 world_p_target_gps = initial_orientation_target.rotate(tfs.target_T_gps.translation());
+      initial_position_target = toGtsam(initial_gps_->pose.pose.position) - world_p_target_gps;
     }
 
     // Account for depth lever arm
-    gtsam::Point3 world_t_dvl_depth =
-      initial_orientation_dvl.rotate(tfs.dvl_T_depth.translation());
-    initial_position_dvl.z() = initial_depth_->pose.pose.position.z - world_t_dvl_depth.z();
+    gtsam::Point3 world_t_target_depth =
+      initial_orientation_target.rotate(tfs.target_T_depth.translation());
+    initial_position_target.z() = initial_depth_->pose.pose.position.z - world_t_target_depth.z();
 
-    return initial_position_dvl;
+    return initial_position_target;
   }
 
-  gtsam::Vector3 computeInitialVelocity(const gtsam::Rot3 & initial_orientation_dvl)
+  gtsam::Vector3 computeInitialVelocity(const gtsam::Rot3 & initial_orientation_target, const TfBundle & tfs)
   {
     if (params_.prior.use_parameter_priors) {
-      // Account for DVL rotation (in world frame)
-      return initial_orientation_dvl.rotate(
+      return initial_orientation_target.rotate(
         toGtsam(params_.prior.parameter_priors.initial_velocity));
     }
 
-    return initial_orientation_dvl.rotate(toGtsam(initial_dvl_->twist.twist.linear));
+    gtsam::Vector3 target_v_dvl = tfs.target_T_dvl.rotation() * toGtsam(initial_dvl_->twist.twist.linear);
+
+    return initial_orientation_target.rotate(target_v_dvl);
   }
 
   gtsam::imuBias::ConstantBias computeInitialBias()

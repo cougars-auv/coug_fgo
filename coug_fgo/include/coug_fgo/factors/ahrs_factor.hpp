@@ -40,7 +40,7 @@ namespace coug_fgo::factors
 class AhrsYawFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3>
 {
   gtsam::Rot3 world_R_sensor_measured_;
-  gtsam::Rot3 base_R_sensor_;
+  gtsam::Rot3 target_R_sensor_;
   double yaw_base_measured_;
 
 public:
@@ -48,20 +48,20 @@ public:
    * @brief Constructor for AhrsYawFactorArm.
    * @param pose_key GTSAM key for the AUV pose.
    * @param measured_rot_sensor The measured orientation of the sensor in the world frame.
-   * @param base_R_sensor The static rotation from base to sensor.
+   * @param target_R_sensor The static rotation from target to sensor.
    * @param mag_declination Magnetic declination to add to the measurement [rad].
    * @param noise_model The noise model for the measurement (1D).
    */
   AhrsYawFactorArm(
     gtsam::Key pose_key, const gtsam::Rot3 & measured_rot_sensor,
-    const gtsam::Rot3 & base_R_sensor, double mag_declination,
+    const gtsam::Rot3 & target_R_sensor, double mag_declination,
     const gtsam::SharedNoiseModel & noise_model)
   : NoiseModelFactor1<gtsam::Pose3>(noise_model, pose_key),
     world_R_sensor_measured_(measured_rot_sensor),
-    base_R_sensor_(base_R_sensor)
+    target_R_sensor_(target_R_sensor)
   {
     gtsam::Rot3 world_R_base_measured = (gtsam::Rot3::Yaw(mag_declination) * measured_rot_sensor) *
-      base_R_sensor.inverse();
+      target_R_sensor.inverse();
     yaw_base_measured_ = world_R_base_measured.yaw();
   }
 

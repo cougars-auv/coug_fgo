@@ -14,7 +14,7 @@
 
 /**
  * @file dvl_preintegrated_factor.hpp
- * @brief GTSAM factor for preintegrated DVL translation measurements.
+ * @brief GTSAM factor for preintegrated DVL translation measurements with a lever arm.
  * @author Nelson Durrant
  * @date Jan 2026
  */
@@ -24,6 +24,7 @@
 #include <gtsam/base/Matrix.h>
 #include <gtsam/base/Vector.h>
 #include <gtsam/geometry/Pose3.h>
+#include <gtsam/inference/Symbol.h>
 #include <gtsam/nonlinear/NonlinearFactor.h>
 
 using gtsam::symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
@@ -32,27 +33,33 @@ namespace coug_fgo::factors
 {
 
 /**
- * @class DvlPreintegratedFactor
- * @brief GTSAM factor for preintegrated DVL translation measurements.
+ * @class DvlPreintegratedFactorArm
+ * @brief GTSAM factor for preintegrated DVL translation measurements with a lever arm.
  */
-class DvlPreintegratedFactor : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>
+class DvlPreintegratedFactorArm : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>
 {
+  gtsam::Pose3 target_P_sensor_;
   gtsam::Vector3 i_p_j_measured_;
 
 public:
   /**
-   * @brief Constructor for DvlPreintegratedFactor.
+   * @brief Constructor for DvlPreintegratedFactorArm.
    * @param pose_key_i GTSAM key for the starting AUV pose.
    * @param pose_key_j GTSAM key for the ending AUV pose.
+   * @param target_T_sensor The static transformation from target to sensor.
    * @param measured_translation The preintegrated translation measurement.
    * @param noise_model The noise model for the measurement.
    */
-  DvlPreintegratedFactor(
+  DvlPreintegratedFactorArm(
     gtsam::Key pose_key_i, gtsam::Key pose_key_j,
+    const gtsam::Pose3 & target_T_sensor,
     const gtsam::Vector3 & measured_translation,
     gtsam::SharedNoiseModel noise_model)
   : gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>(noise_model, pose_key_i, pose_key_j),
-    i_p_j_measured_(measured_translation) {}
+    i_p_j_measured_(measured_translation)
+  {
+    target_P_sensor_ = target_T_sensor;
+  }
 
   /**
    * @brief Evaluates the error and Jacobians for the factor.
@@ -69,12 +76,16 @@ public:
     gtsam::OptionalMatrixType H_pose_j = nullptr) const override
   {
     // Predict the translation measurement
+    gtsam::Matrix66 H_posei_compose, H_posej_compose;
+    gtsam::Pose3 pose_dvl_i = pose_i.compose(target_P_sensor_, H_pose_i ? &H_posei_compose : nullptr);
+    gtsam::Pose3 pose_dvl_j = pose_j.compose(target_P_sensor_, H_pose_j ? &H_posej_compose : nullptr);
+
     gtsam::Matrix36 H_tj_posej = gtsam::Matrix36::Zero();
-    gtsam::Point3 t_j = pose_j.translation(H_pose_j ? &H_tj_posej : nullptr);
+    gtsam::Point3 t_j = pose_dvl_j.translation(H_pose_j ? &H_tj_posej : nullptr);
 
     gtsam::Matrix36 H_pij_posei = gtsam::Matrix36::Zero();
     gtsam::Matrix33 H_pij_tj = gtsam::Matrix33::Zero();
-    gtsam::Point3 p_ij = pose_i.transformTo(
+    gtsam::Point3 p_ij = pose_dvl_i.transformTo(
       t_j, H_pose_i ? &H_pij_posei : nullptr,
       H_pose_j ? &H_pij_tj : nullptr);
 
@@ -83,12 +94,12 @@ public:
 
     if (H_pose_i) {
       // Jacobian with respect to starting pose (3x6)
-      *H_pose_i = H_pij_posei;
+      *H_pose_i = H_pij_posei * H_posei_compose;
     }
 
     if (H_pose_j) {
       // Jacobian with respect to ending pose (3x6)
-      *H_pose_j = H_pij_tj * H_tj_posej;
+      *H_pose_j = H_pij_tj * H_tj_posej * H_posej_compose;
     }
 
     return error;

@@ -58,7 +58,7 @@ public:
    * @param vel_key2 GTSAM key for the second velocity (state j).
    * @param dt The time interval between the two states.
    * @param control_force The sensor-frame force vector from thrusters.
-   * @param body_T_sensor The transform from sensor frame to body frame.
+   * @param target_T_sensor The transform from target frame to sensor frame.
    * @param mass Combined mass (Rigid body + Added mass).
    * @param linear_drag Linear damping coefficient.
    * @param quad_drag Quadratic damping coefficient.
@@ -69,7 +69,7 @@ public:
     gtsam::Key pose_key2, gtsam::Key vel_key2,
     double dt,
     const gtsam::Vector3 & control_force,
-    const gtsam::Pose3 & body_T_sensor,
+    const gtsam::Pose3 & target_T_sensor,
     const gtsam::Matrix33 & mass,
     const gtsam::Matrix33 & linear_drag,
     const gtsam::Matrix33 & quad_drag,
@@ -81,7 +81,7 @@ public:
     linear_drag_(linear_drag),
     quad_drag_(quad_drag)
   {
-    body_f_ = body_T_sensor.rotation() * control_force;
+    body_f_ = target_T_sensor.rotation() * control_force;
     mass_inv_ = mass_.inverse();
   }
 

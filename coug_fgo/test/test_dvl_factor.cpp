@@ -29,14 +29,15 @@
 #include "coug_fgo/factors/dvl_factor.hpp"
 
 /**
- * @brief Verify error evaluation logic.
+ * @brief Verify error evaluation logic and lever arm correction.
  */
-TEST(DvlFactorTest, ErrorEvaluation) {
+TEST(DvlFactorArmTest, ErrorEvaluation) {
   gtsam::Key poseKey = gtsam::symbol_shorthand::X(1);
   gtsam::Key velKey = gtsam::symbol_shorthand::V(1);
   gtsam::Vector3 measured_vel(1.0, 0.0, 0.0);
   gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(3, 0.1);
-  coug_fgo::factors::DvlFactor factor(poseKey, velKey, measured_vel, model);
+  gtsam::Pose3 target_P_sensor = gtsam::Pose3::Identity();
+  coug_fgo::factors::DvlFactorArm factor(poseKey, velKey, target_P_sensor, measured_vel, model);
 
   // Case 1: Identity
   EXPECT_TRUE(
@@ -51,7 +52,21 @@ TEST(DvlFactorTest, ErrorEvaluation) {
       gtsam::Vector3::Zero(),
       factor.evaluateError(pose, gtsam::Vector3(0, 1, 0)), 1e-9));
 
-  // Case 3: Error Check
+  // Case 3: Mounting/Lever Arm
+  gtsam::Pose3 target_P_sensor_arm(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(0, 0, 1));
+  coug_fgo::factors::DvlFactorArm factor_arm(poseKey, velKey, target_P_sensor_arm, gtsam::Vector3(0, -1, 0), model);
+  EXPECT_TRUE(
+    gtsam::assert_equal(
+      gtsam::Vector3::Zero(),
+      factor_arm.evaluateError(gtsam::Pose3::Identity(), gtsam::Vector3(1, 0, 0)), 1e-9));
+
+  // Case 4: Combined
+  EXPECT_TRUE(
+    gtsam::assert_equal(
+      gtsam::Vector3::Zero(),
+      factor_arm.evaluateError(gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(0, 0, 0)), gtsam::Vector3(0, 1, 0)), 1e-9));
+
+  // Case 5: Error Check
   EXPECT_TRUE(
     gtsam::assert_equal(
       gtsam::Vector3(1, 0, 0),
@@ -61,10 +76,11 @@ TEST(DvlFactorTest, ErrorEvaluation) {
 /**
  * @brief Verify Jacobians against numerical differentiation.
  */
-TEST(DvlFactorTest, Jacobians) {
+TEST(DvlFactorArmTest, Jacobians) {
   gtsam::Key poseKey = gtsam::symbol_shorthand::X(1);
   gtsam::Key velKey = gtsam::symbol_shorthand::V(1);
-  coug_fgo::factors::DvlFactor factor(poseKey, velKey, gtsam::Vector3(1.0, 0.5, -0.2),
+  gtsam::Pose3 target_P_sensor_2(gtsam::Rot3::Ypr(0.1, 0, 0), gtsam::Point3(0.5, 0.5, 0.5));
+  coug_fgo::factors::DvlFactorArm factor(poseKey, velKey, target_P_sensor_2, gtsam::Vector3(1.0, 0.5, -0.2),
     gtsam::noiseModel::Isotropic::Sigma(3, 0.1));
 
   gtsam::Pose3 pose = gtsam::Pose3(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1, 2, 3));

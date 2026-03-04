@@ -40,23 +40,23 @@ namespace coug_fgo::factors
 class Gps2dFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3>
 {
   gtsam::Point3 world_p_sensor_measured_;
-  gtsam::Point3 base_p_sensor_;
+  gtsam::Point3 target_p_sensor_;
 
 public:
   /**
    * @brief Constructor for Gps2dFactorArm.
    * @param pose_key GTSAM key for the AUV pose.
    * @param measured_position The measured 3D position (Z is ignored).
-   * @param base_T_sensor The static transformation from base to sensor.
+   * @param target_T_sensor The static transformation from target to sensor.
    * @param noise_model The noise model for the measurement (model dimension must be 2).
    */
   Gps2dFactorArm(
     gtsam::Key pose_key, const gtsam::Point3 & measured_position,
-    const gtsam::Pose3 & base_T_sensor, const gtsam::SharedNoiseModel & noise_model)
+    const gtsam::Pose3 & target_T_sensor, const gtsam::SharedNoiseModel & noise_model)
   : NoiseModelFactor1<gtsam::Pose3>(noise_model, pose_key),
     world_p_sensor_measured_(measured_position)
   {
-    base_p_sensor_ = base_T_sensor.translation();
+    target_p_sensor_ = target_T_sensor.translation();
   }
 
   /**
@@ -71,7 +71,7 @@ public:
   {
     // Predict the position measurement
     gtsam::Matrix36 H_full = gtsam::Matrix36::Zero();
-    gtsam::Point3 p_sensor_est = pose.transformFrom(base_p_sensor_, H ? &H_full : nullptr);
+    gtsam::Point3 p_sensor_est = pose.transformFrom(target_p_sensor_, H ? &H_full : nullptr);
 
     // 2D position residual (ignore Z)
     gtsam::Vector2 error = (p_sensor_est - world_p_sensor_measured_).head<2>();
