@@ -299,7 +299,6 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions & options)
 
 FactorGraphNode::~FactorGraphNode()
 {
-  // TODO(snelsondurrant): Do we need is_running_?
   is_running_ = false;
   cv_.notify_all();
   if (worker_thread_.joinable()) {
@@ -1014,10 +1013,13 @@ void FactorGraphNode::publishGlobalOdom(
 }
 
 void FactorGraphNode::broadcastGlobalTf(
-  const gtsam::Pose3 & pose_base,
+  const gtsam::Pose3 & current_pose,
   const rclcpp::Time & timestamp)
 {
   try {
+    gtsam::Pose3 T_target_base = toGtsam(target_T_base_tf_.transform);
+    gtsam::Pose3 pose_base = current_pose * T_target_base;
+
     gtsam::Pose3 T_odom_base = toGtsam(
       tf_buffer_->lookupTransform(
         params_.odom_frame, params_.base_frame,
@@ -1114,8 +1116,6 @@ void FactorGraphNode::publishGraphMetrics(const rclcpp::Time & timestamp)
 void FactorGraphNode::workerLoop()
 {
   while (is_running_) {
-    // TODO(snelsondurrant): Why do we need the trigger mutex?
-    // Aren't the downstream funcitons already mutexed?
     std::unique_lock<std::mutex> lock(trigger_mutex_);
     cv_.wait(lock);
 
@@ -1125,8 +1125,38 @@ void FactorGraphNode::workerLoop()
 
     if (state_ == State::RUNNING) {
       lock.unlock();
-      updateGraph();
-      optimizeGraph();
+
+      bool should_update = true;
+      if (params_.max_update_rate > 0.0) {
+        rclcpp::Time now = get_clock()->now();
+        rclcpp::Duration min_period =
+          rclcpp::Duration::from_seconds(1.0 / params_.max_update_rate);
+        if (now - last_update_time_ < min_period) {
+          should_update = false;
+        } else {
+          last_update_time_ = now;
+        }
+      }
+
+      if (should_update) {
+        updateGraph();
+      }
+
+      bool should_optimize = true;
+      if (params_.max_opt_rate > 0.0) {
+        rclcpp::Time now = get_clock()->now();
+        rclcpp::Duration min_period =
+          rclcpp::Duration::from_seconds(1.0 / params_.max_opt_rate);
+        if (now - last_opt_time_ < min_period) {
+          should_optimize = false;
+        } else {
+          last_opt_time_ = now;
+        }
+      }
+
+      if (should_optimize) {
+        optimizeGraph();
+      }
     }
   }
 }
@@ -1169,20 +1199,6 @@ void FactorGraphNode::updateGraph()
       }
     }
     return;
-  }
-
-  // TODO(snelsondurrant): Rename this max update rate and add a max optimization rate param too
-  if (params_.max_keyframe_rate > 0.0) {
-    rclcpp::Duration min_period = rclcpp::Duration::from_seconds(1.0 / params_.max_keyframe_rate);
-    if (target_time - prev_time_ < min_period) {
-      RCLCPP_DEBUG(get_logger(), "Limiting keyframe rate. Skipping.");
-      if (params_.experimental.enable_dvl_preintegration) {
-        depth_queue_.pop_back();
-      } else {
-        if (!dvl_queue_.empty()) {dvl_queue_.pop_back();} else {depth_queue_.pop_back();}
-      }
-      return;
-    }
   }
 
   // --- Drain Queues ---
@@ -1289,7 +1305,7 @@ void FactorGraphNode::updateGraph()
 
 void FactorGraphNode::optimizeGraph()
 {
-  std::unique_lock<std::mutex> opt_lock(optimization_mutex_, std::try_to_lock);
+  std::unique_lock<std::mutex> opt_lock(opt_mutex_, std::try_to_lock);
   if (!opt_lock.owns_lock()) {return;}
 
   // --- Load Buffer ---
@@ -1317,6 +1333,7 @@ void FactorGraphNode::optimizeGraph()
 
   // --- Detect Processing Overflow ---
   // TODO(snelsondurrant): This never triggers? Is it right?
+  // It might just be that it is performing well
   size_t num_keyframes = batch_timestamps.size() / 3;  // 3 entries per keyframe (X, V, B)
   if (num_keyframes > 1) {
     RCLCPP_WARN_THROTTLE(
@@ -1413,10 +1430,7 @@ void FactorGraphNode::optimizeGraph()
 
     // --- Publish Global TF ---
     if (params_.publish_global_tf) {
-      // TODO(snelsondurrant): Move this inside the function like the smoothed path
-      // -> current_pose instead
-      gtsam::Pose3 T_target_base = toGtsam(target_T_base_tf_.transform);
-      broadcastGlobalTf(prev_pose_ * T_target_base, batch_target_time);
+      broadcastGlobalTf(prev_pose_, batch_target_time);
     }
 
     // --- Publish Smoothed Path ---

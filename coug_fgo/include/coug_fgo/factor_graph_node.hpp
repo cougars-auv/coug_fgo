@@ -236,7 +236,7 @@ protected:
   // --- Publishing ---
   /**
    * @brief Publishes the optimized global odometry.
-   * @param current_pose The estimated pose.
+   * @param current_pose The estimated target pose.
    * @param pose_covariance The estimation error covariance.
    * @param timestamp The message timestamp.
    */
@@ -247,11 +247,11 @@ protected:
 
   /**
    * @brief Broadcasts the map-to-odom transform.
-   * @param pose_base The estimated base pose.
+   * @param current_pose The estimated target pose.
    * @param timestamp The transform timestamp.
    */
   void broadcastGlobalTf(
-    const gtsam::Pose3 & pose_base,
+    const gtsam::Pose3 & current_pose,
     const rclcpp::Time & timestamp);
 
   /**
@@ -317,6 +317,8 @@ protected:
   size_t prev_step_ = 0;
   size_t current_step_ = 1;
   rclcpp::Time prev_time_{0, 0, RCL_ROS_TIME};
+  rclcpp::Time last_update_time_{0, 0, RCL_ROS_TIME};
+  rclcpp::Time last_opt_time_{0, 0, RCL_ROS_TIME};
 
   std::atomic<double> last_opt_duration_{0.0};
   std::atomic<double> last_smoother_duration_{0.0};
@@ -362,7 +364,7 @@ protected:
   rclcpp::CallbackGroup::SharedPtr sensor_cb_group_;
   std::mutex initialization_mutex_;
   std::mutex update_mutex_;
-  std::mutex optimization_mutex_;
+  std::mutex opt_mutex_;
 
   // --- Graph Buffer ---
   gtsam::NonlinearFactorGraph pending_graph_;
