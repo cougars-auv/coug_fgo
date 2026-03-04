@@ -24,17 +24,19 @@
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/geometry/Rot3.h>
 #include <gtsam/navigation/ImuBias.h>
+
+#include <memory>
+
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/wrench_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/magnetic_field.hpp>
+
 #include <coug_fgo/utils/thread_safe_queue.hpp>
 #include <coug_fgo/factor_graph_parameters.hpp>
 #include <coug_fgo/utils/conversion_utils.hpp>
-
-#include <memory>
 
 namespace coug_fgo::utils
 {

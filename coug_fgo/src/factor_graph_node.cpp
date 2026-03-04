@@ -71,7 +71,6 @@ namespace coug_fgo
 
 void FactorGraphNode::setupRosInterfaces()
 {
-
   // --- ROS TF Interfaces ---
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_, this);
@@ -1154,7 +1153,8 @@ void FactorGraphNode::updateGraph()
     }
   }
 
-  // TODO(snelsondurrant): Can we handle this better? Maybe in the sensor callbacks? Is pop_back() safe here? Anywhere?
+  // TODO(snelsondurrant): Can we handle this better? Maybe in the sensor callbacks?
+  // Is pop_back() safe here? Anywhere?
   if (target_time <= prev_time_ + rclcpp::Duration::from_seconds(1e-6)) {
     RCLCPP_DEBUG(
       get_logger(),
@@ -1413,7 +1413,8 @@ void FactorGraphNode::optimizeGraph()
 
     // --- Publish Global TF ---
     if (params_.publish_global_tf) {
-      // TODO(snelsondurrant): Move this inside the function like the smoothed path -> current_pose instead
+      // TODO(snelsondurrant): Move this inside the function like the smoothed path
+      // -> current_pose instead
       gtsam::Pose3 T_target_base = toGtsam(target_T_base_tf_.transform);
       broadcastGlobalTf(prev_pose_ * T_target_base, batch_target_time);
     }
@@ -1441,7 +1442,6 @@ void FactorGraphNode::optimizeGraph()
     if (params_.publish_graph_metrics) {
       publishGraphMetrics(batch_target_time);
     }
-
   } catch (const std::exception & e) {
     RCLCPP_FATAL(get_logger(), "%s", e.what());
     rclcpp::shutdown();
