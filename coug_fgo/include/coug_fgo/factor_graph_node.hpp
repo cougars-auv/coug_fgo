@@ -113,7 +113,8 @@ protected:
    * @param graph The target factor graph.
    * @param values The initial value estimates.
    */
-  void addPriorFactors(gtsam::NonlinearFactorGraph & graph, gtsam::Values & values);
+  void addPriorFactors(gtsam::NonlinearFactorGraph & graph, 
+    gtsam::Values & values);
 
   /**
    * @brief Adds a GPS position factor to the graph.
@@ -220,7 +221,8 @@ protected:
    * @param timestamp The message timestamp.
    */
   void publishGlobalOdom(
-    const gtsam::Pose3 & current_pose, const gtsam::Matrix & pose_covariance,
+    const gtsam::Pose3 & current_pose, 
+    const gtsam::Matrix & pose_covariance,
     const rclcpp::Time & timestamp);
 
   /**
@@ -228,14 +230,16 @@ protected:
    * @param pose_base The estimated base pose.
    * @param timestamp The transform timestamp.
    */
-  void broadcastGlobalTf(const gtsam::Pose3 & pose_base, const rclcpp::Time & timestamp);
+  void broadcastGlobalTf(const gtsam::Pose3 & pose_base, 
+    const rclcpp::Time & timestamp);
 
   /**
    * @brief Publishes the full optimized trajectory path.
    * @param results The final optimized values.
    * @param timestamp The path timestamp.
    */
-  void publishSmoothedPath(const gtsam::Values & results, const rclcpp::Time & timestamp);
+  void publishSmoothedPath(const gtsam::Values & results, 
+    const rclcpp::Time & timestamp);
 
   /**
    * @brief Publishes the optimized velocity (at the target frame in the map frame).
@@ -244,7 +248,8 @@ protected:
    * @param timestamp The message timestamp.
    */
   void publishVelocity(
-    const gtsam::Vector3 & current_vel, const gtsam::Matrix & vel_covariance,
+    const gtsam::Vector3 & current_vel, 
+    const gtsam::Matrix & vel_covariance,
     const rclcpp::Time & timestamp);
 
   /**
@@ -255,7 +260,8 @@ protected:
    */
   void publishImuBias(
     const gtsam::imuBias::ConstantBias & current_imu_bias,
-    const gtsam::Matrix & imu_bias_covariance, const rclcpp::Time & timestamp);
+    const gtsam::Matrix & imu_bias_covariance, 
+    const rclcpp::Time & timestamp);
 
   /**
    * @brief Publishes high-frequency timing and graph metadata.
