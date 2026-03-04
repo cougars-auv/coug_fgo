@@ -113,7 +113,8 @@ protected:
    * @param graph The target factor graph.
    * @param values The initial value estimates.
    */
-  void addPriorFactors(gtsam::NonlinearFactorGraph & graph, 
+  void addPriorFactors(
+    gtsam::NonlinearFactorGraph & graph,
     gtsam::Values & values);
 
   /**
@@ -199,7 +200,8 @@ protected:
    * @return The interpolated GTSAM rotation.
    */
   gtsam::Rot3 getInterpolatedOrientation(
-    const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs, double target_time);
+    const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
+    double target_time);
 
   /**
    * @brief Integrates and adds a preintegrated DVL factor to the graph.
@@ -211,7 +213,8 @@ protected:
   void addPreintegratedDvlFactor(
     gtsam::NonlinearFactorGraph & graph,
     const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & dvl_msgs,
-    const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs, double target_time);
+    const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
+    double target_time);
 
   // --- Publishing ---
   /**
@@ -230,7 +233,8 @@ protected:
    * @param pose_base The estimated base pose.
    * @param timestamp The transform timestamp.
    */
-  void broadcastGlobalTf(const gtsam::Pose3 & pose_base, 
+  void broadcastGlobalTf(
+    const gtsam::Pose3 & pose_base,
     const rclcpp::Time & timestamp);
 
   /**
@@ -238,7 +242,8 @@ protected:
    * @param results The final optimized values.
    * @param timestamp The path timestamp.
    */
-  void publishSmoothedPath(const gtsam::Values & results, 
+  void publishSmoothedPath(
+    const gtsam::Values & results,
     const rclcpp::Time & timestamp);
 
   /**
@@ -260,7 +265,7 @@ protected:
    */
   void publishImuBias(
     const gtsam::imuBias::ConstantBias & current_imu_bias,
-    const gtsam::Matrix & imu_bias_covariance, 
+    const gtsam::Matrix & imu_bias_covariance,
     const rclcpp::Time & timestamp);
 
   /**
