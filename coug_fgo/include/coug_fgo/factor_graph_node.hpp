@@ -35,11 +35,13 @@
 #include <tf2_ros/transform_listener.h>
 
 #include <atomic>
+#include <condition_variable>
 #include <deque>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
@@ -76,6 +78,11 @@ public:
    */
   explicit FactorGraphNode(const rclcpp::NodeOptions & options);
 
+  /**
+   * @brief FactorGraphNode destructor.
+   */
+  ~FactorGraphNode() override;
+
   enum class State
   {
     WAITING_FOR_SENSORS,
@@ -90,9 +97,27 @@ protected:
   void initializeGraph();
 
   /**
-   * @brief Main optimization loop; adds factors to the graph and invokes the smoother.
+   * @brief Builds factors for one keyframe and accumulates them in the pending buffer.
+   *
+   * Always runs when called. Uses stale estimates for IMU prediction and
+   * preintegrator reset. Drains sensor queues, builds factors, and appends
+   * to the pending graph for optimizeGraph() to consume.
+   */
+  void updateGraph();
+
+  /**
+   * @brief Consumes the pending graph batch and runs the GTSAM smoother.
+   *
+   * Uses try_to_lock on optimization_mutex_. If the previous optimization
+   * is still running, returns immediately. Otherwise, takes the accumulated
+   * pending graph and processes all keyframes in one smoother update.
    */
   void optimizeGraph();
+
+  /**
+   * @brief The background loop run by the dedicated worker thread.
+   */
+  void optimizationLoop();
 
   // --- Setup & Helpers ---
   /**
@@ -293,6 +318,12 @@ protected:
    */
   void checkProcessingOverflow(diagnostic_updater::DiagnosticStatusWrapper & stat);
 
+  // --- Threading & Synchronization ---
+  std::thread worker_thread_;
+  std::condition_variable optimization_cv_;
+  std::mutex trigger_mutex_;
+  std::atomic<bool> is_running_{true};
+
   // --- Graph State ---
   std::atomic<State> state_{State::WAITING_FOR_SENSORS};
   std::unique_ptr<utils::StateInitializer> state_initializer_;
@@ -302,14 +333,21 @@ protected:
   rclcpp::Time prev_time_{0, 0, RCL_ROS_TIME};
 
   std::atomic<double> last_opt_duration_{0.0};
-  std::atomic<double> last_prep_duration_{0.0};
-  std::atomic<double> last_update_duration_{0.0};
+  std::atomic<double> last_smoother_duration_{0.0};
   std::atomic<double> last_cov_duration_{0.0};
   std::atomic<bool> processing_overflow_{false};
   std::atomic<size_t> new_factors_{0};
   std::atomic<size_t> total_factors_{0};
   std::atomic<size_t> total_variables_{0};
   std::map<rclcpp::Time, gtsam::Key> time_to_key_;
+
+  // --- Pending Graph Buffer (updateGraph → optimizeGraph handoff) ---
+  gtsam::NonlinearFactorGraph pending_graph_;
+  gtsam::Values pending_values_;
+  gtsam::IncrementalFixedLagSmoother::KeyTimestampMap pending_timestamps_;
+  rclcpp::Time pending_target_time_{0, 0, RCL_ROS_TIME};
+  size_t pending_last_step_ = 0;
+  bool has_pending_ = false;
 
   // --- GTSAM Objects ---
   std::unique_ptr<gtsam::IncrementalFixedLagSmoother> inc_smoother_;
@@ -340,7 +378,8 @@ protected:
   // --- Multithreading ---
   rclcpp::CallbackGroup::SharedPtr sensor_cb_group_;
   std::mutex initialization_mutex_;
-  std::mutex optimization_mutex_;
+  std::mutex update_mutex_;        ///< Serializes updateGraph; briefly locked by optimizeGraph for handoff
+  std::mutex optimization_mutex_;  ///< try_to_lock in optimizeGraph to skip if busy
 
   // --- Transformations ---
   geometry_msgs::msg::TransformStamped target_T_base_tf_;

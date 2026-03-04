@@ -158,7 +158,7 @@ void FactorGraphNode::setupRosInterfaces()
         if (state_ != State::RUNNING) {
           initializeGraph();
         } else {
-          optimizeGraph();
+          cv_.notify_one();
         }
       } else {
         if (state_ == State::RUNNING && dvl_timed_out) {
@@ -166,7 +166,7 @@ void FactorGraphNode::setupRosInterfaces()
             get_logger(), *get_clock(), 5000,
             "DVL timed out (%.2fs)! Using depth sensor to trigger keyframes.",
             time_since_dvl);
-          optimizeGraph();
+          cv_.notify_one();
         }
       }
     },
@@ -236,7 +236,7 @@ void FactorGraphNode::setupRosInterfaces()
         if (state_ != State::RUNNING) {
           initializeGraph();
         } else {
-          optimizeGraph();
+          cv_.notify_one();
         }
       }
     },
@@ -293,7 +293,17 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions & options)
 
   setupRosInterfaces();
   state_initializer_ = std::make_unique<utils::StateInitializer>(params_);
+  worker_thread_ = std::thread(&FactorGraphNode::optimizationLoop, this);
   RCLCPP_INFO(get_logger(), "Startup complete! Waiting for sensor messages...");
+}
+
+FactorGraphNode::~FactorGraphNode()
+{
+  is_running_ = false;
+  optimization_cv_.notify_all();
+  if (worker_thread_.joinable()) {
+    worker_thread_.join();
+  }
 }
 
 std::shared_ptr<gtsam::PreintegratedCombinedMeasurements::Params>
@@ -327,7 +337,6 @@ FactorGraphNode::configureImuPreintegration()
 
   return imu_params;
 }
-
 
 void FactorGraphNode::addPriorFactors(gtsam::NonlinearFactorGraph & graph, gtsam::Values & values)
 {
@@ -415,7 +424,7 @@ void FactorGraphNode::addPriorFactors(gtsam::NonlinearFactorGraph & graph, gtsam
 
 void FactorGraphNode::initializeGraph()
 {
-  std::lock_guard<std::mutex> init_lock(initialization_mutex_);
+  std::scoped_lock init_lock(initialization_mutex_);
   if (state_ == State::RUNNING) {
     RCLCPP_DEBUG(get_logger(), "Duplicate initialization attempt detected.");
     return;
@@ -450,7 +459,7 @@ void FactorGraphNode::initializeGraph()
     } catch (const tf2::TransformException & ex) {
       RCLCPP_WARN_THROTTLE(
         get_logger(), *get_clock(), 5000,
-        "Waiting for target-to-base TF: %s", ex.what());
+        "Failed to lookup base to target transform: %s", ex.what());
       return;
     }
   }
@@ -1094,8 +1103,7 @@ void FactorGraphNode::publishGraphMetrics(const rclcpp::Time & timestamp)
   metrics_msg.header.stamp = timestamp;
 
   metrics_msg.opt_duration = last_opt_duration_.load();
-  metrics_msg.prep_duration = last_prep_duration_.load();
-  metrics_msg.update_duration = last_update_duration_.load();
+  metrics_msg.smoother_duration = last_smoother_duration_.load();
   metrics_msg.cov_duration = last_cov_duration_.load();
   metrics_msg.new_factors = static_cast<uint32_t>(new_factors_.load());
   metrics_msg.total_factors = static_cast<uint32_t>(total_factors_.load());
@@ -1104,15 +1112,30 @@ void FactorGraphNode::publishGraphMetrics(const rclcpp::Time & timestamp)
   graph_metrics_pub_->publish(metrics_msg);
 }
 
-void FactorGraphNode::optimizeGraph()
+void FactorGraphNode::optimizationLoop()
 {
-  // --- Handle Processing Overflow ---
-  std::unique_lock<std::mutex> opt_lock(optimization_mutex_, std::try_to_lock);
-  if (!opt_lock.owns_lock()) {return;}
+  while (is_running_) {
+    std::unique_lock<std::mutex> lock(trigger_mutex_);
+    optimization_cv_.wait(lock);
 
-  auto opt_start = std::chrono::high_resolution_clock::now();
+    if (!is_running_) {
+      break;
+    }
+
+    if (state_ == State::RUNNING) {
+      lock.unlock();
+      updateGraph();
+      optimizeGraph();
+    }
+  }
+}
+
+void FactorGraphNode::updateGraph()
+{
+  std::scoped_lock update_lock(update_mutex_);
+
+  // --- Determine Target Time ---
   rclcpp::Time target_time{0, 0, RCL_ROS_TIME};
-  bool should_abort = false;
 
   if (imu_queue_.empty()) {
     return;
@@ -1131,6 +1154,7 @@ void FactorGraphNode::optimizeGraph()
     }
   }
 
+  // --- Rate Limiting & Duplicate Detection ---
   if (target_time <= prev_time_ + rclcpp::Duration::from_seconds(1e-6)) {
     RCLCPP_DEBUG(get_logger(), "Duplicate or out-of-order timestamp detected. Skipping.");
     if (params_.experimental.enable_dvl_preintegration) {
@@ -1138,10 +1162,10 @@ void FactorGraphNode::optimizeGraph()
     } else {
       if (!dvl_queue_.empty()) {dvl_queue_.pop_back();} else {depth_queue_.pop_back();}
     }
-    should_abort = true;
+    return;
   }
 
-  if (!should_abort && params_.max_keyframe_rate > 0.0) {
+  if (params_.max_keyframe_rate > 0.0) {
     rclcpp::Duration min_period = rclcpp::Duration::from_seconds(1.0 / params_.max_keyframe_rate);
     if (target_time - prev_time_ < min_period) {
       RCLCPP_DEBUG(get_logger(), "Limiting keyframe rate. Skipping.");
@@ -1150,12 +1174,11 @@ void FactorGraphNode::optimizeGraph()
       } else {
         if (!dvl_queue_.empty()) {dvl_queue_.pop_back();} else {depth_queue_.pop_back();}
       }
-      should_abort = true;
+      return;
     }
   }
 
-  if (should_abort) {return;}
-
+  // --- Drain Queues ---
   std::deque<sensor_msgs::msg::Imu::SharedPtr> imu_msgs = imu_queue_.drain();
   std::deque<nav_msgs::msg::Odometry::SharedPtr> gps_msgs = gps_queue_.drain();
   std::deque<nav_msgs::msg::Odometry::SharedPtr> depth_msgs = depth_queue_.drain();
@@ -1164,28 +1187,6 @@ void FactorGraphNode::optimizeGraph()
   std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> dvl_msgs =
     dvl_queue_.drain();
   std::deque<geometry_msgs::msg::WrenchStamped::SharedPtr> wrench_msgs = wrench_queue_.drain();
-
-  if (params_.experimental.enable_dvl_preintegration) {
-    if (depth_msgs.size() > 1) {
-      RCLCPP_WARN_THROTTLE(
-        get_logger(), *get_clock(), 5000,
-        "Processing overflow. Skipping %zu Depth keyframes.",
-        depth_msgs.size() - 1);
-      processing_overflow_ = true;
-    } else {
-      processing_overflow_ = false;
-    }
-  } else {
-    if (dvl_msgs.size() > 1) {
-      RCLCPP_WARN_THROTTLE(
-        get_logger(), *get_clock(), 5000,
-        "Processing overflow. Skipping %zu DVL keyframes.",
-        dvl_msgs.size() - 1);
-      processing_overflow_ = true;
-    } else {
-      processing_overflow_ = false;
-    }
-  }
 
   // Sort IMU (and DVL) messages
   auto by_time = [](const auto & a, const auto & b) {
@@ -1196,7 +1197,7 @@ void FactorGraphNode::optimizeGraph()
     std::sort(dvl_msgs.begin(), dvl_msgs.end(), by_time);
   }
 
-  // --- Create Factor Graph ---
+  // --- Build Factor Graph ---
   gtsam::NonlinearFactorGraph new_graph;
   gtsam::Values new_values;
   gtsam::IncrementalFixedLagSmoother::KeyTimestampMap new_timestamps;
@@ -1247,7 +1248,7 @@ void FactorGraphNode::optimizeGraph()
     }
   }
 
-  // --- Smoother Update ---
+  // --- Predict Initial Values ---
   auto pred = imu_preintegrator_->predict(gtsam::NavState(prev_pose_, prev_vel_), prev_imu_bias_);
   new_values.insert(X(current_step_), pred.pose());
   new_values.insert(V(current_step_), pred.velocity());
@@ -1256,21 +1257,90 @@ void FactorGraphNode::optimizeGraph()
   new_timestamps[V(current_step_)] = target_time.seconds();
   new_timestamps[B(current_step_)] = target_time.seconds();
 
+  // --- Reset Preintegrators ---
+  imu_preintegrator_->resetIntegrationAndSetBias(prev_imu_bias_);
+
+  time_to_key_[target_time] = X(current_step_);
+  if (!isam_) {
+    time_to_key_.erase(
+      time_to_key_.begin(),
+      time_to_key_.lower_bound(
+        target_time - rclcpp::Duration::from_seconds(params_.smoother_lag)));
+  }
+
+  prev_time_ = target_time;
+  prev_step_ = current_step_;
+  current_step_++;
+
+  // --- Accumulate Buffer ---
+  pending_graph_ += new_graph;
+  pending_values_.insert(new_values);
+  pending_timestamps_.insert(new_timestamps.begin(), new_timestamps.end());
+  pending_target_time_ = target_time;
+  pending_last_step_ = prev_step_;
+  has_pending_ = true;
+}
+
+void FactorGraphNode::optimizeGraph()
+{
+  // --- Try to acquire optimization lock ---
+  std::unique_lock<std::mutex> opt_lock(optimization_mutex_, std::try_to_lock);
+  if (!opt_lock.owns_lock()) {return;}
+
+  // --- Take pending batch (briefly lock update_mutex_) ---
+  gtsam::NonlinearFactorGraph batch_graph;
+  gtsam::Values batch_values;
+  gtsam::IncrementalFixedLagSmoother::KeyTimestampMap batch_timestamps;
+  rclcpp::Time batch_target_time{0, 0, RCL_ROS_TIME};
+  size_t batch_last_step = 0;
+
+  {
+    std::scoped_lock update_lock(update_mutex_);
+    if (!has_pending_) {return;}
+
+    batch_graph = std::move(pending_graph_);
+    batch_values = std::move(pending_values_);
+    batch_timestamps = std::move(pending_timestamps_);
+    batch_target_time = pending_target_time_;
+    batch_last_step = pending_last_step_;
+
+    // Reset pending state
+    pending_graph_ = gtsam::NonlinearFactorGraph();
+    pending_values_ = gtsam::Values();
+    pending_timestamps_.clear();
+    has_pending_ = false;
+  }
+
+  // --- Detect Processing Overflow ---
+  size_t num_keyframes = batch_timestamps.size() / 3;  // 3 entries per keyframe (X, V, B)
+  if (num_keyframes > 1) {
+    RCLCPP_WARN_THROTTLE(
+      get_logger(), *get_clock(), 5000,
+      "Processing overflow. Batching %zu keyframes.", num_keyframes);
+    processing_overflow_ = true;
+  } else {
+    processing_overflow_ = false;
+  }
+
+  auto opt_start = std::chrono::high_resolution_clock::now();
+
   try {
-    auto prep_end = std::chrono::high_resolution_clock::now();
-    last_prep_duration_ = std::chrono::duration<double>(prep_end - opt_start).count();
-    new_factors_ = new_graph.size();
+    new_factors_ = batch_graph.size();
 
     if (inc_smoother_) {
-      auto update_start = std::chrono::high_resolution_clock::now();
-      inc_smoother_->update(new_graph, new_values, new_timestamps);
-      auto update_end = std::chrono::high_resolution_clock::now();
-      last_update_duration_ = std::chrono::duration<double>(update_end - update_start).count();
+      auto smoother_start = std::chrono::high_resolution_clock::now();
+      inc_smoother_->update(batch_graph, batch_values, batch_timestamps);
+      auto smoother_end = std::chrono::high_resolution_clock::now();
+      last_smoother_duration_ = std::chrono::duration<double>(smoother_end - smoother_start).count();
 
-      prev_pose_ = inc_smoother_->calculateEstimate<gtsam::Pose3>(X(current_step_));
-      prev_vel_ = inc_smoother_->calculateEstimate<gtsam::Vector3>(V(current_step_));
-      prev_imu_bias_ =
-        inc_smoother_->calculateEstimate<gtsam::imuBias::ConstantBias>(B(current_step_));
+      // --- Update Estimates (briefly lock update_mutex_) ---
+      {
+        std::scoped_lock update_lock(update_mutex_);
+        prev_pose_ = inc_smoother_->calculateEstimate<gtsam::Pose3>(X(batch_last_step));
+        prev_vel_ = inc_smoother_->calculateEstimate<gtsam::Vector3>(V(batch_last_step));
+        prev_imu_bias_ =
+          inc_smoother_->calculateEstimate<gtsam::imuBias::ConstantBias>(B(batch_last_step));
+      }
 
       if (params_.publish_diagnostics || params_.publish_graph_metrics) {
         total_factors_ = inc_smoother_->getFactors().nrFactors();
@@ -1278,15 +1348,19 @@ void FactorGraphNode::optimizeGraph()
       }
 
     } else if (isam_) {
-      auto update_start = std::chrono::high_resolution_clock::now();
-      isam_->update(new_graph, new_values);
-      auto update_end = std::chrono::high_resolution_clock::now();
-      last_update_duration_ = std::chrono::duration<double>(update_end - update_start).count();
+      auto smoother_start = std::chrono::high_resolution_clock::now();
+      isam_->update(batch_graph, batch_values);
+      auto smoother_end = std::chrono::high_resolution_clock::now();
+      last_smoother_duration_ = std::chrono::duration<double>(smoother_end - smoother_start).count();
 
-      prev_pose_ = isam_->calculateEstimate<gtsam::Pose3>(X(current_step_));
-      prev_vel_ = isam_->calculateEstimate<gtsam::Vector3>(V(current_step_));
-      prev_imu_bias_ =
-        isam_->calculateEstimate<gtsam::imuBias::ConstantBias>(B(current_step_));
+      // --- Update Estimates (briefly lock update_mutex_) ---
+      {
+        std::scoped_lock update_lock(update_mutex_);
+        prev_pose_ = isam_->calculateEstimate<gtsam::Pose3>(X(batch_last_step));
+        prev_vel_ = isam_->calculateEstimate<gtsam::Vector3>(V(batch_last_step));
+        prev_imu_bias_ =
+          isam_->calculateEstimate<gtsam::imuBias::ConstantBias>(B(batch_last_step));
+      }
 
       if (params_.publish_diagnostics || params_.publish_graph_metrics) {
         total_factors_ = isam_->getFactorsUnsafe().nrFactors();
@@ -1294,42 +1368,32 @@ void FactorGraphNode::optimizeGraph()
       }
     }
 
-    imu_preintegrator_->resetIntegrationAndSetBias(prev_imu_bias_);
-
-    time_to_key_[target_time] = X(current_step_);
-    if (!isam_) {
-      time_to_key_.erase(
-        time_to_key_.begin(),
-        time_to_key_.lower_bound(
-          target_time - rclcpp::Duration::from_seconds(params_.smoother_lag)));
-    }
-
     // --- Calculate Covariances ---
     auto cov_start = std::chrono::high_resolution_clock::now();
     gtsam::Matrix new_pose_cov = gtsam::Matrix::Identity(6, 6) * -1.0;
     if (params_.publish_pose_cov) {
       if (inc_smoother_) {
-        new_pose_cov = inc_smoother_->marginalCovariance(X(current_step_));
+        new_pose_cov = inc_smoother_->marginalCovariance(X(batch_last_step));
       } else if (isam_) {
-        new_pose_cov = isam_->marginalCovariance(X(current_step_));
+        new_pose_cov = isam_->marginalCovariance(X(batch_last_step));
       }
     }
 
     gtsam::Matrix vel_cov = gtsam::Matrix::Identity(3, 3) * -1.0;
     if (params_.publish_velocity && params_.publish_velocity_cov) {
       if (inc_smoother_) {
-        vel_cov = inc_smoother_->marginalCovariance(V(current_step_));
+        vel_cov = inc_smoother_->marginalCovariance(V(batch_last_step));
       } else if (isam_) {
-        vel_cov = isam_->marginalCovariance(V(current_step_));
+        vel_cov = isam_->marginalCovariance(V(batch_last_step));
       }
     }
 
     gtsam::Matrix bias_cov = gtsam::Matrix::Identity(6, 6) * -1.0;
     if (params_.publish_imu_bias && params_.publish_imu_bias_cov) {
       if (inc_smoother_) {
-        bias_cov = inc_smoother_->marginalCovariance(B(current_step_));
+        bias_cov = inc_smoother_->marginalCovariance(B(batch_last_step));
       } else if (isam_) {
-        bias_cov = isam_->marginalCovariance(B(current_step_));
+        bias_cov = isam_->marginalCovariance(B(batch_last_step));
       }
     }
     auto opt_end = std::chrono::high_resolution_clock::now();
@@ -1338,40 +1402,36 @@ void FactorGraphNode::optimizeGraph()
 
     // --- Publish Global Odometry ---
     gtsam::Pose3 T_target_base = toGtsam(target_T_base_tf_.transform);
-    publishGlobalOdom(prev_pose_, new_pose_cov, target_time);
+    publishGlobalOdom(prev_pose_, new_pose_cov, batch_target_time);
 
     // --- Publish Global TF ---
     if (params_.publish_global_tf) {
-      broadcastGlobalTf(prev_pose_ * T_target_base, target_time);
+      broadcastGlobalTf(prev_pose_ * T_target_base, batch_target_time);
     }
 
     // --- Publish Smoothed Path ---
     if (params_.publish_smoothed_path) {
       if (inc_smoother_) {
-        publishSmoothedPath(inc_smoother_->calculateEstimate(), target_time);
+        publishSmoothedPath(inc_smoother_->calculateEstimate(), batch_target_time);
       } else if (isam_) {
-        publishSmoothedPath(isam_->calculateEstimate(), target_time);
+        publishSmoothedPath(isam_->calculateEstimate(), batch_target_time);
       }
     }
 
     // --- Publish Velocity ---
     if (params_.publish_velocity) {
-      publishVelocity(prev_vel_, vel_cov, target_time);
+      publishVelocity(prev_vel_, vel_cov, batch_target_time);
     }
 
     // --- Publish IMU Bias ---
     if (params_.publish_imu_bias) {
-      publishImuBias(prev_imu_bias_, bias_cov, target_time);
+      publishImuBias(prev_imu_bias_, bias_cov, batch_target_time);
     }
 
     // --- Publish Graph Metrics ---
     if (params_.publish_graph_metrics) {
-      publishGraphMetrics(target_time);
+      publishGraphMetrics(batch_target_time);
     }
-
-    prev_time_ = target_time;
-    prev_step_ = current_step_;
-    current_step_++;
   } catch (const std::exception & e) {
     RCLCPP_FATAL(get_logger(), "%s", e.what());
     rclcpp::shutdown();
@@ -1447,8 +1507,7 @@ void FactorGraphNode::checkProcessingOverflow(diagnostic_updater::DiagnosticStat
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "No processing overflow detected.");
   }
   stat.add("Optimization Duration (s)", last_opt_duration_.load());
-  stat.add("Data Prep Duration (s)", last_prep_duration_.load());
-  stat.add("Update Duration (s)", last_update_duration_.load());
+  stat.add("Smoother Duration (s)", last_smoother_duration_.load());
   stat.add("Covariance Duration (s)", last_cov_duration_.load());
 
   stat.add("New Factors", new_factors_.load());
