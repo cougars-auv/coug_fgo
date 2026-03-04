@@ -1017,21 +1017,21 @@ void FactorGraphNode::broadcastGlobalTf(
   const rclcpp::Time & timestamp)
 {
   try {
-    gtsam::Pose3 T_target_base = toGtsam(target_T_base_tf_.transform);
-    gtsam::Pose3 pose_base = current_pose * T_target_base;
+    gtsam::Pose3 target_T_base = toGtsam(target_T_base_tf_.transform);
+    gtsam::Pose3 pose_base = current_pose * target_T_base;
 
-    gtsam::Pose3 T_odom_base = toGtsam(
+    gtsam::Pose3 odom_T_base = toGtsam(
       tf_buffer_->lookupTransform(
         params_.odom_frame, params_.base_frame,
         timestamp, rclcpp::Duration::from_seconds(0.05)).transform);
-    gtsam::Pose3 T_map_odom = pose_base * T_odom_base.inverse();
+    gtsam::Pose3 map_T_odom = pose_base * odom_T_base.inverse();
 
     geometry_msgs::msg::TransformStamped tf_msg;
     tf_msg.header.stamp = timestamp;
     tf_msg.header.frame_id = params_.map_frame;
     tf_msg.child_frame_id = params_.odom_frame;
-    tf_msg.transform.translation = toVectorMsg(T_map_odom.translation());
-    tf_msg.transform.rotation = toQuatMsg(T_map_odom.rotation());
+    tf_msg.transform.translation = toVectorMsg(map_T_odom.translation());
+    tf_msg.transform.rotation = toQuatMsg(map_T_odom.rotation());
     tf_broadcaster_->sendTransform(tf_msg);
   } catch (const tf2::TransformException & ex) {
     RCLCPP_ERROR_THROTTLE(
@@ -1048,14 +1048,14 @@ void FactorGraphNode::publishSmoothedPath(
   path_msg.header.stamp = timestamp;
   path_msg.header.frame_id = params_.map_frame;
 
-  gtsam::Pose3 T_target_base = toGtsam(target_T_base_tf_.transform);
+  gtsam::Pose3 target_T_base = toGtsam(target_T_base_tf_.transform);
 
   for (const auto & pair : time_to_key_) {
     if (results.exists(pair.second)) {
       geometry_msgs::msg::PoseStamped ps;
       ps.header.frame_id = params_.map_frame;
       ps.header.stamp = pair.first;
-      ps.pose = toPoseMsg(results.at<gtsam::Pose3>(pair.second) * T_target_base);
+      ps.pose = toPoseMsg(results.at<gtsam::Pose3>(pair.second) * target_T_base);
       path_msg.poses.push_back(ps);
     }
   }
