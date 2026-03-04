@@ -157,7 +157,11 @@ void FactorGraphNode::setupRosInterfaces()
         if (state_ != State::RUNNING) {
           initializeGraph();
         } else {
-          cv_.notify_one();
+          {
+            std::scoped_lock lock(frontend_trigger_mutex_);
+            frontend_trigger_ = true;
+          }
+          frontend_cv_.notify_one();
         }
       } else {
         if (state_ == State::RUNNING && dvl_timed_out) {
@@ -165,7 +169,11 @@ void FactorGraphNode::setupRosInterfaces()
             get_logger(), *get_clock(), 5000,
             "DVL timed out (%.2fs)! Using depth sensor to trigger keyframes.",
             time_since_dvl);
-          cv_.notify_one();
+          {
+            std::scoped_lock lock(frontend_trigger_mutex_);
+            frontend_trigger_ = true;
+          }
+          frontend_cv_.notify_one();
         }
       }
     },
@@ -235,7 +243,11 @@ void FactorGraphNode::setupRosInterfaces()
         if (state_ != State::RUNNING) {
           initializeGraph();
         } else {
-          cv_.notify_one();
+          {
+            std::scoped_lock lock(frontend_trigger_mutex_);
+            frontend_trigger_ = true;
+          }
+          frontend_cv_.notify_one();
         }
       }
     },
@@ -292,7 +304,8 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions & options)
 
   setupRosInterfaces();
   state_initializer_ = std::make_unique<utils::StateInitializer>(params_);
-  worker_thread_ = std::thread(&FactorGraphNode::workerLoop, this);
+  frontend_thread_ = std::thread(&FactorGraphNode::frontendLoop, this);
+  backend_thread_ = std::thread(&FactorGraphNode::backendLoop, this);
 
   RCLCPP_INFO(get_logger(), "Startup complete! Waiting for sensor messages...");
 }
@@ -300,9 +313,21 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions & options)
 FactorGraphNode::~FactorGraphNode()
 {
   is_running_ = false;
-  cv_.notify_all();
-  if (worker_thread_.joinable()) {
-    worker_thread_.join();
+  {
+    std::scoped_lock lock(frontend_trigger_mutex_);
+    frontend_trigger_ = true;
+  }
+  frontend_cv_.notify_all();
+  {
+    std::scoped_lock lock(backend_trigger_mutex_);
+    backend_trigger_ = true;
+  }
+  backend_cv_.notify_all();
+  if (frontend_thread_.joinable()) {
+    frontend_thread_.join();
+  }
+  if (backend_thread_.joinable()) {
+    backend_thread_.join();
   }
 }
 
@@ -824,11 +849,6 @@ gtsam::Rot3 FactorGraphNode::getInterpolatedOrientation(
   const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
   const rclcpp::Time & target_time)
 {
-  if (imu_msgs.empty()) {
-    RCLCPP_DEBUG(get_logger(), "IMU queue empty. Returning identity rotation.");
-    return gtsam::Rot3();
-  }
-
   auto it_after = std::lower_bound(
     imu_msgs.begin(), imu_msgs.end(), target_time,
     [](const auto & msg, const rclcpp::Time & t) {
@@ -922,8 +942,8 @@ void FactorGraphNode::addPreintegratedDvlFactor(
       pim.resetIntegration();
 
       rclcpp::Time current_loop_time = last_dvl_time;
-      gtsam::Vector3 last_acc = gtsam::Vector3::Zero();
-      gtsam::Vector3 last_gyr = gtsam::Vector3::Zero();
+      gtsam::Vector3 last_acc = last_imu_acc_;
+      gtsam::Vector3 last_gyr = last_imu_gyr_;
 
       for (const auto & msg : imu_msgs) {
         rclcpp::Time imu_time(msg->header.stamp);
@@ -1025,7 +1045,7 @@ void FactorGraphNode::broadcastGlobalTf(
     gtsam::Pose3 odom_T_base = toGtsam(
       tf_buffer_->lookupTransform(
         params_.odom_frame, params_.base_frame,
-        timestamp, rclcpp::Duration::from_seconds(0.05)).transform);
+        tf2::TimePointZero).transform);
     gtsam::Pose3 map_T_odom = pose_base * odom_T_base.inverse();
 
     geometry_msgs::msg::TransformStamped tf_msg;
@@ -1115,11 +1135,12 @@ void FactorGraphNode::publishGraphMetrics(const rclcpp::Time & timestamp)
   graph_metrics_pub_->publish(metrics_msg);
 }
 
-void FactorGraphNode::workerLoop()
+void FactorGraphNode::frontendLoop()
 {
   while (is_running_) {
-    std::unique_lock<std::mutex> lock(trigger_mutex_);
-    cv_.wait(lock);
+    std::unique_lock<std::mutex> lock(frontend_trigger_mutex_);
+    frontend_cv_.wait(lock, [this] {return frontend_trigger_ || !is_running_;});
+    frontend_trigger_ = false;
 
     if (!is_running_) {
       break;
@@ -1142,7 +1163,29 @@ void FactorGraphNode::workerLoop()
 
       if (should_update) {
         updateGraph();
+        {
+          std::scoped_lock lock(backend_trigger_mutex_);
+          backend_trigger_ = true;
+        }
+        backend_cv_.notify_one();
       }
+    }
+  }
+}
+
+void FactorGraphNode::backendLoop()
+{
+  while (is_running_) {
+    std::unique_lock<std::mutex> lock(backend_trigger_mutex_);
+    backend_cv_.wait(lock, [this] {return backend_trigger_ || !is_running_;});
+    backend_trigger_ = false;
+
+    if (!is_running_) {
+      break;
+    }
+
+    if (state_ == State::RUNNING) {
+      lock.unlock();
 
       bool should_optimize = true;
       if (params_.max_opt_rate > 0.0) {
@@ -1165,12 +1208,7 @@ void FactorGraphNode::workerLoop()
 
 void FactorGraphNode::updateGraph()
 {
-  std::scoped_lock update_lock(update_mutex_);
   rclcpp::Time target_time{0, 0, RCL_ROS_TIME};
-
-  if (imu_queue_.empty()) {
-    return;
-  }
 
   if (params_.experimental.enable_dvl_preintegration) {
     if (depth_queue_.empty()) {return;}
@@ -1272,47 +1310,48 @@ void FactorGraphNode::updateGraph()
     }
   }
 
-  // --- Predict Initial Values ---
-  auto pred = imu_preintegrator_->predict(gtsam::NavState(prev_pose_, prev_vel_), prev_imu_bias_);
-  new_values.insert(X(current_step_), pred.pose());
-  new_values.insert(V(current_step_), pred.velocity());
-  new_values.insert(B(current_step_), prev_imu_bias_);
-  new_timestamps[X(current_step_)] = target_time.seconds();
-  new_timestamps[V(current_step_)] = target_time.seconds();
-  new_timestamps[B(current_step_)] = target_time.seconds();
+  {
+    std::scoped_lock update_lock(buffer_mutex_);
 
-  // --- Reset Preintegrators ---
-  imu_preintegrator_->resetIntegrationAndSetBias(prev_imu_bias_);
+    // --- Predict Initial Values ---
+    auto pred = imu_preintegrator_->predict(gtsam::NavState(prev_pose_, prev_vel_), prev_imu_bias_);
+    new_values.insert(X(current_step_), pred.pose());
+    new_values.insert(V(current_step_), pred.velocity());
+    new_values.insert(B(current_step_), prev_imu_bias_);
+    new_timestamps[X(current_step_)] = target_time.seconds();
+    new_timestamps[V(current_step_)] = target_time.seconds();
+    new_timestamps[B(current_step_)] = target_time.seconds();
 
-  if (params_.publish_smoothed_path) {
-    time_to_key_[target_time] = X(current_step_);
-    if (!isam_) {
-      time_to_key_.erase(
-        time_to_key_.begin(),
-        time_to_key_.lower_bound(
-          target_time - rclcpp::Duration::from_seconds(params_.smoother_lag)));
+    // --- Reset Preintegrators ---
+    imu_preintegrator_->resetIntegrationAndSetBias(prev_imu_bias_);
+
+    if (params_.publish_smoothed_path) {
+      time_to_key_[target_time] = X(current_step_);
+      if (!isam_) {
+        time_to_key_.erase(
+          time_to_key_.begin(),
+          time_to_key_.lower_bound(
+            target_time - rclcpp::Duration::from_seconds(params_.smoother_lag)));
+      }
     }
+
+    prev_time_ = target_time;
+    prev_step_ = current_step_;
+    current_step_++;
+
+    // --- Add Graph to Buffer ---
+    buffer_graph_ += new_graph;
+    buffer_values_.insert(new_values);
+    buffer_timestamps_.insert(new_timestamps.begin(), new_timestamps.end());
+    buffer_target_time_ = target_time;
+    buffer_last_step_ = prev_step_;
+    has_buffer_ = true;
   }
-
-  prev_time_ = target_time;
-  prev_step_ = current_step_;
-  current_step_++;
-
-  // --- Add Graph to Buffer ---
-  pending_graph_ += new_graph;
-  pending_values_.insert(new_values);
-  pending_timestamps_.insert(new_timestamps.begin(), new_timestamps.end());
-  pending_target_time_ = target_time;
-  pending_last_step_ = prev_step_;
-  has_pending_ = true;
 }
 
 void FactorGraphNode::optimizeGraph()
 {
-  std::unique_lock<std::mutex> opt_lock(opt_mutex_, std::try_to_lock);
-  if (!opt_lock.owns_lock()) {return;}
-
-  // --- Load Buffer ---
+  // --- Load Graph from Buffer ---
   gtsam::NonlinearFactorGraph batch_graph;
   gtsam::Values batch_values;
   gtsam::IncrementalFixedLagSmoother::KeyTimestampMap batch_timestamps;
@@ -1320,19 +1359,19 @@ void FactorGraphNode::optimizeGraph()
   size_t batch_last_step = 0;
 
   {
-    std::scoped_lock update_lock(update_mutex_);
-    if (!has_pending_) {return;}
+    std::scoped_lock update_lock(buffer_mutex_);
+    if (!has_buffer_) {return;}
 
-    batch_graph = std::move(pending_graph_);
-    batch_values = std::move(pending_values_);
-    batch_timestamps = std::move(pending_timestamps_);
-    batch_target_time = pending_target_time_;
-    batch_last_step = pending_last_step_;
+    batch_graph = std::move(buffer_graph_);
+    batch_values = std::move(buffer_values_);
+    batch_timestamps = std::move(buffer_timestamps_);
+    batch_target_time = buffer_target_time_;
+    batch_last_step = buffer_last_step_;
 
-    pending_graph_ = gtsam::NonlinearFactorGraph();
-    pending_values_ = gtsam::Values();
-    pending_timestamps_.clear();
-    has_pending_ = false;
+    buffer_graph_ = gtsam::NonlinearFactorGraph();
+    buffer_values_ = gtsam::Values();
+    buffer_timestamps_.clear();
+    has_buffer_ = false;
   }
 
   // --- Detect Processing Overflow ---
@@ -1362,7 +1401,7 @@ void FactorGraphNode::optimizeGraph()
         std::chrono::duration<double>(smoother_end - smoother_start).count();
 
       {
-        std::scoped_lock update_lock(update_mutex_);
+        std::scoped_lock update_lock(buffer_mutex_);
         prev_pose_ = inc_smoother_->calculateEstimate<gtsam::Pose3>(X(batch_last_step));
         prev_vel_ = inc_smoother_->calculateEstimate<gtsam::Vector3>(V(batch_last_step));
         prev_imu_bias_ =
@@ -1382,7 +1421,7 @@ void FactorGraphNode::optimizeGraph()
         std::chrono::duration<double>(smoother_end - smoother_start).count();
 
       {
-        std::scoped_lock update_lock(update_mutex_);
+        std::scoped_lock update_lock(buffer_mutex_);
         prev_pose_ = isam_->calculateEstimate<gtsam::Pose3>(X(batch_last_step));
         prev_vel_ = isam_->calculateEstimate<gtsam::Vector3>(V(batch_last_step));
         prev_imu_bias_ =

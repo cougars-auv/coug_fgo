@@ -97,19 +97,24 @@ protected:
   void initializeGraph();
 
   /**
-   * @brief Builds factors for one keyframe and accumulates them in the pending buffer.
+   * @brief Builds factors for one keyframe and accumulates them in the buffer buffer.
    */
   void updateGraph();
 
   /**
-   * @brief Consumes the pending buffer and runs the GTSAM smoother.
+   * @brief Consumes the buffer buffer and runs the GTSAM smoother.
    */
   void optimizeGraph();
 
   /**
-   * @brief The background loop run by the dedicated worker thread.
+   * @brief The background loop run by the dedicated frontend thread.
    */
-  void workerLoop();
+  void frontendLoop();
+
+  /**
+   * @brief The background loop run by the dedicated backend thread.
+   */
+  void backendLoop();
 
   // --- Setup & Helpers ---
   /**
@@ -356,23 +361,27 @@ protected:
   utils::ThreadSafeQueue<geometry_msgs::msg::WrenchStamped::SharedPtr> wrench_queue_;
 
   // --- Multithreading ---
-  std::thread worker_thread_;
-  std::condition_variable cv_;
-  std::mutex trigger_mutex_;
+  std::thread frontend_thread_;
+  std::thread backend_thread_;
+  std::condition_variable frontend_cv_;
+  std::condition_variable backend_cv_;
+  std::mutex frontend_trigger_mutex_;
+  std::mutex backend_trigger_mutex_;
+  bool frontend_trigger_{false};
+  bool backend_trigger_{false};
   std::atomic<bool> is_running_{true};
 
   rclcpp::CallbackGroup::SharedPtr sensor_cb_group_;
   std::mutex initialization_mutex_;
-  std::mutex update_mutex_;
-  std::mutex opt_mutex_;
+  std::mutex buffer_mutex_;
 
   // --- Graph Buffer ---
-  gtsam::NonlinearFactorGraph pending_graph_;
-  gtsam::Values pending_values_;
-  gtsam::IncrementalFixedLagSmoother::KeyTimestampMap pending_timestamps_;
-  rclcpp::Time pending_target_time_{0, 0, RCL_ROS_TIME};
-  size_t pending_last_step_ = 0;
-  bool has_pending_ = false;
+  gtsam::NonlinearFactorGraph buffer_graph_;
+  gtsam::Values buffer_values_;
+  gtsam::IncrementalFixedLagSmoother::KeyTimestampMap buffer_timestamps_;
+  rclcpp::Time buffer_target_time_{0, 0, RCL_ROS_TIME};
+  size_t buffer_last_step_ = 0;
+  bool has_buffer_ = false;
 
   // --- Transformations ---
   geometry_msgs::msg::TransformStamped target_T_base_tf_;
