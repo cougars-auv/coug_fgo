@@ -491,7 +491,9 @@ void FactorGraphNode::initializeGraph()
   gtsam::Values initial_values;
   addPriorFactors(initial_graph, initial_values);
 
-  time_to_key_[state_initializer_->time_] = X(0);
+  if (params_.publish_smoothed_path) {
+    time_to_key_[state_initializer_->time_] = X(0);
+  }
 
   // --- Initialize Preintegrators ---
   imu_preintegrator_ = std::make_unique<gtsam::PreintegratedCombinedMeasurements>(
@@ -1282,12 +1284,14 @@ void FactorGraphNode::updateGraph()
   // --- Reset Preintegrators ---
   imu_preintegrator_->resetIntegrationAndSetBias(prev_imu_bias_);
 
-  time_to_key_[target_time] = X(current_step_);
-  if (!isam_) {
-    time_to_key_.erase(
-      time_to_key_.begin(),
-      time_to_key_.lower_bound(
-        target_time - rclcpp::Duration::from_seconds(params_.smoother_lag)));
+  if (params_.publish_smoothed_path) {
+    time_to_key_[target_time] = X(current_step_);
+    if (!isam_) {
+      time_to_key_.erase(
+        time_to_key_.begin(),
+        time_to_key_.lower_bound(
+          target_time - rclcpp::Duration::from_seconds(params_.smoother_lag)));
+    }
   }
 
   prev_time_ = target_time;
