@@ -26,6 +26,8 @@
 #include <stdexcept>
 #include <utility>
 
+#include <rclcpp/rclcpp.hpp>
+
 namespace coug_fgo::utils
 {
 
@@ -45,7 +47,7 @@ public:
   {
     std::scoped_lock lock(mutex_);
     queue_.push_back(value);
-    last_msg_time_ = value->header.stamp.sec + value->header.stamp.nanosec * 1e-9;
+    last_msg_time_ = rclcpp::Time(value->header.stamp);
   }
 
   /**
@@ -84,9 +86,9 @@ public:
 
   /**
    * @brief Gets the timestamp of the last message added to the queue.
-   * @return The timestamp in seconds.
+   * @return The timestamp as rclcpp::Time.
    */
-  double getLastTime() const
+  rclcpp::Time getLastTime() const
   {
     std::scoped_lock lock(mutex_);
     return last_msg_time_;
@@ -130,7 +132,7 @@ public:
 private:
   mutable std::mutex mutex_;
   std::deque<T> queue_;
-  double last_msg_time_ = 0.0;
+  rclcpp::Time last_msg_time_{0, 0, RCL_ROS_TIME};
 };
 
 }  // namespace coug_fgo::utils

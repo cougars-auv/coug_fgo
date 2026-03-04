@@ -165,33 +165,33 @@ protected:
   /**
    * @brief Adds a constant velocity factor to the graph.
    * @param graph The target factor graph.
-   * @param target_time The timestamp in seconds for the new state key.
+   * @param target_time The timestamp for the new state key.
    */
   void addConstantVelocityFactor(
     gtsam::NonlinearFactorGraph & graph,
-    double target_time);
+    const rclcpp::Time & target_time);
 
   /**
    * @brief Adds an AUV dynamics factor to the graph.
    * @param graph The target factor graph.
    * @param wrench_msgs Queue of wrench messages to process.
-   * @param target_time The timestamp in seconds for the new state key.
+   * @param target_time The timestamp for the new state key.
    */
   void addAuvDynamicsFactor(
     gtsam::NonlinearFactorGraph & graph,
     const std::deque<geometry_msgs::msg::WrenchStamped::SharedPtr> & wrench_msgs,
-    double target_time);
+    const rclcpp::Time & target_time);
 
   /**
    * @brief Integrates and adds a combined IMU factor to the graph.
    * @param graph The target factor graph.
    * @param imu_msgs Queue of IMU messages to process.
-   * @param target_time The timestamp in seconds for the new state key.
+   * @param target_time The timestamp for the new state key.
    */
   void addPreintegratedImuFactor(
     gtsam::NonlinearFactorGraph & graph,
     const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
-    double target_time);
+    const rclcpp::Time & target_time);
 
   /**
    * @brief Interpolates orientation between IMU messages.
@@ -201,7 +201,7 @@ protected:
    */
   gtsam::Rot3 getInterpolatedOrientation(
     const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
-    double target_time);
+    const rclcpp::Time & target_time);
 
   /**
    * @brief Integrates and adds a preintegrated DVL factor to the graph.
@@ -214,7 +214,7 @@ protected:
     gtsam::NonlinearFactorGraph & graph,
     const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & dvl_msgs,
     const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
-    double target_time);
+    const rclcpp::Time & target_time);
 
   // --- Publishing ---
   /**
@@ -299,7 +299,7 @@ protected:
 
   size_t prev_step_ = 0;
   size_t current_step_ = 1;
-  double prev_time_ = 0.0;
+  rclcpp::Time prev_time_{0, 0, RCL_ROS_TIME};
 
   std::atomic<double> last_opt_duration_{0.0};
   std::atomic<double> last_prep_duration_{0.0};
@@ -309,7 +309,7 @@ protected:
   std::atomic<size_t> new_factors_{0};
   std::atomic<size_t> total_factors_{0};
   std::atomic<size_t> total_variables_{0};
-  std::map<double, gtsam::Key> time_to_key_;
+  std::map<rclcpp::Time, gtsam::Key> time_to_key_;
 
   // --- GTSAM Objects ---
   std::unique_ptr<gtsam::IncrementalFixedLagSmoother> inc_smoother_;

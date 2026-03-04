@@ -54,7 +54,7 @@ protected:
 TEST_F(ThreadSafeQueueTest, Initialization) {
   EXPECT_TRUE(queue.empty());
   EXPECT_EQ(queue.size(), 0u);
-  EXPECT_DOUBLE_EQ(queue.getLastTime(), 0.0);
+  EXPECT_EQ(queue.getLastTime(), rclcpp::Time(0, 0, RCL_ROS_TIME));
 }
 
 /**
@@ -64,11 +64,11 @@ TEST_F(ThreadSafeQueueTest, PushAndSize) {
   queue.push(createMsg(1.0));
   EXPECT_FALSE(queue.empty());
   EXPECT_EQ(queue.size(), 1u);
-  EXPECT_DOUBLE_EQ(queue.getLastTime(), 1.0);
+  EXPECT_EQ(queue.getLastTime().seconds(), 1.0);
 
   queue.push(createMsg(2.5));
   EXPECT_EQ(queue.size(), 2u);
-  EXPECT_DOUBLE_EQ(queue.getLastTime(), 2.5);
+  EXPECT_EQ(queue.getLastTime().seconds(), 2.5);
 }
 
 /**

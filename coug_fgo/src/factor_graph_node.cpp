@@ -151,7 +151,7 @@ void FactorGraphNode::setupRosInterfaces()
       }
       depth_queue_.push(msg);
 
-      double time_since_dvl = this->get_clock()->now().seconds() - dvl_queue_.getLastTime();
+      double time_since_dvl = (this->get_clock()->now() - dvl_queue_.getLastTime()).seconds();
       bool dvl_timed_out = time_since_dvl > params_.dvl.timeout_threshold;
 
       if (params_.experimental.enable_dvl_preintegration) {
@@ -459,7 +459,7 @@ void FactorGraphNode::initializeGraph()
   utils::QueueBundle queues{
     imu_queue_, gps_queue_, depth_queue_, mag_queue_, ahrs_queue_, dvl_queue_};
 
-  if (!state_initializer_->update(get_clock()->now().seconds(), queues)) {
+  if (!state_initializer_->update(get_clock()->now(), queues)) {
     return;
   }
 
@@ -505,9 +505,9 @@ void FactorGraphNode::initializeGraph()
 
   // --- Initialize Smoother ---
   gtsam::IncrementalFixedLagSmoother::KeyTimestampMap initial_timestamps;
-  initial_timestamps[X(0)] = prev_time_;
-  initial_timestamps[V(0)] = prev_time_;
-  initial_timestamps[B(0)] = prev_time_;
+  initial_timestamps[X(0)] = prev_time_.seconds();
+  initial_timestamps[V(0)] = prev_time_.seconds();
+  initial_timestamps[B(0)] = prev_time_.seconds();
 
   gtsam::ISAM2Params isam2_params;
   isam2_params.relinearizeThreshold = params_.relinearize_threshold;
@@ -700,9 +700,9 @@ void FactorGraphNode::addDvlFactor(
 
 void FactorGraphNode::addConstantVelocityFactor(
   gtsam::NonlinearFactorGraph & graph,
-  double target_time)
+  const rclcpp::Time & target_time)
 {
-  double dt = target_time - prev_time_;
+  double dt = (target_time - prev_time_).seconds();
   Eigen::Vector3d vel_random_walk = toGtsam(params_.const_vel.velocity_sigma);
   double sqrt_dt = std::sqrt(std::max(dt, 0.001));
   Eigen::Vector3d scaled_sigma = vel_random_walk * sqrt_dt;
@@ -721,7 +721,7 @@ void FactorGraphNode::addConstantVelocityFactor(
 void FactorGraphNode::addAuvDynamicsFactor(
   gtsam::NonlinearFactorGraph & graph,
   const std::deque<geometry_msgs::msg::WrenchStamped::SharedPtr> & wrench_msgs,
-  double target_time)
+  const rclcpp::Time & target_time)
 {
   if (target_T_com_tf_.header.frame_id.empty()) {return;}
 
@@ -745,7 +745,7 @@ void FactorGraphNode::addAuvDynamicsFactor(
       gtsam::noiseModel::mEstimator::Tukey::Create(params_.dynamics.robust_k), dynamics_noise);
   }
 
-  double dt = target_time - prev_time_;
+  double dt = (target_time - prev_time_).seconds();
   RCLCPP_DEBUG(get_logger(), "Adding dynamics factor at step %zu", current_step_);
   graph.emplace_shared<coug_fgo::factors::AuvDynamicsFactorArm>(
     X(prev_step_), V(prev_step_),
@@ -760,15 +760,16 @@ void FactorGraphNode::addAuvDynamicsFactor(
 
 void FactorGraphNode::addPreintegratedImuFactor(
   gtsam::NonlinearFactorGraph & graph,
-  const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs, double target_time)
+  const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
+  const rclcpp::Time & target_time)
 {
   if (target_T_imu_tf_.header.frame_id.empty() || !imu_preintegrator_ || imu_msgs.empty()) {return;}
 
-  double last_imu_time = prev_time_;
+  rclcpp::Time last_imu_time = prev_time_;
   std::deque<sensor_msgs::msg::Imu::SharedPtr> unused_imu_msgs;
 
   for (const auto & imu_msg : imu_msgs) {
-    double current_imu_time = rclcpp::Time(imu_msg->header.stamp).seconds();
+    rclcpp::Time current_imu_time(imu_msg->header.stamp);
     if (current_imu_time > target_time) {
       unused_imu_msgs.push_back(imu_msg);
       continue;
@@ -779,7 +780,7 @@ void FactorGraphNode::addPreintegratedImuFactor(
       continue;
     }
 
-    double dt = current_imu_time - last_imu_time;
+    double dt = (current_imu_time - last_imu_time).seconds();
     if (dt > 1e-9) {
       imu_preintegrator_->integrateMeasurement(last_imu_acc_, last_imu_gyr_, dt);
     }
@@ -791,7 +792,7 @@ void FactorGraphNode::addPreintegratedImuFactor(
 
   // Extra measurement to reach exact target time
   if (last_imu_time < target_time) {
-    double dt = target_time - last_imu_time;
+    double dt = (target_time - last_imu_time).seconds();
     if (dt > 1e-6) {
       imu_preintegrator_->integrateMeasurement(last_imu_acc_, last_imu_gyr_, dt);
     }
@@ -812,7 +813,8 @@ void FactorGraphNode::addPreintegratedImuFactor(
 }
 
 gtsam::Rot3 FactorGraphNode::getInterpolatedOrientation(
-  const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs, double target_time)
+  const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
+  const rclcpp::Time & target_time)
 {
   if (imu_msgs.empty()) {
     RCLCPP_DEBUG(get_logger(), "IMU queue empty. Returning identity rotation.");
@@ -821,7 +823,9 @@ gtsam::Rot3 FactorGraphNode::getInterpolatedOrientation(
 
   auto it_after = std::lower_bound(
     imu_msgs.begin(), imu_msgs.end(), target_time,
-    [](const auto & msg, double t) {return rclcpp::Time(msg->header.stamp).seconds() < t;});
+    [](const auto & msg, const rclcpp::Time & t) {
+      return rclcpp::Time(msg->header.stamp) < t;
+    });
 
   if (it_after == imu_msgs.begin()) {return toGtsam(imu_msgs.front()->orientation);}
 
@@ -831,15 +835,15 @@ gtsam::Rot3 FactorGraphNode::getInterpolatedOrientation(
     it_after--;
   }
 
-  double t1 = rclcpp::Time((*(it_after - 1))->header.stamp).seconds();
-  double t2 = rclcpp::Time((*it_after)->header.stamp).seconds();
-  double denominator = t2 - t1;
+  rclcpp::Time t1((*(it_after - 1))->header.stamp);
+  rclcpp::Time t2((*it_after)->header.stamp);
+  double denominator = (t2 - t1).seconds();
 
   if (std::abs(denominator) < 1e-9) {
     return toGtsam((*(it_after - 1))->orientation);
   }
 
-  double alpha = (target_time - t1) / denominator;
+  double alpha = (target_time - t1).seconds() / denominator;
 
   // Use Slerp for quaternion interpolation (handles alpha > 1.0 for extrapolation)
   return toGtsam((*(it_after - 1))->orientation).slerp(alpha, toGtsam((*it_after)->orientation));
@@ -848,11 +852,12 @@ gtsam::Rot3 FactorGraphNode::getInterpolatedOrientation(
 void FactorGraphNode::addPreintegratedDvlFactor(
   gtsam::NonlinearFactorGraph & graph,
   const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & dvl_msgs,
-  const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs, double target_time)
+  const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
+  const rclcpp::Time & target_time)
 {
   if (target_T_imu_tf_.header.frame_id.empty() || !dvl_preintegrator_ || imu_msgs.empty()) {return;}
 
-  double last_dvl_time = prev_time_;
+  rclcpp::Time last_dvl_time = prev_time_;
   std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> unused_dvl_msgs;
 
   gtsam::Rot3 target_R_imu = toGtsam(target_T_imu_tf_.transform.rotation);
@@ -864,7 +869,7 @@ void FactorGraphNode::addPreintegratedDvlFactor(
   dvl_preintegrator_->reset(world_R_imu_prev * imu_R_dvl);
 
   for (const auto & dvl_msg : dvl_msgs) {
-    double current_dvl_time = rclcpp::Time(dvl_msg->header.stamp).seconds();
+    rclcpp::Time current_dvl_time(dvl_msg->header.stamp);
     if (current_dvl_time > target_time) {
       unused_dvl_msgs.push_back(dvl_msg);
       continue;
@@ -875,7 +880,7 @@ void FactorGraphNode::addPreintegratedDvlFactor(
       continue;
     }
 
-    double dt = current_dvl_time - last_dvl_time;
+    double dt = (current_dvl_time - last_dvl_time).seconds();
     if (dt > 1e-9) {
       // Integrate DVL measurement alongside interpolated IMU attitude
       gtsam::Rot3 world_R_imu_cur = getInterpolatedOrientation(imu_msgs, current_dvl_time);
@@ -908,23 +913,23 @@ void FactorGraphNode::addPreintegratedDvlFactor(
       gtsam::PreintegratedCombinedMeasurements pim = *imu_preintegrator_;
       pim.resetIntegration();
 
-      double current_loop_time = last_dvl_time;
+      rclcpp::Time current_loop_time = last_dvl_time;
       gtsam::Vector3 last_acc = gtsam::Vector3::Zero();
       gtsam::Vector3 last_gyr = gtsam::Vector3::Zero();
 
       for (const auto & msg : imu_msgs) {
-        double imu_time = rclcpp::Time(msg->header.stamp).seconds();
+        rclcpp::Time imu_time(msg->header.stamp);
         if (imu_time <= last_dvl_time) {continue;}
         if (imu_time > target_time) {break;}
 
         last_acc = toGtsam(msg->linear_acceleration);
         last_gyr = toGtsam(msg->angular_velocity);
-        pim.integrateMeasurement(last_acc, last_gyr, imu_time - current_loop_time);
+        pim.integrateMeasurement(last_acc, last_gyr, (imu_time - current_loop_time).seconds());
         current_loop_time = imu_time;
       }
 
       if (target_time > current_loop_time) {
-        pim.integrateMeasurement(last_acc, last_gyr, target_time - current_loop_time);
+        pim.integrateMeasurement(last_acc, last_gyr, (target_time - current_loop_time).seconds());
       }
 
       gtsam::Rot3 start_imu_rot = getInterpolatedOrientation(imu_msgs, last_dvl_time);
@@ -938,12 +943,13 @@ void FactorGraphNode::addPreintegratedDvlFactor(
       gtsam::Vector3 dvl_body_vel = dvl_R_imu.unrotate(predicted_state.bodyVelocity());
 
       dvl_preintegrator_->integrateMeasurement(
-        dvl_body_vel, predicted_state.attitude() * imu_R_dvl, target_time - last_dvl_time,
+        dvl_body_vel, predicted_state.attitude() * imu_R_dvl,
+        (target_time - last_dvl_time).seconds(),
         gtsam::I_3x3 * 0.02);  // Hard-coded TURTLMap covariance
 
       last_dvl_velocity_ = dvl_body_vel;
     } else {
-      double dt = target_time - last_dvl_time;
+      double dt = (target_time - last_dvl_time).seconds();
       if (dt > 1e-6) {
         gtsam::Rot3 cur_imu_att = getInterpolatedOrientation(imu_msgs, target_time);
         gtsam::Rot3 cur_dvl_att = cur_imu_att * imu_R_dvl;
@@ -1038,7 +1044,7 @@ void FactorGraphNode::publishSmoothedPath(
     if (results.exists(pair.second)) {
       geometry_msgs::msg::PoseStamped ps;
       ps.header.frame_id = params_.map_frame;
-      ps.header.stamp = rclcpp::Time(static_cast<int64_t>(pair.first * 1e9));
+      ps.header.stamp = pair.first;
       ps.pose = toPoseMsg(results.at<gtsam::Pose3>(pair.second) * T_target_base);
       path_msg.poses.push_back(ps);
     }
@@ -1105,7 +1111,7 @@ void FactorGraphNode::optimizeGraph()
   if (!opt_lock.owns_lock()) {return;}
 
   auto opt_start = std::chrono::high_resolution_clock::now();
-  double target_time = 0.0;
+  rclcpp::Time target_time{0, 0, RCL_ROS_TIME};
   bool should_abort = false;
 
   if (imu_queue_.empty()) {
@@ -1114,21 +1120,18 @@ void FactorGraphNode::optimizeGraph()
 
   if (params_.experimental.enable_dvl_preintegration) {
     if (depth_queue_.empty()) {return;}
-    target_time = depth_queue_.back()->header.stamp.sec +
-      depth_queue_.back()->header.stamp.nanosec * 1e-9;
+    target_time = rclcpp::Time(depth_queue_.back()->header.stamp);
   } else {
     if (dvl_queue_.empty() && depth_queue_.empty()) {return;}
 
     if (!dvl_queue_.empty()) {
-      target_time = dvl_queue_.back()->header.stamp.sec +
-        dvl_queue_.back()->header.stamp.nanosec * 1e-9;
+      target_time = rclcpp::Time(dvl_queue_.back()->header.stamp);
     } else {
-      target_time = depth_queue_.back()->header.stamp.sec +
-        depth_queue_.back()->header.stamp.nanosec * 1e-9;
+      target_time = rclcpp::Time(depth_queue_.back()->header.stamp);
     }
   }
 
-  if (target_time <= prev_time_ + 1e-6) {
+  if (target_time <= prev_time_ + rclcpp::Duration::from_seconds(1e-6)) {
     RCLCPP_DEBUG(get_logger(), "Duplicate or out-of-order timestamp detected. Skipping.");
     if (params_.experimental.enable_dvl_preintegration) {
       depth_queue_.pop_back();
@@ -1139,7 +1142,7 @@ void FactorGraphNode::optimizeGraph()
   }
 
   if (!should_abort && params_.max_keyframe_rate > 0.0) {
-    double min_period = 1.0 / params_.max_keyframe_rate;
+    rclcpp::Duration min_period = rclcpp::Duration::from_seconds(1.0 / params_.max_keyframe_rate);
     if (target_time - prev_time_ < min_period) {
       RCLCPP_DEBUG(get_logger(), "Limiting keyframe rate. Skipping.");
       if (params_.experimental.enable_dvl_preintegration) {
@@ -1249,9 +1252,9 @@ void FactorGraphNode::optimizeGraph()
   new_values.insert(X(current_step_), pred.pose());
   new_values.insert(V(current_step_), pred.velocity());
   new_values.insert(B(current_step_), prev_imu_bias_);
-  new_timestamps[X(current_step_)] = target_time;
-  new_timestamps[V(current_step_)] = target_time;
-  new_timestamps[B(current_step_)] = target_time;
+  new_timestamps[X(current_step_)] = target_time.seconds();
+  new_timestamps[V(current_step_)] = target_time.seconds();
+  new_timestamps[B(current_step_)] = target_time.seconds();
 
   try {
     auto prep_end = std::chrono::high_resolution_clock::now();
@@ -1297,7 +1300,8 @@ void FactorGraphNode::optimizeGraph()
     if (!isam_) {
       time_to_key_.erase(
         time_to_key_.begin(),
-        time_to_key_.lower_bound(target_time - params_.smoother_lag));
+        time_to_key_.lower_bound(
+          target_time - rclcpp::Duration::from_seconds(params_.smoother_lag)));
     }
 
     // --- Calculate Covariances ---
@@ -1334,36 +1338,35 @@ void FactorGraphNode::optimizeGraph()
 
     // --- Publish Global Odometry ---
     gtsam::Pose3 T_target_base = toGtsam(target_T_base_tf_.transform);
-    rclcpp::Time ros_target_time(static_cast<int64_t>(target_time * 1e9));
-    publishGlobalOdom(prev_pose_, new_pose_cov, ros_target_time);
+    publishGlobalOdom(prev_pose_, new_pose_cov, target_time);
 
     // --- Publish Global TF ---
     if (params_.publish_global_tf) {
-      broadcastGlobalTf(prev_pose_ * T_target_base, ros_target_time);
+      broadcastGlobalTf(prev_pose_ * T_target_base, target_time);
     }
 
     // --- Publish Smoothed Path ---
     if (params_.publish_smoothed_path) {
       if (inc_smoother_) {
-        publishSmoothedPath(inc_smoother_->calculateEstimate(), ros_target_time);
+        publishSmoothedPath(inc_smoother_->calculateEstimate(), target_time);
       } else if (isam_) {
-        publishSmoothedPath(isam_->calculateEstimate(), ros_target_time);
+        publishSmoothedPath(isam_->calculateEstimate(), target_time);
       }
     }
 
     // --- Publish Velocity ---
     if (params_.publish_velocity) {
-      publishVelocity(prev_vel_, vel_cov, ros_target_time);
+      publishVelocity(prev_vel_, vel_cov, target_time);
     }
 
     // --- Publish IMU Bias ---
     if (params_.publish_imu_bias) {
-      publishImuBias(prev_imu_bias_, bias_cov, ros_target_time);
+      publishImuBias(prev_imu_bias_, bias_cov, target_time);
     }
 
     // --- Publish Graph Metrics ---
     if (params_.publish_graph_metrics) {
-      publishGraphMetrics(ros_target_time);
+      publishGraphMetrics(target_time);
     }
 
     prev_time_ = target_time;
@@ -1380,17 +1383,17 @@ void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrap
   stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "All requested sensors online.");
 
   auto check_queue =
-    [&](const std::string & name, size_t size, double last_time, bool enabled, bool is_critical,
-      double timeout) {
+    [&](const std::string & name, size_t size, const rclcpp::Time & last_time, bool enabled,
+      bool is_critical, double timeout) {
       if (!enabled) {return;}
 
       double time_since =
-        (last_time > 0.0) ? (this->get_clock()->now().seconds() - last_time) : -1.0;
+        (last_time.nanoseconds() > 0) ? (this->get_clock()->now() - last_time).seconds() : -1.0;
 
       stat.add(name + " Queue Size", size);
       stat.add(name + " Time Since Last (s)", time_since);
 
-      if (time_since > timeout || (last_time == 0.0 && size == 0)) {
+      if (time_since > timeout || (last_time.nanoseconds() == 0 && size == 0)) {
         if (is_critical) {
           stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, name + " is offline.");
         } else {

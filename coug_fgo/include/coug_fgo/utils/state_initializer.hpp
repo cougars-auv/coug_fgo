@@ -27,6 +27,7 @@
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/wrench_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
+#include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/magnetic_field.hpp>
 #include <coug_fgo/utils/thread_safe_queue.hpp>
@@ -81,11 +82,11 @@ public:
 
   /**
    * @brief Updates the running averages with new data from sensor queues.
-   * @param current_time Current ROS time in seconds.
+   * @param current_time Current ROS time.
    * @param queues Bundle of sensor message queues.
    * @return True if initialization averaging is complete.
    */
-  bool update(double current_time, QueueBundle & queues)
+  bool update(const rclcpp::Time & current_time, QueueBundle & queues)
   {
     if (params_.prior.use_parameter_priors) {
       initial_imu_ = queues.imu.back();
@@ -103,13 +104,13 @@ public:
       return true;
     }
 
-    if (start_avg_time_ == 0.0) {
+    if (start_avg_time_.nanoseconds() == 0) {
       start_avg_time_ = current_time;
     }
 
     incrementAverages(queues);
 
-    return (current_time - start_avg_time_) >= params_.prior.initialization_duration;
+    return (current_time - start_avg_time_).seconds() >= params_.prior.initialization_duration;
   }
 
   /**
@@ -126,16 +127,16 @@ public:
     velocity_ = computeInitialVelocity(initial_orientation_target, tfs);
     bias_ = computeInitialBias();
     if (params_.experimental.enable_dvl_preintegration) {
-      time_ = initial_depth_->header.stamp.sec + initial_depth_->header.stamp.nanosec * 1e-9;
+      time_ = rclcpp::Time(initial_depth_->header.stamp);
     } else {
-      time_ = initial_dvl_->header.stamp.sec + initial_dvl_->header.stamp.nanosec * 1e-9;
+      time_ = rclcpp::Time(initial_dvl_->header.stamp);
     }
   }
 
   gtsam::Pose3 pose_;
   gtsam::Vector3 velocity_;
   gtsam::imuBias::ConstantBias bias_;
-  double time_ = 0.0;
+  rclcpp::Time time_{0, 0, RCL_ROS_TIME};
 
   sensor_msgs::msg::Imu::SharedPtr initial_imu_;
   nav_msgs::msg::Odometry::SharedPtr initial_gps_;
@@ -367,7 +368,7 @@ private:
   }
 
   const factor_graph_node::Params & params_;
-  double start_avg_time_ = 0.0;
+  rclcpp::Time start_avg_time_{0, 0, RCL_ROS_TIME};
   size_t imu_count_ = 0, gps_count_ = 0, depth_count_ = 0, mag_count_ = 0, ahrs_count_ = 0,
     dvl_count_ = 0;
   gtsam::Rot3 ahrs_ref_;
