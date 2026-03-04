@@ -1357,7 +1357,6 @@ void FactorGraphNode::optimizeGraph()
       last_smoother_duration_ =
         std::chrono::duration<double>(smoother_end - smoother_start).count();
 
-      // --- Update Estimates ---
       {
         std::scoped_lock update_lock(update_mutex_);
         prev_pose_ = inc_smoother_->calculateEstimate<gtsam::Pose3>(X(batch_last_step));
@@ -1378,7 +1377,6 @@ void FactorGraphNode::optimizeGraph()
       last_smoother_duration_ =
         std::chrono::duration<double>(smoother_end - smoother_start).count();
 
-      // --- Update Estimates ---
       {
         std::scoped_lock update_lock(update_mutex_);
         prev_pose_ = isam_->calculateEstimate<gtsam::Pose3>(X(batch_last_step));
