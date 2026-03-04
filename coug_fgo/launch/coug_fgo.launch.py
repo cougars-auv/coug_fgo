@@ -284,6 +284,7 @@ def generate_launch_description():
                 remappings=[
                     ("imu/data_raw", "imu/data_raw"),
                     ("imu/data", "imu/data"),
+                    ("imu/mag", "imu/mag"),
                 ],
             ),
             # https://docs.ros.org/en/melodic/api/robot_localization/html/state_estimation_nodes.html
