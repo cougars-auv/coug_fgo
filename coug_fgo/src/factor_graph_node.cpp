@@ -258,9 +258,6 @@ void FactorGraphNode::setupRosInterfaces()
         }
       }
       wrench_queue_.push(msg);
-      if (params_.dynamics.enable_dynamics) {
-        last_wrench_msg_ = msg;
-      }
     },
     sensor_options);
 
