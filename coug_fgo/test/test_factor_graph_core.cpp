@@ -103,7 +103,7 @@ protected:
       gtsam::Pose3(), gtsam::Pose3(), gtsam::Pose3(), gtsam::Pose3()};
   }
 
-  FactorGraphCore initializeCore()
+  std::unique_ptr<FactorGraphCore> initializeCore()
   {
     StateInitializer init(params_);
     QueueBundle q;
@@ -116,8 +116,8 @@ protected:
     TfBundle tfs = createIdentityTfs();
     init.compute(tfs);
 
-    FactorGraphCore core(params_);
-    core.initialize(init, tfs);
+    auto core = std::make_unique<FactorGraphCore>(params_);
+    core->initialize(init, tfs);
     return core;
   }
 };
@@ -127,7 +127,7 @@ protected:
  */
 TEST_F(FactorGraphCoreTest, Initialize) {
   auto core = initializeCore();
-  EXPECT_EQ(core.prev_time().seconds(), 1.0);
+  EXPECT_EQ(core->prev_time().seconds(), 1.0);
 }
 
 /**
@@ -142,7 +142,7 @@ TEST_F(FactorGraphCoreTest, UpdateStaleTime) {
   msgs.dvl.push_back(createDvlMsg(0.5));
 
   rclcpp::Time stale_time(0, 500000000, RCL_ROS_TIME);
-  auto result = core.update(stale_time, msgs);
+  auto result = core->update(stale_time, msgs);
   EXPECT_FALSE(result.has_value());
 }
 
@@ -160,9 +160,9 @@ TEST_F(FactorGraphCoreTest, Update) {
   msgs.dvl.push_back(createDvlMsg(1.3));
 
   rclcpp::Time target_time(1, 300000000, RCL_ROS_TIME);
-  auto result = core.update(target_time, msgs);
+  auto result = core->update(target_time, msgs);
   EXPECT_TRUE(result.has_value());
-  EXPECT_EQ(core.prev_time().seconds(), 1.3);
+  EXPECT_EQ(core->prev_time().seconds(), 1.3);
 }
 
 /**
@@ -179,9 +179,9 @@ TEST_F(FactorGraphCoreTest, Optimize) {
   msgs.dvl.push_back(createDvlMsg(1.3));
 
   rclcpp::Time target_time(1, 300000000, RCL_ROS_TIME);
-  core.update(target_time, msgs);
+  core->update(target_time, msgs);
 
-  auto result = core.optimize();
+  auto result = core->optimize();
   EXPECT_TRUE(result.has_value());
 
   // After one short step from identity, the pose should still be near identity
@@ -194,6 +194,6 @@ TEST_F(FactorGraphCoreTest, Optimize) {
  */
 TEST_F(FactorGraphCoreTest, OptimizeWithoutUpdate) {
   auto core = initializeCore();
-  auto result = core.optimize();
+  auto result = core->optimize();
   EXPECT_FALSE(result.has_value());
 }
