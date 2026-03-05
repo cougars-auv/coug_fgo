@@ -124,15 +124,11 @@ void FactorGraphNode::setupRosInterfaces()
       depth_queue_.push(msg);
 
       if (params_.experimental.enable_dvl_preintegration) {
-        if (state_ != State::RUNNING) {
-          initializeGraph();
-        } else {
-          {
-            std::scoped_lock lock(frontend_trigger_mutex_);
-            frontend_trigger_ = true;
-          }
-          frontend_cv_.notify_one();
+        {
+          std::scoped_lock lock(frontend_trigger_mutex_);
+          frontend_trigger_ = true;
         }
+        frontend_cv_.notify_one();
       } else {
         double time_since_dvl = (get_clock()->now() - dvl_queue_.getLastTime()).seconds();
         if (state_ == State::RUNNING && time_since_dvl > params_.dvl.timeout_threshold) {
@@ -183,15 +179,11 @@ void FactorGraphNode::setupRosInterfaces()
       dvl_queue_.push(msg);
 
       if (!params_.experimental.enable_dvl_preintegration) {
-        if (state_ != State::RUNNING) {
-          initializeGraph();
-        } else {
-          {
-            std::scoped_lock lock(frontend_trigger_mutex_);
-            frontend_trigger_ = true;
-          }
-          frontend_cv_.notify_one();
+        {
+          std::scoped_lock lock(frontend_trigger_mutex_);
+          frontend_trigger_ = true;
         }
+        frontend_cv_.notify_one();
       }
     },
     sensor_options);
@@ -266,73 +258,6 @@ FactorGraphNode::~FactorGraphNode()
   if (backend_thread_.joinable()) {
     backend_thread_.join();
   }
-}
-
-void FactorGraphNode::initializeGraph()
-{
-  std::scoped_lock init_lock(initialization_mutex_);
-  if (state_ == State::RUNNING) {
-    RCLCPP_DEBUG(get_logger(), "Duplicate initialization attempt detected.");
-    return;
-  }
-
-  // --- Wait for Sensor TFs ---
-  bool imu_ok = !target_T_imu_tf_.header.frame_id.empty();
-  bool gps_ok = !(params_.gps.enable_gps || params_.gps.enable_gps_init_only) ||
-    !target_T_gps_tf_.header.frame_id.empty();
-  bool depth_ok = !target_T_depth_tf_.header.frame_id.empty();
-  bool mag_ok = !(params_.mag.enable_mag || params_.mag.enable_mag_init_only) ||
-    !target_T_mag_tf_.header.frame_id.empty();
-  bool ahrs_ok = !(params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) ||
-    !target_T_ahrs_tf_.header.frame_id.empty();
-  bool dvl_ok = !target_T_dvl_tf_.header.frame_id.empty();
-
-  if (!(imu_ok && gps_ok && depth_ok && mag_ok && ahrs_ok && dvl_ok)) {
-    RCLCPP_WARN_THROTTLE(
-      get_logger(), *get_clock(), 5000, "Waiting for sensor TFs: %s%s%s%s%s%s",
-      !imu_ok ? "[IMU] " : "",
-      (!gps_ok && params_.gps.enable_gps) ? "[GPS] " : "",
-      (!mag_ok && params_.mag.enable_mag) ? "[Magnetometer] " : "",
-      (!ahrs_ok && params_.ahrs.enable_ahrs) ? "[AHRS] " : "",
-      !depth_ok ? "[Depth] " : "", !dvl_ok ? "[DVL] " : "");
-    return;
-  }
-
-  if (target_T_base_tf_.header.frame_id.empty()) {
-    try {
-      target_T_base_tf_ = tf_buffer_->lookupTransform(
-        params_.target_frame, params_.base_frame, tf2::TimePointZero);
-    } catch (const tf2::TransformException & ex) {
-      RCLCPP_WARN_THROTTLE(
-        get_logger(), *get_clock(), 5000,
-        "Failed to lookup base to target transform: %s", ex.what());
-      return;
-    }
-  }
-
-  // --- Compute Initial State ---
-  utils::QueueBundle queues;
-  queues.imu = imu_queue_.drain();
-  queues.gps = gps_queue_.drain();
-  queues.depth = depth_queue_.drain();
-  queues.mag = mag_queue_.drain();
-  queues.ahrs = ahrs_queue_.drain();
-  queues.dvl = dvl_queue_.drain();
-  queues.wrench = wrench_queue_.drain();
-  if (!state_initializer_->update(get_clock()->now(), queues)) {
-    return;
-  }
-
-  utils::TfBundle tfs{
-    toGtsam(target_T_imu_tf_.transform), toGtsam(target_T_gps_tf_.transform),
-    toGtsam(target_T_depth_tf_.transform), toGtsam(target_T_mag_tf_.transform),
-    toGtsam(target_T_ahrs_tf_.transform), toGtsam(target_T_dvl_tf_.transform),
-    toGtsam(target_T_base_tf_.transform), toGtsam(target_T_com_tf_.transform)};
-  state_initializer_->compute(tfs);
-  core_->initialize(*state_initializer_, tfs);
-
-  state_ = State::RUNNING;
-  RCLCPP_INFO(get_logger(), "Graph initialized successfully!");
 }
 
 void FactorGraphNode::publishGlobalOdom(
@@ -485,9 +410,11 @@ void FactorGraphNode::frontendLoop()
       break;
     }
 
-    if (state_ == State::RUNNING) {
-      lock.unlock();
+    lock.unlock();
 
+    if (state_ != State::RUNNING) {
+      initializeGraph();
+    } else {
       bool should_update = true;
       if (params_.max_update_rate > 0.0) {
         rclcpp::Time now = get_clock()->now();
@@ -545,10 +472,76 @@ void FactorGraphNode::backendLoop()
   }
 }
 
+void FactorGraphNode::initializeGraph()
+{
+  std::scoped_lock init_lock(initialization_mutex_);
+  if (state_ == State::RUNNING) {
+    RCLCPP_DEBUG(get_logger(), "Duplicate initialization attempt detected.");
+    return;
+  }
+
+  // --- Wait for Sensor TFs ---
+  bool imu_ok = !target_T_imu_tf_.header.frame_id.empty();
+  bool gps_ok = !(params_.gps.enable_gps || params_.gps.enable_gps_init_only) ||
+    !target_T_gps_tf_.header.frame_id.empty();
+  bool depth_ok = !target_T_depth_tf_.header.frame_id.empty();
+  bool mag_ok = !(params_.mag.enable_mag || params_.mag.enable_mag_init_only) ||
+    !target_T_mag_tf_.header.frame_id.empty();
+  bool ahrs_ok = !(params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) ||
+    !target_T_ahrs_tf_.header.frame_id.empty();
+  bool dvl_ok = !target_T_dvl_tf_.header.frame_id.empty();
+
+  if (!(imu_ok && gps_ok && depth_ok && mag_ok && ahrs_ok && dvl_ok)) {
+    RCLCPP_WARN_THROTTLE(
+      get_logger(), *get_clock(), 5000, "Waiting for sensor TFs: %s%s%s%s%s%s",
+      !imu_ok ? "[IMU] " : "",
+      (!gps_ok && params_.gps.enable_gps) ? "[GPS] " : "",
+      (!mag_ok && params_.mag.enable_mag) ? "[Magnetometer] " : "",
+      (!ahrs_ok && params_.ahrs.enable_ahrs) ? "[AHRS] " : "",
+      !depth_ok ? "[Depth] " : "", !dvl_ok ? "[DVL] " : "");
+    return;
+  }
+
+  if (target_T_base_tf_.header.frame_id.empty()) {
+    try {
+      target_T_base_tf_ = tf_buffer_->lookupTransform(
+        params_.target_frame, params_.base_frame, tf2::TimePointZero);
+    } catch (const tf2::TransformException & ex) {
+      RCLCPP_WARN_THROTTLE(
+        get_logger(), *get_clock(), 5000,
+        "Failed to lookup base to target transform: %s", ex.what());
+      return;
+    }
+  }
+
+  // --- Compute Initial State ---
+  utils::QueueBundle queues;
+  queues.imu = imu_queue_.drain();
+  queues.gps = gps_queue_.drain();
+  queues.depth = depth_queue_.drain();
+  queues.mag = mag_queue_.drain();
+  queues.ahrs = ahrs_queue_.drain();
+  queues.dvl = dvl_queue_.drain();
+  queues.wrench = wrench_queue_.drain();
+  if (!state_initializer_->update(get_clock()->now(), queues)) {
+    return;
+  }
+
+  utils::TfBundle tfs{
+    toGtsam(target_T_imu_tf_.transform), toGtsam(target_T_gps_tf_.transform),
+    toGtsam(target_T_depth_tf_.transform), toGtsam(target_T_mag_tf_.transform),
+    toGtsam(target_T_ahrs_tf_.transform), toGtsam(target_T_dvl_tf_.transform),
+    toGtsam(target_T_base_tf_.transform), toGtsam(target_T_com_tf_.transform)};
+  state_initializer_->compute(tfs);
+  core_->initialize(*state_initializer_, tfs);
+
+  state_ = State::RUNNING;
+  RCLCPP_INFO(get_logger(), "Graph initialized successfully!");
+}
+
 void FactorGraphNode::updateGraph()
 {
   rclcpp::Time target_time{0, 0, RCL_ROS_TIME};
-
   if (params_.experimental.enable_dvl_preintegration) {
     if (!depth_queue_.empty()) {
       target_time = rclcpp::Time(depth_queue_.back()->header.stamp);
