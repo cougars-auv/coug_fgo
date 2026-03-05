@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /**
- * @file conversion_utils.hpp
+ * @file conversions.hpp
  * @brief Utility functions for converting between ROS 2 and GTSAM data types.
  * @author Nelson Durrant
  * @date Jan 2026

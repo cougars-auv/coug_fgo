@@ -41,7 +41,7 @@ TEST(ConstantVelocityFactorTest, ErrorEvaluation) {
   coug_fgo::factors::ConstantVelocityFactor factor(
     poseKey1, velKey1, poseKey2, velKey2, model);
 
-  // Case 1: Identity
+  // Zero error when both keyframes share the same body-frame velocity
   EXPECT_TRUE(
     gtsam::assert_equal(
       gtsam::Vector3::Zero(),
@@ -49,7 +49,7 @@ TEST(ConstantVelocityFactorTest, ErrorEvaluation) {
         gtsam::Pose3::Identity(), gtsam::Vector3(1, 0, 0),
         gtsam::Pose3::Identity(), gtsam::Vector3(1, 0, 0)), 1e-9));
 
-  // Case 2: Rotation
+  // Rotation-compensated velocity is preserved across a yaw change
   EXPECT_TRUE(
     gtsam::assert_equal(
       gtsam::Vector3::Zero(),
@@ -58,7 +58,7 @@ TEST(ConstantVelocityFactorTest, ErrorEvaluation) {
         gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(1, 1, 0)),
         gtsam::Vector3(0, 1, 0)), 1e-9));
 
-  // Case 3: Error Check
+  // Non-zero residual when body-frame velocities differ between keyframes
   EXPECT_TRUE(
     gtsam::assert_equal(
       gtsam::Vector3(-1, 0, 0),

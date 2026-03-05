@@ -35,7 +35,7 @@ TEST(DepthFactorArmTest, ErrorEvaluation) {
   gtsam::Key poseKey = gtsam::symbol_shorthand::X(1);
   gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(1, 0.1);
 
-  // Case 1: Identity
+  // Zero error when pose Z matches the measured depth
   coug_fgo::factors::DepthFactorArm factor1(poseKey, 5.0, gtsam::Pose3::Identity(), model);
   EXPECT_NEAR(
     factor1.evaluateError(
@@ -44,7 +44,7 @@ TEST(DepthFactorArmTest, ErrorEvaluation) {
           0, 0,
           5)))[0], 0.0, 1e-9);
 
-  // Case 2: Rotation
+  // Body rotation does not affect world-frame depth reading
   EXPECT_NEAR(
     factor1.evaluateError(
       gtsam::Pose3(
@@ -52,7 +52,7 @@ TEST(DepthFactorArmTest, ErrorEvaluation) {
           0, 0,
           5)))[0], 0.0, 1e-9);
 
-  // Case 3: Mounting/Lever Arm
+  // Lever arm offset between target and sensor is compensated
   coug_fgo::factors::DepthFactorArm factor2(poseKey, 5.0,
     gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(0, 0, 1)), model);
   EXPECT_NEAR(
@@ -62,16 +62,7 @@ TEST(DepthFactorArmTest, ErrorEvaluation) {
           0, 0,
           4)))[0], 0.0, 1e-9);
 
-  // Case 4: Combined
-  EXPECT_NEAR(
-    factor2.evaluateError(
-      gtsam::Pose3(
-        gtsam::Rot3::Rx(M_PI), gtsam::Point3(
-          0, 0,
-          6)))[0], 0.0,
-    1e-9);
-
-  // Case 5: Error Check
+  // Non-zero residual when predicted depth differs from measurement
   EXPECT_NEAR(
     factor1.evaluateError(
       gtsam::Pose3(

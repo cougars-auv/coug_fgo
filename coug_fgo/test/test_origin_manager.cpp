@@ -13,8 +13,8 @@
 // limitations under the License.
 
 /**
- * @file test_origin_manager_node.cpp
- * @brief Unit tests for origin_manager_node.hpp
+ * @file test_origin_manager.cpp
+ * @brief Unit tests for origin_manager.hpp
  * @author Nelson Durrant
  * @date Jan 2026
  */
@@ -22,7 +22,7 @@
 #include <gtest/gtest.h>
 #include <rclcpp/rclcpp.hpp>
 
-#include "coug_fgo/origin_manager_node.hpp"
+#include "coug_fgo/origin_manager.hpp"
 
 using coug_fgo::OriginManagerNode;
 
@@ -35,12 +35,12 @@ class TestOriginManagerNode : public OriginManagerNode
 public:
   using OriginManagerNode::OriginManagerNode;
 
-  // Expose protected methods
+  // Expose protected methods for direct unit testing
   using OriginManagerNode::navsatCallback;
   using OriginManagerNode::originCallback;
   using OriginManagerNode::convertToEnu;
 
-  // Expose protected state
+  // Expose protected state for assertion checking
   using OriginManagerNode::origin_navsat_;
   using OriginManagerNode::origin_utm_;
   using OriginManagerNode::params_;
@@ -91,9 +91,11 @@ TEST_F(OriginManagerNodeTest, OriginCallback) {
   auto msg = createNavSatMsg(40.2444, -111.6608, 1400.0);
   node->originCallback(msg);
 
+  // First origin is accepted
   EXPECT_FALSE(node->origin_navsat_.header.frame_id.empty());
   EXPECT_NEAR(node->origin_navsat_.latitude, 40.2444, 1e-6);
 
+  // Duplicate origin is rejected (origin is immutable once set)
   auto msg2 = createNavSatMsg(45.0, -120.0, 1000.0);
   node->originCallback(msg2);
   EXPECT_NEAR(node->origin_navsat_.latitude, 40.2444, 1e-6);
@@ -126,11 +128,13 @@ TEST_F(OriginManagerNodeTest, ConvertToEnu) {
   auto current_msg = createNavSatMsg(40.2454, -111.6598, 1410.0);
   nav_msgs::msg::Odometry odom;
 
+  // Displacement is positive when moving north and east from origin
   EXPECT_TRUE(node->convertToEnu(current_msg, odom));
   EXPECT_GT(odom.pose.pose.position.x, 0.0);
   EXPECT_GT(odom.pose.pose.position.y, 0.0);
   EXPECT_NEAR(odom.pose.pose.position.z, 10.0, 1e-3);
 
+  // Conversion fails when the GPS fix crosses a UTM zone boundary
   auto far_msg = createNavSatMsg(21.3069, -157.8583, 0.0);
   EXPECT_FALSE(node->convertToEnu(far_msg, odom));
 }

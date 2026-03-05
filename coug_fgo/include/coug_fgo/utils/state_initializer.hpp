@@ -34,45 +34,16 @@
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/magnetic_field.hpp>
 
-#include <coug_fgo/utils/thread_safe_queue.hpp>
+#include <coug_fgo/utils/types.hpp>
 #include <coug_fgo/factor_graph_parameters.hpp>
-#include <coug_fgo/utils/conversion_utils.hpp>
+#include <coug_fgo/utils/conversions.hpp>
 
 namespace coug_fgo::utils
 {
 
 /**
- * @struct TfBundle
- * @brief Container for TF sensor transformations.
- */
-struct TfBundle
-{
-  gtsam::Pose3 target_T_imu;
-  gtsam::Pose3 target_T_gps;
-  gtsam::Pose3 target_T_depth;
-  gtsam::Pose3 target_T_mag;
-  gtsam::Pose3 target_T_ahrs;
-  gtsam::Pose3 target_T_dvl;
-  gtsam::Pose3 target_T_base;
-};
-
-/**
- * @struct QueueBundle
- * @brief Container for sensor message queues.
- */
-struct QueueBundle
-{
-  ThreadSafeQueue<sensor_msgs::msg::Imu::SharedPtr> & imu;
-  ThreadSafeQueue<nav_msgs::msg::Odometry::SharedPtr> & gps;
-  ThreadSafeQueue<nav_msgs::msg::Odometry::SharedPtr> & depth;
-  ThreadSafeQueue<sensor_msgs::msg::MagneticField::SharedPtr> & mag;
-  ThreadSafeQueue<sensor_msgs::msg::Imu::SharedPtr> & ahrs;
-  ThreadSafeQueue<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & dvl;
-};
-
-/**
  * @class StateInitializer
- * @brief Utility for initializing state priors from sensor data.
+ * @brief Computes initial state priors for factor graph initialization.
  */
 class StateInitializer
 {
@@ -150,11 +121,14 @@ public:
   geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr initial_dvl_;
 
 private:
+  /**
+   * @brief Accumulates running averages from drained sensor message deques.
+   * @param queues Bundle of drained sensor message deques to process.
+   */
   void incrementAverages(QueueBundle & queues)
   {
     // Average IMU
-    auto imu_msgs = queues.imu.drain();
-    for (const auto & msg : imu_msgs) {
+    for (const auto & msg : queues.imu) {
       if (imu_count_ == 0) {
         initial_imu_ = std::make_shared<sensor_msgs::msg::Imu>(*msg);
       } else {
@@ -178,8 +152,7 @@ private:
 
     // Average GPS
     if (params_.gps.enable_gps || params_.gps.enable_gps_init_only) {
-      auto gps_msgs = queues.gps.drain();
-      for (const auto & msg : gps_msgs) {
+      for (const auto & msg : queues.gps) {
         if (gps_count_ == 0) {
           initial_gps_ = std::make_shared<nav_msgs::msg::Odometry>(*msg);
         } else {
@@ -197,8 +170,7 @@ private:
     }
 
     // Average Depth
-    auto depth_msgs = queues.depth.drain();
-    for (const auto & msg : depth_msgs) {
+    for (const auto & msg : queues.depth) {
       if (depth_count_ == 0) {
         initial_depth_ = std::make_shared<nav_msgs::msg::Odometry>(*msg);
       } else {
@@ -211,8 +183,7 @@ private:
     }
 
     // Average DVL
-    auto dvl_msgs = queues.dvl.drain();
-    for (const auto & msg : dvl_msgs) {
+    for (const auto & msg : queues.dvl) {
       if (dvl_count_ == 0) {
         initial_dvl_ = std::make_shared<geometry_msgs::msg::TwistWithCovarianceStamped>(*msg);
       } else {
@@ -230,8 +201,7 @@ private:
 
     // Average Magnetometer
     if (params_.mag.enable_mag || params_.mag.enable_mag_init_only) {
-      auto mag_msgs = queues.mag.drain();
-      for (const auto & msg : mag_msgs) {
+      for (const auto & msg : queues.mag) {
         if (mag_count_ == 0) {
           initial_mag_ = std::make_shared<sensor_msgs::msg::MagneticField>(*msg);
         } else {
@@ -250,8 +220,7 @@ private:
 
     // Average AHRS
     if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) {
-      auto ahrs_msgs = queues.ahrs.drain();
-      for (const auto & msg : ahrs_msgs) {
+      for (const auto & msg : queues.ahrs) {
         if (ahrs_count_ == 0) {
           initial_ahrs_ = std::make_shared<sensor_msgs::msg::Imu>(*msg);
           ahrs_ref_ = toGtsam(msg->orientation);
@@ -267,6 +236,11 @@ private:
     }
   }
 
+  /**
+   * @brief Computes initial orientation from accelerometer tilt and heading sensors.
+   * @param tfs SE(3) sensor transforms for lever arm compensation.
+   * @return Initial rotation of the target frame in the world frame.
+   */
   gtsam::Rot3 computeInitialOrientation(const TfBundle & tfs)
   {
     double roll = params_.prior.parameter_priors.initial_orientation[0];
@@ -315,6 +289,12 @@ private:
     return gtsam::Rot3::Ypr(yaw, pitch, roll);
   }
 
+  /**
+   * @brief Computes initial position using GPS and depth with lever arm compensation.
+   * @param initial_orientation_target The computed initial rotation.
+   * @param tfs SE(3) sensor transforms for lever arm compensation.
+   * @return Initial position of the target frame in the world frame.
+   */
   gtsam::Point3 computeInitialPosition(
     const gtsam::Rot3 & initial_orientation_target,
     const TfBundle & tfs)
@@ -345,6 +325,12 @@ private:
     return initial_position_target;
   }
 
+  /**
+   * @brief Computes initial world-frame velocity from DVL body-frame measurements.
+   * @param initial_orientation_target The computed initial rotation.
+   * @param tfs SE(3) sensor transforms for lever arm compensation.
+   * @return Initial velocity of the target frame in the world frame.
+   */
   gtsam::Vector3 computeInitialVelocity(
     const gtsam::Rot3 & initial_orientation_target,
     const TfBundle & tfs)
@@ -362,6 +348,10 @@ private:
     return initial_orientation_target.rotate(target_v_dvl);
   }
 
+  /**
+   * @brief Computes initial IMU bias from averaged gyroscope readings.
+   * @return Initial accelerometer and gyroscope bias estimate.
+   */
   gtsam::imuBias::ConstantBias computeInitialBias()
   {
     gtsam::Vector3 init_gyro_bias;

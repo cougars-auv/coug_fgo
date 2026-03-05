@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /**
- * @file dvl_a50_twist_node.hpp
+ * @file dvl_a50_twist.hpp
  * @brief ROS 2 node that converts raw DVL velocity data to a twist message.
  * @author Nelson Durrant
  * @date Jan 2026
@@ -43,7 +43,7 @@ class DvlA50TwistNode : public rclcpp::Node
 {
 public:
   /**
-   * @brief DvlA50TwistNode constructor.
+   * @brief Constructs the node and sets up DVL velocity conversion.
    * @param options The node options.
    */
   explicit DvlA50TwistNode(const rclcpp::NodeOptions & options);

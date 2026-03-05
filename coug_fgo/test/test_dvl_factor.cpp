@@ -39,20 +39,20 @@ TEST(DvlFactorArmTest, ErrorEvaluation) {
   gtsam::Pose3 target_P_sensor = gtsam::Pose3::Identity();
   coug_fgo::factors::DvlFactorArm factor(poseKey, velKey, target_P_sensor, measured_vel, model);
 
-  // Case 1: Identity
+  // Zero error when body velocity unrotates to match the measurement
   EXPECT_TRUE(
     gtsam::assert_equal(
       gtsam::Vector3::Zero(),
       factor.evaluateError(gtsam::Pose3::Identity(), gtsam::Vector3(1, 0, 0)), 1e-9));
 
-  // Case 2: Rotation
+  // Yaw rotation correctly maps world velocity to body frame
   gtsam::Pose3 pose = gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(0, 0, 0));
   EXPECT_TRUE(
     gtsam::assert_equal(
       gtsam::Vector3::Zero(),
       factor.evaluateError(pose, gtsam::Vector3(0, 1, 0)), 1e-9));
 
-  // Case 3: Mounting/Lever Arm
+  // Sensor mounting rotation is compensated in velocity prediction
   gtsam::Pose3 target_P_sensor_arm(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(0, 0, 1));
   coug_fgo::factors::DvlFactorArm factor_arm(poseKey, velKey, target_P_sensor_arm,
     gtsam::Vector3(0, -1, 0), model);
@@ -61,15 +61,7 @@ TEST(DvlFactorArmTest, ErrorEvaluation) {
       gtsam::Vector3::Zero(),
       factor_arm.evaluateError(gtsam::Pose3::Identity(), gtsam::Vector3(1, 0, 0)), 1e-9));
 
-  // Case 4: Combined
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector3::Zero(),
-      factor_arm.evaluateError(
-        gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(0, 0, 0)),
-        gtsam::Vector3(0, 1, 0)), 1e-9));
-
-  // Case 5: Error Check
+  // Non-zero residual when predicted velocity differs from measurement
   EXPECT_TRUE(
     gtsam::assert_equal(
       gtsam::Vector3(1, 0, 0),

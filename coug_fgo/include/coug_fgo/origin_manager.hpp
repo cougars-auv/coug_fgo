@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /**
- * @file origin_manager_node.hpp
+ * @file origin_manager.hpp
  * @brief ROS 2 node for AUV fleet origin management.
  * @author Nelson Durrant
  * @date Jan 2026
@@ -48,7 +48,7 @@ class OriginManagerNode : public rclcpp::Node
 {
 public:
   /**
-   * @brief OriginManagerNode constructor.
+   * @brief Constructs the node and sets up GPS origin management.
    * @param options The node options.
    */
   explicit OriginManagerNode(const rclcpp::NodeOptions & options);

@@ -13,8 +13,8 @@
 // limitations under the License.
 
 /**
- * @file test_conversion_utils.cpp
- * @brief Unit tests for conversion_utils.hpp.
+ * @file test_conversions.cpp
+ * @brief Unit tests for conversions.hpp.
  * @author Nelson Durrant (w Gemini 3 Pro)
  * @date Jan 2026
  */
@@ -23,12 +23,12 @@
 #include <gtsam/base/Matrix.h>
 #include <gtsam/geometry/Pose3.h>
 
-#include "coug_fgo/utils/conversion_utils.hpp"
+#include "coug_fgo/utils/conversions.hpp"
 
 /**
  * @brief Verify basic geometry conversions from ROS messages to GTSAM types.
  */
-TEST(ConversionUtilsTest, RosToGtsam_Geometry) {
+TEST(ConversionsTest, RosToGtsam_Geometry) {
   geometry_msgs::msg::Point pt_msg;
   pt_msg.x = 1.0; pt_msg.y = 2.0; pt_msg.z = 3.0;
   gtsam::Point3 pt = coug_fgo::utils::toGtsam(pt_msg);
@@ -72,7 +72,7 @@ TEST(ConversionUtilsTest, RosToGtsam_Geometry) {
 /**
  * @brief Verify linear algebra conversions from STL containers to GTSAM types.
  */
-TEST(ConversionUtilsTest, RosToGtsam_Matrices) {
+TEST(ConversionsTest, RosToGtsam_Matrices) {
   std::array<double, 9> cov9;
   cov9.fill(0.0); cov9[0] = 1.0; cov9[4] = 5.0; cov9[8] = 9.0;
   gtsam::Matrix33 m33 = coug_fgo::utils::toGtsam(cov9);
@@ -95,7 +95,7 @@ TEST(ConversionUtilsTest, RosToGtsam_Matrices) {
 /**
  * @brief Verify helper functions for matrix extraction and creation.
  */
-TEST(ConversionUtilsTest, Helpers_MatrixLogic) {
+TEST(ConversionsTest, Helpers_MatrixLogic) {
   std::array<double, 36> cov36;
   cov36.fill(0.0);
   cov36[0] = 1.0;
@@ -126,7 +126,7 @@ TEST(ConversionUtilsTest, Helpers_MatrixLogic) {
 /**
  * @brief Verify conversions from GTSAM types back to ROS messages.
  */
-TEST(ConversionUtilsTest, GtsamToRos_Geometry) {
+TEST(ConversionsTest, GtsamToRos_Geometry) {
   gtsam::Point3 pt(1.0, 2.0, 3.0);
   gtsam::Vector3 vec(4.0, 5.0, 6.0);
   gtsam::Rot3 rot = gtsam::Rot3::Identity();
@@ -148,7 +148,7 @@ TEST(ConversionUtilsTest, GtsamToRos_Geometry) {
 /**
  * @brief Verify GTSAM to ROS covariance conversions.
  */
-TEST(ConversionUtilsTest, GtsamToRos_Covariance) {
+TEST(ConversionsTest, GtsamToRos_Covariance) {
   gtsam::Matrix33 m33 = gtsam::Matrix33::Identity() * 5.0;
   std::array<double, 36> arr36_padded = coug_fgo::utils::toCovariance36Msg(m33);
   EXPECT_DOUBLE_EQ(arr36_padded[0], 5.0);

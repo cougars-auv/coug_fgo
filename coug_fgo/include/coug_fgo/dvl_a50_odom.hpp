@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /**
- * @file dvl_a50_odom_node.hpp
+ * @file dvl_a50_odom.hpp
  * @brief ROS 2 node that converts raw DVL dead-reckoning data to an odometry message.
  * @author Nelson Durrant
  * @date Jan 2026
@@ -47,7 +47,7 @@ class DvlA50OdomNode : public rclcpp::Node
 {
 public:
   /**
-   * @brief DvlA50OdomNode constructor.
+   * @brief Constructs the node and sets up DVL dead-reckoning conversion.
    * @param options The node options.
    */
   explicit DvlA50OdomNode(const rclcpp::NodeOptions & options);

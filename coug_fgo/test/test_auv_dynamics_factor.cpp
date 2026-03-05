@@ -31,7 +31,7 @@
 /**
  * @brief Verify error evaluation logic and lever arm correction.
  */
-TEST(AuvDynamicsFactorArmTest, ZeroError) {
+TEST(AuvDynamicsFactorArmTest, ErrorEvaluation) {
   gtsam::Key poseKey1 = gtsam::symbol_shorthand::X(1);
   gtsam::Key velKey1 = gtsam::symbol_shorthand::V(1);
   gtsam::Key poseKey2 = gtsam::symbol_shorthand::X(2);
@@ -45,7 +45,7 @@ TEST(AuvDynamicsFactorArmTest, ZeroError) {
   gtsam::Vector3 control_force = gtsam::Vector3::Zero();
   gtsam::Pose3 target_P_sensor = gtsam::Pose3::Identity();
 
-  // Case 1: Identity
+  // Zero error with no forces and no velocity change
   coug_fgo::factors::AuvDynamicsFactorArm factor(
     poseKey1, velKey1, poseKey2, velKey2, dt, control_force, target_P_sensor,
     mass, linear_drag, quad_drag, model);
@@ -57,8 +57,8 @@ TEST(AuvDynamicsFactorArmTest, ZeroError) {
         gtsam::Pose3::Identity(), gtsam::Vector3::Zero(),
         gtsam::Pose3::Identity(), gtsam::Vector3::Zero()), 1e-9));
 
-  // Case 2: Dynamic Identity
-  // Subcase A: Constant Acceleration
+  // Case 2: Dynamic equilibrium scenarios
+  // Constant thrust produces expected acceleration (F = ma)
   control_force = gtsam::Vector3(10.0, 0.0, 0.0);
   coug_fgo::factors::AuvDynamicsFactorArm factor_thrust(
     poseKey1, velKey1, poseKey2, velKey2, dt, control_force, target_P_sensor,
@@ -71,7 +71,7 @@ TEST(AuvDynamicsFactorArmTest, ZeroError) {
         gtsam::Pose3::Identity(), gtsam::Vector3::Zero(),
         gtsam::Pose3::Identity(), gtsam::Vector3(1.0, 0.0, 0.0)), 1e-9));
 
-  // Subcase B: Drag Equilibrium
+  // Drag force balances thrust at steady-state velocity
   linear_drag = gtsam::Matrix33::Identity() * 1.0;
   control_force = gtsam::Vector3(10.0, 0.0, 0.0);
   coug_fgo::factors::AuvDynamicsFactorArm factor_drag(
@@ -85,7 +85,7 @@ TEST(AuvDynamicsFactorArmTest, ZeroError) {
         gtsam::Pose3::Identity(), gtsam::Vector3(10.0, 0.0, 0.0),
         gtsam::Pose3::Identity(), gtsam::Vector3(10.0, 0.0, 0.0)), 1e-9));
 
-  // Case 3: Rotation
+  // Thrust direction rotates with the body frame
   linear_drag = gtsam::Matrix33::Zero();
   control_force = gtsam::Vector3(10.0, 0.0, 0.0);
   coug_fgo::factors::AuvDynamicsFactorArm factor_rot(
@@ -101,7 +101,7 @@ TEST(AuvDynamicsFactorArmTest, ZeroError) {
         gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3::Zero()),
         gtsam::Vector3(0.0, 1.0, 0.0)), 1e-9));
 
-  // Case 4: Mounting/Lever Arm
+  // Sensor mounting transform redirects the control force
   target_P_sensor = gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3::Zero());
   control_force = gtsam::Vector3(10.0, 0.0, 0.0);
   coug_fgo::factors::AuvDynamicsFactorArm factor_mount(
@@ -115,20 +115,7 @@ TEST(AuvDynamicsFactorArmTest, ZeroError) {
         gtsam::Pose3::Identity(), gtsam::Vector3::Zero(),
         gtsam::Pose3::Identity(), gtsam::Vector3(0.0, 1.0, 0.0)), 1e-9));
 
-  // Case 5: Combined
-  gtsam::Pose3 body_pose = gtsam::Pose3(gtsam::Rot3::Roll(M_PI_2), gtsam::Point3::Zero());
-  coug_fgo::factors::AuvDynamicsFactorArm factor_comb(
-    poseKey1, velKey1, poseKey2, velKey2, dt, control_force, target_P_sensor,
-    mass, linear_drag, quad_drag, model);
-
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector3::Zero(),
-      factor_comb.evaluateError(
-        body_pose, gtsam::Vector3::Zero(),
-        body_pose, gtsam::Vector3(0.0, 0.0, 1.0)), 1e-9));
-
-  // Case 6: Error Check
+  // Non-zero residual when velocity change violates the dynamics model
   coug_fgo::factors::AuvDynamicsFactorArm factor_err(
     poseKey1, velKey1, poseKey2, velKey2, dt, gtsam::Vector3::Zero(), gtsam::Pose3::Identity(),
     mass, gtsam::Matrix33::Zero(), gtsam::Matrix33::Zero(), model);

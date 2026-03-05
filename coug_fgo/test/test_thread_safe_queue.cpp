@@ -84,6 +84,7 @@ TEST_F(ThreadSafeQueueTest, Drain) {
   EXPECT_TRUE(queue.empty());
   EXPECT_EQ(queue.size(), 0u);
 
+  // Drained messages preserve insertion order (FIFO)
   EXPECT_DOUBLE_EQ(drained[0]->header.stamp.sec + drained[0]->header.stamp.nanosec * 1e-9, 1.0);
   EXPECT_DOUBLE_EQ(drained[1]->header.stamp.sec + drained[1]->header.stamp.nanosec * 1e-9, 2.0);
   EXPECT_DOUBLE_EQ(drained[2]->header.stamp.sec + drained[2]->header.stamp.nanosec * 1e-9, 3.0);
@@ -102,6 +103,7 @@ TEST_F(ThreadSafeQueueTest, Restore) {
   queue.restore(items);
   EXPECT_EQ(queue.size(), 3u);
 
+  // Restored items are prepended, preserving chronological order
   auto drained = queue.drain();
   EXPECT_DOUBLE_EQ(drained[0]->header.stamp.sec + drained[0]->header.stamp.nanosec * 1e-9, 1.0);
   EXPECT_DOUBLE_EQ(drained[1]->header.stamp.sec + drained[1]->header.stamp.nanosec * 1e-9, 2.0);

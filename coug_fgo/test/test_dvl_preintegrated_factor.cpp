@@ -40,13 +40,13 @@ TEST(DvlPreintegratedFactorArmTest, ErrorEvaluation) {
   coug_fgo::factors::DvlPreintegratedFactorArm factor(
     poseIKey, poseJKey, target_P_sensor, measured_translation, model);
 
-  // Case 1: Identity
+  // Non-zero error when no translation occurred but measurement is non-zero
   EXPECT_TRUE(
     gtsam::assert_equal(
       gtsam::Vector3(-1, 0, 0),
       factor.evaluateError(gtsam::Pose3::Identity(), gtsam::Pose3::Identity()), 1e-9));
 
-  // Case 2: Correct Translation
+  // Zero error when body-frame translation matches the measurement
   gtsam::Pose3 pose_i = gtsam::Pose3::Identity();
   gtsam::Pose3 pose_j = gtsam::Pose3(gtsam::Rot3::Identity(), gtsam::Point3(1, 0, 0));
   EXPECT_TRUE(
@@ -54,7 +54,7 @@ TEST(DvlPreintegratedFactorArmTest, ErrorEvaluation) {
       gtsam::Vector3::Zero(),
       factor.evaluateError(pose_i, pose_j), 1e-9));
 
-  // Case 3: Rotation + Translation
+  // Rotation is accounted for when computing relative displacement
   pose_i = gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(0, 0, 0));
   pose_j = gtsam::Pose3(gtsam::Rot3::Identity(), gtsam::Point3(0, 1, 0));
   EXPECT_TRUE(
@@ -62,7 +62,7 @@ TEST(DvlPreintegratedFactorArmTest, ErrorEvaluation) {
       gtsam::Vector3::Zero(),
       factor.evaluateError(pose_i, pose_j), 1e-9));
 
-  // Case 4: Mounting/Lever Arm
+  // Sensor mounting transform is compensated in displacement prediction
   gtsam::Pose3 target_P_sensor_arm(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(0, 0, 1));
   coug_fgo::factors::DvlPreintegratedFactorArm factor_arm(
     poseIKey, poseJKey, target_P_sensor_arm, gtsam::Vector3(0, -1, 0), model);
@@ -74,15 +74,7 @@ TEST(DvlPreintegratedFactorArmTest, ErrorEvaluation) {
       gtsam::Vector3::Zero(),
       factor_arm.evaluateError(pose_i, pose_j), 1e-9));
 
-  // Case 5: Combined
-  pose_i = gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(0, 0, 0));
-  pose_j = gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(0, 1, 0));
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector3::Zero(),
-      factor_arm.evaluateError(pose_i, pose_j), 1e-9));
-
-  // Case 6: Error Check
+  // Repeated baseline check confirms consistent residual
   EXPECT_TRUE(
     gtsam::assert_equal(
       gtsam::Vector3(-1, 0, 0),

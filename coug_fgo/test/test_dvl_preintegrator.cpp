@@ -51,6 +51,7 @@ TEST_F(DvlPreintegratorTest, StationaryIntegration) {
   for (int i = 0; i < 10; ++i) {
     integrator.integrateMeasurement(vel, orient, 0.1, measured_cov);
   }
+  // Ten steps of zero velocity should not change the displacement
   EXPECT_TRUE(integrator.delta().isZero());
 }
 
@@ -64,6 +65,7 @@ TEST_F(DvlPreintegratorTest, ConstantVelocityX) {
     integrator.integrateMeasurement(vel, orient, 0.1, measured_cov);
   }
 
+  // 10 steps at 1 m/s for 0.1s each should yield 1m of displacement along X
   gtsam::Vector3 delta = integrator.delta();
   EXPECT_NEAR(delta.x(), 1.0, 1e-6);
   EXPECT_NEAR(delta.y(), 0.0, 1e-6);
@@ -78,6 +80,7 @@ TEST_F(DvlPreintegratorTest, RotatedIntegration) {
 
   integrator.integrateMeasurement(vel, orient, 1.0, measured_cov);
 
+  // Body-X velocity at 90° yaw should integrate entirely into world-Y
   gtsam::Vector3 delta = integrator.delta();
   EXPECT_NEAR(delta.x(), 0.0, 1e-6);
   EXPECT_NEAR(delta.y(), 1.0, 1e-6);
@@ -88,8 +91,10 @@ TEST_F(DvlPreintegratorTest, RotatedIntegration) {
  */
 TEST_F(DvlPreintegratorTest, Reset) {
   integrator.integrateMeasurement(gtsam::Vector3(1, 0, 0), gtsam::Rot3(), 1.0, measured_cov);
+  // After integration, delta is nonzero
   EXPECT_FALSE(integrator.delta().isZero());
 
+  // After reset, both delta and covariance return to zero
   integrator.reset(gtsam::Rot3::Identity());
   EXPECT_TRUE(integrator.delta().isZero());
   EXPECT_TRUE(integrator.covariance().isZero());

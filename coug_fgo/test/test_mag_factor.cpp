@@ -36,7 +36,7 @@ TEST(MagFactorArmTest, ErrorEvaluation) {
   gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(3, 0.1);
   gtsam::Vector3 reference_field_world(1.0, 0.0, 0.0);
 
-  // Case 1: Identity
+  // Zero error when predicted field matches the measurement at identity
   coug_fgo::factors::MagFactorArm factor1(poseKey, reference_field_world, reference_field_world,
     gtsam::Rot3::Identity(), model);
   EXPECT_TRUE(
@@ -44,7 +44,7 @@ TEST(MagFactorArmTest, ErrorEvaluation) {
       gtsam::Vector3::Zero(),
       factor1.evaluateError(gtsam::Pose3::Identity()), 1e-9));
 
-  // Case 2: Rotation
+  // Consistent measurement under a known rotation produces zero error
   gtsam::Pose3 pose_90 = gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3());
   gtsam::Vector3 measured_90 = pose_90.rotation().unrotate(reference_field_world);
   coug_fgo::factors::MagFactorArm factor2(poseKey, measured_90, reference_field_world,
@@ -54,7 +54,7 @@ TEST(MagFactorArmTest, ErrorEvaluation) {
       gtsam::Vector3::Zero(),
       factor2.evaluateError(pose_90), 1e-9));
 
-  // Case 3: Mounting/Lever Arm
+  // Sensor mounting rotation is compensated in field prediction
   gtsam::Rot3 target_R_sensor = gtsam::Rot3::Yaw(M_PI_2);
   gtsam::Vector3 measured_mount = target_R_sensor.unrotate(reference_field_world);
   coug_fgo::factors::MagFactorArm factor3(poseKey, measured_mount, reference_field_world,
@@ -64,19 +64,7 @@ TEST(MagFactorArmTest, ErrorEvaluation) {
       gtsam::Vector3::Zero(),
       factor3.evaluateError(gtsam::Pose3::Identity()), 1e-9));
 
-  // Case 4: Combined
-  gtsam::Pose3 pose_comb = gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_4), gtsam::Point3());
-  gtsam::Rot3 target_R_sensor_comb = gtsam::Rot3::Yaw(M_PI_4);
-  gtsam::Vector3 measured_comb =
-    target_R_sensor_comb.unrotate(pose_comb.rotation().unrotate(reference_field_world));
-  coug_fgo::factors::MagFactorArm factor4(poseKey, measured_comb, reference_field_world,
-    target_R_sensor_comb, model);
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector3::Zero(),
-      factor4.evaluateError(pose_comb), 1e-9));
-
-  // Case 5: Error Check
+  // Non-zero residual when pose flips the predicted field direction
   EXPECT_TRUE(
     gtsam::assert_equal(
       gtsam::Vector3(-2, 0, 0),

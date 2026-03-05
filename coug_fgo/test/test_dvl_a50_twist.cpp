@@ -13,8 +13,8 @@
 // limitations under the License.
 
 /**
- * @file test_dvl_a50_twist_node.cpp
- * @brief Unit tests for dvl_a50_twist_node.hpp.
+ * @file test_dvl_a50_twist.cpp
+ * @brief Unit tests for dvl_a50_twist.hpp.
  * @author Nelson Durrant (w Gemini 3 Pro)
  * @date Jan 2026
  */
@@ -24,7 +24,7 @@
 #include <dvl_msgs/msg/dvl.hpp>
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
 
-#include "coug_fgo/dvl_a50_twist_node.hpp"
+#include "coug_fgo/dvl_a50_twist.hpp"
 
 using coug_fgo::DvlA50TwistNode;
 
@@ -37,10 +37,10 @@ class TestDvlA50TwistNode : public DvlA50TwistNode
 public:
   using DvlA50TwistNode::DvlA50TwistNode;
 
-  // Expose protected methods
+  // Expose protected methods for direct unit testing
   using DvlA50TwistNode::convertToTwist;
 
-  // Expose protected state
+  // Expose protected state for assertion checking
   using DvlA50TwistNode::params_;
 };
 
@@ -80,23 +80,30 @@ TEST_F(DvlA50TwistNodeTest, ConvertToTwist) {
   msg->time_of_validity = 1234567;
   msg->covariance = {0.1, 0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.0, 0.3};
 
+  // Disable parameter overrides; covariance comes from the DVL message
   node->params_.use_parameter_frame = false;
   node->params_.use_fom_covariance = false;
 
   auto twist_msg = node->convertToTwist(msg);
 
+  // Frame ID is preserved from the original DVL message
   EXPECT_STREQ(twist_msg.header.frame_id.c_str(), "dvl_link");
+
+  // Microsecond DVL timestamp is converted to ROS seconds + nanoseconds
   EXPECT_EQ(twist_msg.header.stamp.sec, 1);
   EXPECT_EQ(twist_msg.header.stamp.nanosec, 234567000);
 
+  // Velocity components are passed through without modification
   EXPECT_DOUBLE_EQ(twist_msg.twist.twist.linear.x, 1.0);
   EXPECT_DOUBLE_EQ(twist_msg.twist.twist.linear.y, 2.0);
   EXPECT_DOUBLE_EQ(twist_msg.twist.twist.linear.z, 3.0);
 
+  // DVL covariance diagonal is mapped to the 6x6 ROS covariance matrix
   EXPECT_DOUBLE_EQ(twist_msg.twist.covariance[0], 0.1);
   EXPECT_DOUBLE_EQ(twist_msg.twist.covariance[7], 0.2);
   EXPECT_DOUBLE_EQ(twist_msg.twist.covariance[14], 0.3);
 
+  // When FOM covariance is enabled, diagonal is scale * fom^2
   node->params_.use_fom_covariance = true;
   node->params_.fom_covariance_scale = 2.0;
   msg->fom = 0.5;

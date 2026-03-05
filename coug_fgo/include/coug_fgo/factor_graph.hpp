@@ -13,8 +13,8 @@
 // limitations under the License.
 
 /**
- * @file factor_graph_node.hpp
- * @brief ROS 2 node for AUV factor graph optimization using GTSAM.
+ * @file factor_graph.hpp
+ * @brief ROS 2 node for multi-sensor AUV state estimation via factor graph optimization.
  * @author Nelson Durrant
  * @date Jan 2026
  */
@@ -23,26 +23,17 @@
 
 #include <gtsam/base/Vector.h>
 #include <gtsam/geometry/Pose3.h>
-#include <gtsam/geometry/Rot3.h>
-#include <gtsam/navigation/CombinedImuFactor.h>
 #include <gtsam/navigation/ImuBias.h>
-#include <gtsam/nonlinear/NonlinearFactorGraph.h>
-#include <gtsam/nonlinear/Values.h>
-#include <gtsam/nonlinear/IncrementalFixedLagSmoother.h>
-#include <gtsam/nonlinear/ISAM2.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
 
 #include <atomic>
 #include <condition_variable>
-#include <deque>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
-#include <vector>
 
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/wrench_stamped.hpp>
@@ -54,8 +45,8 @@
 #include <sensor_msgs/msg/magnetic_field.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
-#include "coug_fgo/utils/conversion_utils.hpp"
-#include "coug_fgo/utils/dvl_preintegrator.hpp"
+#include "coug_fgo/factor_graph_core.hpp"
+#include "coug_fgo/utils/conversions.hpp"
 #include "coug_fgo/utils/state_initializer.hpp"
 #include "coug_fgo/utils/thread_safe_queue.hpp"
 #include <coug_fgo/factor_graph_parameters.hpp>
@@ -67,19 +58,19 @@ namespace coug_fgo
 
 /**
  * @class FactorGraphNode
- * @brief ROS 2 node for AUV factor graph optimization using GTSAM.
+ * @brief ROS 2 node for multi-sensor AUV state estimation via factor graph optimization.
  */
 class FactorGraphNode : public rclcpp::Node
 {
 public:
   /**
-   * @brief FactorGraphNode constructor.
-   * @param options The node options.
+   * @brief Constructs the node and launches frontend/backend threads.
+   * @param options ROS 2 node options (composable node support).
    */
   explicit FactorGraphNode(const rclcpp::NodeOptions & options);
 
   /**
-   * @brief FactorGraphNode destructor.
+   * @brief Joins worker threads and shuts down gracefully.
    */
   ~FactorGraphNode() override;
 
@@ -97,12 +88,12 @@ protected:
   void initializeGraph();
 
   /**
-   * @brief Builds factors for one keyframe and accumulates them in the shared buffer.
+   * @brief Drains queues and delegates factor building to the core.
    */
   void updateGraph();
 
   /**
-   * @brief Consumes the shared buffer and runs the GTSAM smoother.
+   * @brief Delegates optimization to the core and publishes results.
    */
   void optimizeGraph();
 
@@ -116,127 +107,11 @@ protected:
    */
   void backendLoop();
 
-  // --- Setup & Helpers ---
+  // --- Setup ---
   /**
-   * @brief Initializes publishers, subscribers, and timers.
+   * @brief Creates publishers, subscribers, TF interfaces, and diagnostics.
    */
   void setupRosInterfaces();
-
-  /**
-   * @brief Configures GTSAM combined IMU preintegration parameters.
-   * @return GTSAM preintegration parameters.
-   */
-  std::shared_ptr<gtsam::PreintegratedCombinedMeasurements::Params>
-  configureImuPreintegration();
-
-  // --- Factor Management ---
-  /**
-   * @brief Adds prior factors to the GTSAM graph.
-   * @param graph The target factor graph.
-   * @param values The initial value estimates.
-   */
-  void addPriorFactors(
-    gtsam::NonlinearFactorGraph & graph,
-    gtsam::Values & values);
-
-  /**
-   * @brief Adds a GPS position factor to the graph.
-   * @param graph The target factor graph.
-   * @param gps_msgs Queue of GPS messages to process.
-   */
-  void addGpsFactor(
-    gtsam::NonlinearFactorGraph & graph,
-    const std::deque<nav_msgs::msg::Odometry::SharedPtr> & gps_msgs);
-
-  /**
-   * @brief Adds a depth factor to the graph.
-   * @param graph The target factor graph.
-   * @param depth_msgs Queue of depth messages to process.
-   */
-  void addDepthFactor(
-    gtsam::NonlinearFactorGraph & graph,
-    const std::deque<nav_msgs::msg::Odometry::SharedPtr> & depth_msgs);
-
-  /**
-   * @brief Adds a magnetic orientation factor to the graph.
-   * @param graph The target factor graph.
-   * @param mag_msgs Queue of magnetometer messages to process.
-   */
-  void addMagFactor(
-    gtsam::NonlinearFactorGraph & graph,
-    const std::deque<sensor_msgs::msg::MagneticField::SharedPtr> & mag_msgs);
-
-  /**
-   * @brief Adds a AHRS orientation factor to the graph.
-   * @param graph The target factor graph.
-   * @param ahrs_msgs Queue of AHRS messages to process.
-   */
-  void addAhrsFactor(
-    gtsam::NonlinearFactorGraph & graph,
-    const std::deque<sensor_msgs::msg::Imu::SharedPtr> & ahrs_msgs);
-
-  /**
-   * @brief Adds a velocity (DVL) factor to the graph.
-   * @param graph The target factor graph.
-   * @param dvl_msgs Queue of DVL messages to process.
-   */
-  void addDvlFactor(
-    gtsam::NonlinearFactorGraph & graph,
-    const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & dvl_msgs);
-
-  /**
-   * @brief Adds a constant velocity factor to the graph.
-   * @param graph The target factor graph.
-   * @param target_time The timestamp for the new state key.
-   */
-  void addConstantVelocityFactor(
-    gtsam::NonlinearFactorGraph & graph,
-    const rclcpp::Time & target_time);
-
-  /**
-   * @brief Adds an AUV dynamics factor to the graph.
-   * @param graph The target factor graph.
-   * @param wrench_msgs Queue of wrench messages to process.
-   * @param target_time The timestamp for the new state key.
-   */
-  void addAuvDynamicsFactor(
-    gtsam::NonlinearFactorGraph & graph,
-    const std::deque<geometry_msgs::msg::WrenchStamped::SharedPtr> & wrench_msgs,
-    const rclcpp::Time & target_time);
-
-  /**
-   * @brief Integrates and adds a combined IMU factor to the graph.
-   * @param graph The target factor graph.
-   * @param imu_msgs Queue of IMU messages to process.
-   * @param target_time The timestamp for the new state key.
-   */
-  void addPreintegratedImuFactor(
-    gtsam::NonlinearFactorGraph & graph,
-    const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
-    const rclcpp::Time & target_time);
-
-  /**
-   * @brief Interpolates orientation between IMU messages.
-   * @param imu_msgs IMU message history.
-   * @param target_time Integration target time.
-   * @return The interpolated GTSAM rotation.
-   */
-  gtsam::Rot3 getInterpolatedOrientation(
-    const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
-    const rclcpp::Time & target_time);
-
-  /**
-   * @brief Integrates and adds a preintegrated DVL factor to the graph.
-   * @param graph The target factor graph.
-   * @param dvl_msgs Queue of DVL measurements.
-   * @param imu_msgs Queue of IMU measurements for orientation.
-   * @param target_time The timestamp for the new pose key.
-   */
-  void addPreintegratedDvlFactor(
-    gtsam::NonlinearFactorGraph & graph,
-    const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & dvl_msgs,
-    const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
-    const rclcpp::Time & target_time);
 
   // --- Publishing ---
   /**
@@ -315,16 +190,16 @@ protected:
    */
   void checkProcessingOverflow(diagnostic_updater::DiagnosticStatusWrapper & stat);
 
-  // --- Graph State ---
+  // --- Core ---
+  std::unique_ptr<FactorGraphCore> core_;
+
+  // --- Node State ---
   std::atomic<State> state_{State::WAITING_FOR_SENSORS};
   std::unique_ptr<utils::StateInitializer> state_initializer_;
-
-  size_t prev_step_ = 0;
-  size_t current_step_ = 1;
-  rclcpp::Time prev_time_{0, 0, RCL_ROS_TIME};
   rclcpp::Time last_update_time_{0, 0, RCL_ROS_TIME};
   rclcpp::Time last_opt_time_{0, 0, RCL_ROS_TIME};
 
+  // --- Diagnostics State ---
   std::atomic<double> last_opt_duration_{0.0};
   std::atomic<double> last_smoother_duration_{0.0};
   std::atomic<double> last_cov_duration_{0.0};
@@ -332,24 +207,6 @@ protected:
   std::atomic<size_t> new_factors_{0};
   std::atomic<size_t> total_factors_{0};
   std::atomic<size_t> total_variables_{0};
-  std::map<rclcpp::Time, gtsam::Key> time_to_key_;
-
-  // --- GTSAM Objects ---
-  std::unique_ptr<gtsam::IncrementalFixedLagSmoother> inc_smoother_;
-  std::unique_ptr<gtsam::ISAM2> isam_;
-
-  std::unique_ptr<gtsam::PreintegratedCombinedMeasurements> imu_preintegrator_;
-  std::unique_ptr<utils::DvlPreintegrator> dvl_preintegrator_;
-
-  gtsam::Pose3 prev_pose_;
-  gtsam::Vector3 prev_vel_;
-  gtsam::imuBias::ConstantBias prev_imu_bias_;
-
-  gtsam::Vector3 last_dvl_velocity_ = gtsam::Vector3::Zero();
-  gtsam::Matrix3 last_dvl_covariance_ = gtsam::Matrix3::Zero();
-  gtsam::Vector3 last_imu_acc_ = gtsam::Vector3::Zero();
-  gtsam::Vector3 last_imu_gyr_ = gtsam::Vector3::Zero();
-  geometry_msgs::msg::WrenchStamped::SharedPtr last_wrench_msg_;
 
   // --- Message Queues ---
   utils::ThreadSafeQueue<sensor_msgs::msg::Imu::SharedPtr> imu_queue_;
@@ -373,15 +230,6 @@ protected:
 
   rclcpp::CallbackGroup::SharedPtr sensor_cb_group_;
   std::mutex initialization_mutex_;
-  std::mutex buffer_mutex_;
-
-  // --- Graph Buffer ---
-  gtsam::NonlinearFactorGraph buffer_graph_;
-  gtsam::Values buffer_values_;
-  gtsam::IncrementalFixedLagSmoother::KeyTimestampMap buffer_timestamps_;
-  rclcpp::Time buffer_target_time_{0, 0, RCL_ROS_TIME};
-  size_t buffer_last_step_ = 0;
-  bool has_buffer_ = false;
 
   // --- Transformations ---
   geometry_msgs::msg::TransformStamped target_T_base_tf_;

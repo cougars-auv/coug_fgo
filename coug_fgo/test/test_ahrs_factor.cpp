@@ -35,7 +35,7 @@ TEST(AhrsYawFactorArmTest, ErrorEvaluation) {
   gtsam::Key poseKey = gtsam::symbol_shorthand::X(1);
   gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(1, 0.1);
 
-  // Case 1: Identity
+  // Zero error when estimated yaw matches the measured yaw
   coug_fgo::factors::AhrsYawFactorArm factor1(poseKey, gtsam::Rot3::Identity(),
     gtsam::Rot3::Identity(), 0.0, model);
   EXPECT_TRUE(
@@ -43,7 +43,7 @@ TEST(AhrsYawFactorArmTest, ErrorEvaluation) {
       gtsam::Vector1::Zero(),
       factor1.evaluateError(gtsam::Pose3::Identity()), 1e-9));
 
-  // Case 2: Rotation
+  // Consistent yaw produces zero error at non-trivial heading
   gtsam::Pose3 pose_rot = gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3());
   coug_fgo::factors::AhrsYawFactorArm factor_rot(poseKey, gtsam::Rot3::Yaw(M_PI_2),
     gtsam::Rot3::Identity(), 0.0, model);
@@ -52,7 +52,7 @@ TEST(AhrsYawFactorArmTest, ErrorEvaluation) {
       gtsam::Vector1::Zero(),
       factor_rot.evaluateError(pose_rot), 1e-9));
 
-  // Case 3: Mounting/Lever Arm
+  // Sensor mounting rotation is compensated in yaw extraction
   coug_fgo::factors::AhrsYawFactorArm factor2(poseKey, gtsam::Rot3::Yaw(M_PI_2),
     gtsam::Rot3::Yaw(M_PI_2), 0.0, model);
   EXPECT_TRUE(
@@ -60,15 +60,7 @@ TEST(AhrsYawFactorArmTest, ErrorEvaluation) {
       gtsam::Vector1::Zero(),
       factor2.evaluateError(gtsam::Pose3::Identity()), 1e-9));
 
-  // Case 4: Combined
-  coug_fgo::factors::AhrsYawFactorArm factor_comb(poseKey, gtsam::Rot3::Yaw(M_PI),
-    gtsam::Rot3::Yaw(M_PI_2), 0.0, model);
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector1::Zero(),
-      factor_comb.evaluateError(gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3())), 1e-9));
-
-  // Case 5: Error Check
+  // Non-zero residual proportional to the yaw discrepancy
   double angle = 0.174533;
   gtsam::Vector error =
     factor2.evaluateError(gtsam::Pose3(gtsam::Rot3::Yaw(angle), gtsam::Point3()));

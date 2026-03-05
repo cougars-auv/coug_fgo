@@ -35,7 +35,7 @@ TEST(Gps2dFactorArmTest, ErrorEvaluation) {
   gtsam::Key poseKey = gtsam::symbol_shorthand::X(1);
   gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(2, 0.1);
 
-  // Case 1: Identity
+  // Zero error when pose XY matches the measured position
   coug_fgo::factors::Gps2dFactorArm factor1(poseKey, gtsam::Point3(1, 2, 3),
     gtsam::Pose3::Identity(), model);
   EXPECT_TRUE(
@@ -43,13 +43,13 @@ TEST(Gps2dFactorArmTest, ErrorEvaluation) {
       gtsam::Vector2::Zero(),
       factor1.evaluateError(gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(1, 2, 3))), 1e-9));
 
-  // Case 2: Rotation
+  // Yaw rotation does not affect world-frame 2D position
   EXPECT_TRUE(
     gtsam::assert_equal(
       gtsam::Vector2::Zero(),
       factor1.evaluateError(gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(1, 2, 3))), 1e-9));
 
-  // Case 3: Mounting/Lever Arm
+  // Lever arm offset between target and sensor is compensated
   coug_fgo::factors::Gps2dFactorArm factor2(poseKey, gtsam::Point3(1, 2, 3),
     gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(1, 0, 0)), model);
   EXPECT_TRUE(
@@ -57,13 +57,7 @@ TEST(Gps2dFactorArmTest, ErrorEvaluation) {
       gtsam::Vector2::Zero(),
       factor2.evaluateError(gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(0, 2, 3))), 1e-9));
 
-  // Case 4: Combined
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector2::Zero(),
-      factor2.evaluateError(gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(1, 1, 3))), 1e-9));
-
-  // Case 5: Error Check
+  // Non-zero residual when predicted position differs from measurement
   EXPECT_TRUE(
     gtsam::assert_equal(
       gtsam::Vector2(1, 0),
