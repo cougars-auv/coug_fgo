@@ -20,6 +20,7 @@ on:
     paths:
       - ".github/workflows/docker_ci.yml"
       - "**/package.xml"
+  workflow_dispatch:
 
 jobs:
   trigger-upstream:
