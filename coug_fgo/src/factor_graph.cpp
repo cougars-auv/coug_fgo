@@ -565,13 +565,6 @@ void FactorGraphNode::updateGraph()
     }
   }
 
-  if (target_time <= core_->prev_time() + rclcpp::Duration::from_seconds(1e-6)) {
-    RCLCPP_DEBUG(
-      get_logger(),
-      "Duplicate or out-of-order timestamp detected. Skipping.");
-    return;
-  }
-
   // --- Update Request ---
   utils::QueueBundle msgs;
   msgs.imu = imu_queue_.drain();

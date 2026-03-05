@@ -665,6 +665,13 @@ std::optional<UpdateResult> FactorGraphCore::update(
   const rclcpp::Time & target_time,
   utils::QueueBundle & msgs)
 {
+  if (target_time <= prev_time_ + rclcpp::Duration::from_seconds(1e-6)) {
+    RCLCPP_DEBUG(
+      kLogger,
+      "Duplicate or out-of-order timestamp detected. Skipping.");
+    return std::nullopt;
+  }
+
   // Sort IMU (and DVL) messages
   auto by_time = [](const auto & a, const auto & b) {
       return rclcpp::Time(a->header.stamp) < rclcpp::Time(b->header.stamp);

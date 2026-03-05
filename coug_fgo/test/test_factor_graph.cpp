@@ -81,10 +81,10 @@ TEST_F(FactorGraphNodeTest, InitialState) {
 }
 
 /**
- * @brief Verify core is not initialized before sensors arrive.
+ * @brief Verify core is initialized after startup.
  */
-TEST_F(FactorGraphNodeTest, CoreNotInitialized) {
-  EXPECT_EQ(node->core_, nullptr);
+TEST_F(FactorGraphNodeTest, CoreInitialized) {
+  EXPECT_NE(node->core_, nullptr);
 }
 
 /**
