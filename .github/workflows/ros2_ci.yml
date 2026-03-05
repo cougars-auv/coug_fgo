@@ -65,11 +65,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y lcov gcc-11
           lcov --gcov-tool gcov-11 --capture --directory ${{ github.workspace }}/.work/target_ws/build --output-file coverage.info --ignore-errors mismatch,gcov,source
           lcov --remove coverage.info '/usr/*' '/opt/*' '*/test/*' '*/tests/*' '*/install/*' '*/build/*' --output-file coverage.info --ignore-errors mismatch,gcov,unused
-          echo "=== SF paths before sed ==="
-          grep "^SF:" coverage.info | head -10
-          sed -i "s|${{ github.workspace }}/.work/target_ws/src|${{ github.workspace }}|g" coverage.info
-          echo "=== SF paths after sed ==="
-          grep "^SF:" coverage.info | head -10
+          sed -i "s|${{ github.workspace }}/.work/target_ws/src/${{ github.event.repository.name }}|${{ github.workspace }}|g" coverage.info
       - if: matrix.runner == 'ubuntu-latest'
         uses: codecov/codecov-action@v5
         with:
