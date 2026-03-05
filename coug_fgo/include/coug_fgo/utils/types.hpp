@@ -16,15 +16,15 @@
  * @file types.hpp
  * @brief Shared types for the factor graph system.
  * @author Nelson Durrant
- * @date Mar 2026
+ * @date Jan 2026
  */
 
 #pragma once
 
+#include <gtsam/geometry/Pose3.h>
+
 #include <deque>
 #include <memory>
-
-#include <gtsam/geometry/Pose3.h>
 
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/wrench_stamped.hpp>

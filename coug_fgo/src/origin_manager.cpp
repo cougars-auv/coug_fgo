@@ -42,10 +42,14 @@ OriginManagerNode::OriginManagerNode(const rclcpp::NodeOptions & options)
   params_ = param_listener_->get_params();
 
   // --- ROS Interfaces ---
-  odom_pub_ = create_publisher<nav_msgs::msg::Odometry>(params_.gps_odom_topic, rclcpp::SystemDefaultsQoS());
+  odom_pub_ = create_publisher<nav_msgs::msg::Odometry>(
+    params_.gps_odom_topic,
+    rclcpp::SystemDefaultsQoS());
 
   if (params_.set_origin) {
-    origin_pub_ = create_publisher<sensor_msgs::msg::NavSatFix>(params_.origin_topic, rclcpp::SystemDefaultsQoS());
+    origin_pub_ = create_publisher<sensor_msgs::msg::NavSatFix>(
+      params_.origin_topic,
+      rclcpp::SystemDefaultsQoS());
   } else {
     origin_sub_ = create_subscription<sensor_msgs::msg::NavSatFix>(
       params_.origin_topic, rclcpp::SystemDefaultsQoS(),

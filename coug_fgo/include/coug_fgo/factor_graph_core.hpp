@@ -16,20 +16,21 @@
  * @file factor_graph_core.hpp
  * @brief ROS-independent GTSAM factor graph logic for AUV state estimation.
  * @author Nelson Durrant
- * @date Mar 2026
+ * @date Jan 2026
  */
 
 #pragma once
-
-#include <map>
-#include <memory>
-#include <mutex>
-#include <optional>
 
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/navigation/CombinedImuFactor.h>
 #include <gtsam/nonlinear/ISAM2.h>
 #include <gtsam/nonlinear/IncrementalFixedLagSmoother.h>
+
+#include <deque>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <optional>
 
 #include <rclcpp/rclcpp.hpp>
 
@@ -53,12 +54,15 @@ struct OptimizeResult
   gtsam::Matrix pose_cov;
   gtsam::Matrix vel_cov;
   gtsam::Matrix bias_cov;
+
   gtsam::Values all_estimates;
   rclcpp::Time target_time{0, 0, RCL_ROS_TIME};
+
   double opt_duration = 0.0;
   double smoother_duration = 0.0;
   double cov_duration = 0.0;
   bool processing_overflow = false;
+
   size_t num_keyframes = 0;
   size_t new_factors = 0;
   size_t total_factors = 0;
@@ -116,7 +120,7 @@ public:
   /**
    * @brief Returns the last processed timestamp (for stale check by the node).
    */
-  rclcpp::Time prev_time() const { return prev_time_; }
+  rclcpp::Time prev_time() const {return prev_time_;}
 
   std::mutex buffer_mutex;
   std::map<rclcpp::Time, gtsam::Key> time_to_key;
@@ -248,8 +252,6 @@ private:
 
   // --- Parameters ---
   const factor_graph_node::Params & params_;
-
-  // --- Sensor Transforms ---
   utils::TfBundle tfs_;
 
   // --- GTSAM Solver ---
@@ -267,14 +269,14 @@ private:
   gtsam::Vector3 prev_vel_;
   gtsam::imuBias::ConstantBias prev_imu_bias_;
 
-  // --- Cached Sensor Data ---
+  // --- Sensor Data ---
   gtsam::Vector3 last_dvl_velocity_ = gtsam::Vector3::Zero();
   gtsam::Matrix3 last_dvl_covariance_ = gtsam::Matrix3::Zero();
   gtsam::Vector3 last_imu_acc_ = gtsam::Vector3::Zero();
   gtsam::Vector3 last_imu_gyr_ = gtsam::Vector3::Zero();
   geometry_msgs::msg::WrenchStamped::SharedPtr last_wrench_msg_;
 
-  // --- Double Buffer ---
+  // --- Buffer ---
   gtsam::NonlinearFactorGraph buffer_graph_;
   gtsam::Values buffer_values_;
   gtsam::IncrementalFixedLagSmoother::KeyTimestampMap buffer_timestamps_;

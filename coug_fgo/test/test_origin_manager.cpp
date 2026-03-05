@@ -15,7 +15,7 @@
 /**
  * @file test_origin_manager.cpp
  * @brief Unit tests for origin_manager.hpp
- * @author Nelson Durrant
+ * @author Nelson Durrant (w Gemini 3 Pro)
  * @date Jan 2026
  */
 

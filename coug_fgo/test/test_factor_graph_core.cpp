@@ -15,8 +15,8 @@
 /**
  * @file test_factor_graph_core.cpp
  * @brief Unit tests for factor_graph_core.hpp.
- * @author Nelson Durrant
- * @date Mar 2026
+ * @author Nelson Durrant (w Gemini 3 Pro)
+ * @date Jan 2026
  */
 
 #include <gtest/gtest.h>

@@ -15,8 +15,8 @@
 /**
  * @file test_state_initializer.cpp
  * @brief Unit tests for state_initializer.hpp.
- * @author Nelson Durrant
- * @date Mar 2026
+ * @author Nelson Durrant (w Gemini 3 Pro)
+ * @date Jan 2026
  */
 
 #include <gtest/gtest.h>
@@ -185,8 +185,14 @@ TEST_F(StateInitializerTest, Compute) {
   // Default parameter priors: orientation=[0,0,0], position=[0,0,0], velocity=[0,0,0]
   // With identity TFs, pose should be identity rotation at origin
   EXPECT_TRUE(gtsam::assert_equal(gtsam::Rot3::Identity(), init.pose_.rotation(), 1e-9));
-  EXPECT_TRUE(gtsam::assert_equal(gtsam::Point3(gtsam::Point3::Zero()), gtsam::Point3(init.pose_.translation()), 1e-9));
-  EXPECT_TRUE(gtsam::assert_equal(gtsam::Vector3(gtsam::Vector3::Zero()), gtsam::Vector3(init.velocity_), 1e-9));
+  EXPECT_TRUE(
+    gtsam::assert_equal(
+      gtsam::Point3(gtsam::Point3::Zero()),
+      gtsam::Point3(init.pose_.translation()), 1e-9));
+  EXPECT_TRUE(
+    gtsam::assert_equal(
+      gtsam::Vector3(gtsam::Vector3::Zero()),
+      gtsam::Vector3(init.velocity_), 1e-9));
   EXPECT_NEAR(init.bias_.accelerometer().norm(), 0.0, 1e-9);
   EXPECT_NEAR(init.bias_.gyroscope().norm(), 0.0, 1e-9);
   EXPECT_EQ(init.time_.seconds(), 1.0);

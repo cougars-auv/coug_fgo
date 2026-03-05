@@ -43,21 +43,31 @@ void FactorGraphNode::setupRosInterfaces()
   tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
   // --- ROS Publishers ---
-  global_odom_pub_ = create_publisher<nav_msgs::msg::Odometry>(params_.global_odom_topic, rclcpp::SystemDefaultsQoS());
+  global_odom_pub_ = create_publisher<nav_msgs::msg::Odometry>(
+    params_.global_odom_topic,
+    rclcpp::SystemDefaultsQoS());
   if (params_.publish_smoothed_path) {
-    smoothed_path_pub_ = create_publisher<nav_msgs::msg::Path>(params_.smoothed_path_topic, rclcpp::SystemDefaultsQoS());
+    smoothed_path_pub_ = create_publisher<nav_msgs::msg::Path>(
+      params_.smoothed_path_topic,
+      rclcpp::SystemDefaultsQoS());
   }
   if (params_.publish_velocity) {
     velocity_pub_ =
-      create_publisher<geometry_msgs::msg::TwistWithCovarianceStamped>(params_.velocity_topic, rclcpp::SystemDefaultsQoS());
+      create_publisher<geometry_msgs::msg::TwistWithCovarianceStamped>(
+      params_.velocity_topic,
+      rclcpp::SystemDefaultsQoS());
   }
   if (params_.publish_imu_bias) {
     imu_bias_pub_ =
-      create_publisher<geometry_msgs::msg::TwistWithCovarianceStamped>(params_.imu_bias_topic, rclcpp::SystemDefaultsQoS());
+      create_publisher<geometry_msgs::msg::TwistWithCovarianceStamped>(
+      params_.imu_bias_topic,
+      rclcpp::SystemDefaultsQoS());
   }
   if (params_.publish_graph_metrics) {
     graph_metrics_pub_ =
-      create_publisher<coug_fgo_msgs::msg::GraphMetrics>(params_.graph_metrics_topic, rclcpp::SystemDefaultsQoS());
+      create_publisher<coug_fgo_msgs::msg::GraphMetrics>(
+      params_.graph_metrics_topic,
+      rclcpp::SystemDefaultsQoS());
   }
 
   // --- ROS Callback Groups ---
@@ -65,7 +75,6 @@ void FactorGraphNode::setupRosInterfaces()
   auto sensor_options = rclcpp::SubscriptionOptions();
   sensor_options.callback_group = sensor_cb_group_;
 
-  // --- TF Lookup Helper ---
   auto try_lookup_tf =
     [this](geometry_msgs::msg::TransformStamped & tf_out,
       const std::string & child, const std::string & sensor_name) {
@@ -320,8 +329,6 @@ void FactorGraphNode::initializeGraph()
     toGtsam(target_T_ahrs_tf_.transform), toGtsam(target_T_dvl_tf_.transform),
     toGtsam(target_T_base_tf_.transform), toGtsam(target_T_com_tf_.transform)};
   state_initializer_->compute(tfs);
-
-  // --- Delegate to Core ---
   core_->initialize(*state_initializer_, tfs);
 
   state_ = State::RUNNING;
@@ -565,7 +572,7 @@ void FactorGraphNode::updateGraph()
     return;
   }
 
-  // --- Drain Queues ---
+  // --- Update Request ---
   utils::QueueBundle msgs;
   msgs.imu = imu_queue_.drain();
   msgs.gps = gps_queue_.drain();
@@ -575,7 +582,6 @@ void FactorGraphNode::updateGraph()
   msgs.dvl = dvl_queue_.drain();
   msgs.wrench = wrench_queue_.drain();
 
-  // --- Delegate to Core ---
   auto result = core_->update(target_time, msgs);
 
   // Re-queue unused messages
@@ -591,6 +597,7 @@ void FactorGraphNode::updateGraph()
 
 void FactorGraphNode::optimizeGraph()
 {
+  // --- Optimization Request ---
   try {
     auto result = core_->optimize();
     if (!result) {return;}

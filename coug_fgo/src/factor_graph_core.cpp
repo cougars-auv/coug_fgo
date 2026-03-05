@@ -16,7 +16,7 @@
  * @file factor_graph_core.cpp
  * @brief Implementation of the FactorGraphCore.
  * @author Nelson Durrant
- * @date Mar 2026
+ * @date Jan 2026
  */
 
 #include "coug_fgo/factor_graph_core.hpp"
@@ -185,6 +185,7 @@ void FactorGraphCore::addPriorFactors(
     params_.prior.parameter_priors.initial_position_sigmas[2];
 
   if (!params_.prior.use_parameter_priors) {
+    // Add initial position prior
     if (params_.gps.enable_gps) {
       prior_pose_sigmas(3) = params_.gps.use_parameter_covariance ?
         params_.gps.parameter_covariance.position_noise_sigmas[0] :
@@ -197,6 +198,7 @@ void FactorGraphCore::addPriorFactors(
       params_.depth.parameter_covariance.position_z_noise_sigma :
       std::sqrt(state_init.initial_depth_->pose.covariance[14]);
 
+    // Add initial orientation prior
     if (params_.ahrs.enable_ahrs) {
       prior_pose_sigmas(2) = params_.ahrs.use_parameter_covariance ?
         params_.ahrs.parameter_covariance.yaw_noise_sigma :
@@ -205,11 +207,9 @@ void FactorGraphCore::addPriorFactors(
       double h_mag = std::sqrt(
         params_.mag.reference_field[0] * params_.mag.reference_field[0] +
         params_.mag.reference_field[1] * params_.mag.reference_field[1]);
-
       double mag_sigma_norm = params_.mag.use_parameter_covariance ?
         params_.mag.parameter_covariance.magnetic_field_noise_sigmas[0] :
         std::sqrt(toGtsam(state_init.initial_mag_->magnetic_field_covariance)(0, 0));
-
       prior_pose_sigmas(2) = mag_sigma_norm / h_mag;
     }
     prior_pose_sigmas(0) = params_.imu.use_parameter_covariance ?
@@ -428,8 +428,6 @@ void FactorGraphCore::addAuvDynamicsFactor(
   const std::deque<geometry_msgs::msg::WrenchStamped::SharedPtr> & wrench_msgs,
   const rclcpp::Time & target_time)
 {
-  if (tfs_.target_T_com.equals(gtsam::Pose3())) {return;}
-
   // Implement a zero-order hold (ZOH) for wrench commands
   if (!wrench_msgs.empty()) {
     last_wrench_msg_ = wrench_msgs.back();
@@ -727,7 +725,7 @@ std::optional<UpdateResult> FactorGraphCore::update(
   {
     std::scoped_lock update_lock(buffer_mutex);
 
-    // --- Predict Initial Values ---
+    // --- Add State Predictions ---
     auto pred = imu_preintegrator_->predict(
       gtsam::NavState(prev_pose_, prev_vel_), prev_imu_bias_);
     new_values.insert(X(current_step_), pred.pose());
@@ -802,7 +800,6 @@ std::optional<OptimizeResult> FactorGraphCore::optimize()
 
   // --- Smoother Optimization ---
   auto opt_start = std::chrono::high_resolution_clock::now();
-
   result.new_factors = batch_graph.size();
 
   if (inc_smoother_) {
@@ -883,7 +880,7 @@ std::optional<OptimizeResult> FactorGraphCore::optimize()
   result.cov_duration = std::chrono::duration<double>(opt_end - cov_start).count();
   result.opt_duration = std::chrono::duration<double>(opt_end - opt_start).count();
 
-  // --- Provide full estimates for smoothed path ---
+  // --- Export Smoothed Path ---
   if (params_.publish_smoothed_path) {
     if (inc_smoother_) {
       result.all_estimates = inc_smoother_->calculateEstimate();
