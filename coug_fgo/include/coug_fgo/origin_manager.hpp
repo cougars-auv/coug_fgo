@@ -35,7 +35,7 @@
 #include <sensor_msgs/msg/imu.hpp>
 #include <diagnostic_updater/diagnostic_updater.hpp>
 
-#include <coug_fgo/origin_manager_parameters.hpp>
+#include "coug_fgo/origin_manager_parameters.hpp"
 
 namespace coug_fgo
 {

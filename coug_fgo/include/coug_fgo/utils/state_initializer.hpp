@@ -34,9 +34,9 @@
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/magnetic_field.hpp>
 
-#include <coug_fgo/utils/types.hpp>
-#include <coug_fgo/factor_graph_parameters.hpp>
-#include <coug_fgo/utils/conversions.hpp>
+#include "coug_fgo/factor_graph_parameters.hpp"
+#include "coug_fgo/utils/conversions.hpp"
+#include "coug_fgo/utils/types.hpp"
 
 namespace coug_fgo::utils
 {

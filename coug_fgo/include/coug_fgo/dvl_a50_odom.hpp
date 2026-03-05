@@ -34,7 +34,7 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-#include <coug_fgo/dvl_a50_odom_parameters.hpp>
+#include "coug_fgo/dvl_a50_odom_parameters.hpp"
 
 namespace coug_fgo
 {

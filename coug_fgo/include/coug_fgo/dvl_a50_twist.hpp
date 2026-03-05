@@ -30,7 +30,7 @@
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-#include <coug_fgo/dvl_a50_twist_parameters.hpp>
+#include "coug_fgo/dvl_a50_twist_parameters.hpp"
 
 namespace coug_fgo
 {

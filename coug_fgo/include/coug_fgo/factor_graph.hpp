@@ -46,10 +46,10 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 #include "coug_fgo/factor_graph_core.hpp"
+#include "coug_fgo/factor_graph_parameters.hpp"
 #include "coug_fgo/utils/conversions.hpp"
 #include "coug_fgo/utils/state_initializer.hpp"
 #include "coug_fgo/utils/thread_safe_queue.hpp"
-#include <coug_fgo/factor_graph_parameters.hpp>
 #include <coug_fgo_msgs/msg/graph_metrics.hpp>
 
 
