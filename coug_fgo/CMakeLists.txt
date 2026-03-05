@@ -129,6 +129,21 @@ if(BUILD_TESTING)
   )
   target_link_libraries(test_depth_factor gtsam)
 
+  ament_add_gtest(test_dvl_a50_odom test/test_dvl_a50_odom.cpp)
+  target_include_directories(test_dvl_a50_odom PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  )
+  target_link_libraries(test_dvl_a50_odom
+    factor_graph_component
+  )
+  ament_target_dependencies(test_dvl_a50_odom
+    rclcpp
+    nav_msgs
+    dvl_msgs
+    tf2_ros
+    geometry_msgs
+  )
+
   ament_add_gtest(test_dvl_a50_twist test/test_dvl_a50_twist.cpp)
   target_include_directories(test_dvl_a50_twist PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
