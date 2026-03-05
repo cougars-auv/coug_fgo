@@ -229,7 +229,6 @@ protected:
   std::atomic<bool> is_running_{true};
 
   rclcpp::CallbackGroup::SharedPtr sensor_cb_group_;
-  std::mutex initialization_mutex_;
 
   // --- Transformations ---
   geometry_msgs::msg::TransformStamped target_T_base_tf_;

@@ -474,12 +474,6 @@ void FactorGraphNode::backendLoop()
 
 void FactorGraphNode::initializeGraph()
 {
-  std::scoped_lock init_lock(initialization_mutex_);
-  if (state_ == State::RUNNING) {
-    RCLCPP_DEBUG(get_logger(), "Duplicate initialization attempt detected.");
-    return;
-  }
-
   // --- Wait for Sensor TFs ---
   bool imu_ok = !target_T_imu_tf_.header.frame_id.empty();
   bool gps_ok = !(params_.gps.enable_gps || params_.gps.enable_gps_init_only) ||
