@@ -131,7 +131,7 @@ void FactorGraphNode::setupRosInterfaces()
         frontend_cv_.notify_one();
       } else {
         double time_since_dvl = (get_clock()->now() - dvl_queue_.getLastTime()).seconds();
-        if (state_ == State::RUNNING && time_since_dvl > params_.dvl.timeout_threshold) {
+        if (state_.load() == State::RUNNING && time_since_dvl > params_.dvl.timeout_threshold) {
           RCLCPP_WARN_THROTTLE(
             get_logger(), *get_clock(), 5000,
             "DVL timed out (%.2fs)! Using depth sensor to trigger keyframes.",
@@ -241,7 +241,7 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions & options)
 
 FactorGraphNode::~FactorGraphNode()
 {
-  is_running_ = false;
+  is_running_.store(false);
   {
     std::scoped_lock lock(frontend_trigger_mutex_);
     frontend_trigger_ = true;
@@ -401,18 +401,18 @@ void FactorGraphNode::publishGraphMetrics(const rclcpp::Time & timestamp)
 
 void FactorGraphNode::frontendLoop()
 {
-  while (is_running_) {
+  while (is_running_.load()) {
     std::unique_lock<std::mutex> lock(frontend_trigger_mutex_);
-    frontend_cv_.wait(lock, [this] {return frontend_trigger_ || !is_running_;});
+    frontend_cv_.wait(lock, [this] {return frontend_trigger_ || !is_running_.load();});
     frontend_trigger_ = false;
 
-    if (!is_running_) {
+    if (!is_running_.load()) {
       break;
     }
 
     lock.unlock();
 
-    if (state_ != State::RUNNING) {
+    if (state_.load() != State::RUNNING) {
       initializeGraph();
     } else {
       bool should_update = true;
@@ -441,16 +441,16 @@ void FactorGraphNode::frontendLoop()
 
 void FactorGraphNode::backendLoop()
 {
-  while (is_running_) {
+  while (is_running_.load()) {
     std::unique_lock<std::mutex> lock(backend_trigger_mutex_);
-    backend_cv_.wait(lock, [this] {return backend_trigger_ || !is_running_;});
+    backend_cv_.wait(lock, [this] {return backend_trigger_ || !is_running_.load();});
     backend_trigger_ = false;
 
-    if (!is_running_) {
+    if (!is_running_.load()) {
       break;
     }
 
-    if (state_ == State::RUNNING) {
+    if (state_.load() == State::RUNNING) {
       lock.unlock();
 
       bool should_optimize = true;
@@ -529,7 +529,7 @@ void FactorGraphNode::initializeGraph()
   state_initializer_->compute(tfs);
   core_->initialize(*state_initializer_, tfs);
 
-  state_ = State::RUNNING;
+  state_.store(State::RUNNING);
   RCLCPP_INFO(get_logger(), "Graph initialized successfully!");
 }
 
@@ -583,13 +583,13 @@ void FactorGraphNode::optimizeGraph()
     if (!result) {return;}
 
     // --- Update Diagnostics State ---
-    last_opt_duration_ = result->opt_duration;
-    last_smoother_duration_ = result->smoother_duration;
-    last_cov_duration_ = result->cov_duration;
-    new_factors_ = result->new_factors;
-    total_factors_ = result->total_factors;
-    total_variables_ = result->total_variables;
-    processing_overflow_ = result->processing_overflow;
+    last_opt_duration_.store(result->opt_duration);
+    last_smoother_duration_.store(result->smoother_duration);
+    last_cov_duration_.store(result->cov_duration);
+    new_factors_.store(result->new_factors);
+    total_factors_.store(result->total_factors);
+    total_variables_.store(result->total_variables);
+    processing_overflow_.store(result->processing_overflow);
 
     if (result->processing_overflow) {
       RCLCPP_WARN_THROTTLE(
@@ -674,7 +674,7 @@ void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrap
 
 void FactorGraphNode::checkGraphState(diagnostic_updater::DiagnosticStatusWrapper & stat)
 {
-  switch (state_) {
+  switch (state_.load()) {
     case State::RUNNING:
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Optimizing factor graph.");
       break;
@@ -686,7 +686,7 @@ void FactorGraphNode::checkGraphState(diagnostic_updater::DiagnosticStatusWrappe
 
 void FactorGraphNode::checkProcessingOverflow(diagnostic_updater::DiagnosticStatusWrapper & stat)
 {
-  if (processing_overflow_) {
+  if (processing_overflow_.load()) {
     stat.summary(
       diagnostic_msgs::msg::DiagnosticStatus::WARN,
       "Processing overflow detected. Skipping keyframes.");

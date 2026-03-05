@@ -143,8 +143,8 @@ void OriginManagerNode::originCallback(const sensor_msgs::msg::NavSatFix::Shared
 
 void OriginManagerNode::navsatCallback(const sensor_msgs::msg::NavSatFix::SharedPtr msg)
 {
-  last_navsat_time_ = this->get_clock()->now().seconds();
-  last_fix_status_ = msg->status.status;
+  last_navsat_time_.store(this->get_clock()->now().seconds());
+  last_fix_status_.store(msg->status.status);
 
   if (params_.simulate_dropout && params_.dropout_frequency > 0) {
     double current_time = get_clock()->now().seconds();
@@ -319,16 +319,17 @@ void OriginManagerNode::checkNavSatFix(diagnostic_updater::DiagnosticStatusWrapp
 {
   stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "GPS fix acquired.");
 
-  stat.add("Fix Status", last_fix_status_);
+  stat.add("Fix Status", last_fix_status_.load());
 
   double time_since =
-    (last_navsat_time_ > 0.0) ? (this->get_clock()->now().seconds() - last_navsat_time_) : -1.0;
+    (last_navsat_time_.load() > 0.0) ?
+    (this->get_clock()->now().seconds() - last_navsat_time_.load()) : -1.0;
   stat.add("Time Since Last (s)", time_since);
 
-  if (time_since > params_.timeout_threshold || last_navsat_time_ == 0.0) {
+  if (time_since > params_.timeout_threshold || last_navsat_time_.load() == 0.0) {
     stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "GPS is offline.");
   }
-  if (last_fix_status_ == sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX) {
+  if (last_fix_status_.load() == sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX) {
     stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "No GPS fix acquired.");
   }
 }

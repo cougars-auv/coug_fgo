@@ -62,8 +62,8 @@ DvlA50TwistNode::DvlA50TwistNode(const rclcpp::NodeOptions & options)
 
 void DvlA50TwistNode::dvlCallback(const dvl_msgs::msg::DVL::SharedPtr msg)
 {
-  last_dvl_time_ = this->get_clock()->now().seconds();
-  last_velocity_valid_ = msg->velocity_valid;
+  last_dvl_time_.store(this->get_clock()->now().seconds());
+  last_velocity_valid_.store(msg->velocity_valid);
 
   if (params_.simulate_dropout && params_.dropout_frequency > 0.0) {
     double current_time = get_clock()->now().seconds();
@@ -129,16 +129,17 @@ void DvlA50TwistNode::checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper
 {
   stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "DVL data acquired.");
 
-  stat.add("Velocity Valid", last_velocity_valid_);
+  stat.add("Velocity Valid", last_velocity_valid_.load());
 
   double time_since =
-    (last_dvl_time_ > 0.0) ? (this->get_clock()->now().seconds() - last_dvl_time_) : -1.0;
+    (last_dvl_time_.load() > 0.0) ?
+    (this->get_clock()->now().seconds() - last_dvl_time_.load()) : -1.0;
   stat.add("Time Since Last (s)", time_since);
 
-  if (time_since > params_.timeout_threshold || last_dvl_time_ == 0.0) {
+  if (time_since > params_.timeout_threshold || last_dvl_time_.load() == 0.0) {
     stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "DVL is offline.");
   }
-  if (!last_velocity_valid_ && last_dvl_time_ > 0.0) {
+  if (!last_velocity_valid_.load() && last_dvl_time_.load() > 0.0) {
     stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "DVL velocity is invalid.");
   }
 }

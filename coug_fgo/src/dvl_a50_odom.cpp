@@ -67,7 +67,7 @@ DvlA50OdomNode::DvlA50OdomNode(const rclcpp::NodeOptions & options)
 
 void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg)
 {
-  last_dvl_time_ = this->get_clock()->now().seconds();
+  last_dvl_time_.store(this->get_clock()->now().seconds());
 
   std::string current_dvl_frame =
     params_.use_parameter_frame ? params_.parameter_frame : msg->header.frame_id;
@@ -143,10 +143,11 @@ void DvlA50OdomNode::checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper 
   stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "DVL DR data acquired.");
 
   double time_since =
-    (last_dvl_time_ > 0.0) ? (this->get_clock()->now().seconds() - last_dvl_time_) : -1.0;
+    (last_dvl_time_.load() > 0.0) ?
+    (this->get_clock()->now().seconds() - last_dvl_time_.load()) : -1.0;
   stat.add("Time Since Last (s)", time_since);
 
-  if (time_since > params_.timeout_threshold || last_dvl_time_ == 0.0) {
+  if (time_since > params_.timeout_threshold || last_dvl_time_.load() == 0.0) {
     stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "DVL DR is offline.");
   }
 }
