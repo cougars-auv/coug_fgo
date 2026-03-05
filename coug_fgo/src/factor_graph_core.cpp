@@ -681,6 +681,8 @@ std::optional<UpdateResult> FactorGraphCore::update(
   gtsam::Values new_values;
   gtsam::IncrementalFixedLagSmoother::KeyTimestampMap new_timestamps;
 
+  UpdateResult result;
+
   addPreintegratedImuFactor(new_graph, msgs.imu, target_time, result.unused_imu);
   if (params_.gps.enable_gps) {addGpsFactor(new_graph, msgs.gps);}
   addDepthFactor(new_graph, msgs.depth);
