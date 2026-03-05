@@ -44,7 +44,7 @@ namespace coug_fgo::utils
  * @param msg The input Point message.
  * @return The resulting gtsam::Point3.
  */
-gtsam::Point3 toGtsam(const geometry_msgs::msg::Point & msg)
+inline gtsam::Point3 toGtsam(const geometry_msgs::msg::Point & msg)
 {
   return {msg.x, msg.y, msg.z};
 }
@@ -54,7 +54,7 @@ gtsam::Point3 toGtsam(const geometry_msgs::msg::Point & msg)
  * @param msg The input Vector3 message.
  * @return The resulting gtsam::Vector3.
  */
-gtsam::Vector3 toGtsam(const geometry_msgs::msg::Vector3 & msg)
+inline gtsam::Vector3 toGtsam(const geometry_msgs::msg::Vector3 & msg)
 {
   return {msg.x, msg.y, msg.z};
 }
@@ -64,7 +64,7 @@ gtsam::Vector3 toGtsam(const geometry_msgs::msg::Vector3 & msg)
  * @param msg The input Quaternion message.
  * @return The resulting gtsam::Rot3.
  */
-gtsam::Rot3 toGtsam(const geometry_msgs::msg::Quaternion & msg)
+inline gtsam::Rot3 toGtsam(const geometry_msgs::msg::Quaternion & msg)
 {
   return gtsam::Rot3::Quaternion(msg.w, msg.x, msg.y, msg.z);
 }
@@ -74,7 +74,7 @@ gtsam::Rot3 toGtsam(const geometry_msgs::msg::Quaternion & msg)
  * @param msg The input Pose message.
  * @return The resulting gtsam::Pose3.
  */
-gtsam::Pose3 toGtsam(const geometry_msgs::msg::Pose & msg)
+inline gtsam::Pose3 toGtsam(const geometry_msgs::msg::Pose & msg)
 {
   return {toGtsam(msg.orientation), toGtsam(msg.position)};
 }
@@ -84,7 +84,7 @@ gtsam::Pose3 toGtsam(const geometry_msgs::msg::Pose & msg)
  * @param msg The input Transform message.
  * @return The resulting gtsam::Pose3.
  */
-gtsam::Pose3 toGtsam(const geometry_msgs::msg::Transform & msg)
+inline gtsam::Pose3 toGtsam(const geometry_msgs::msg::Transform & msg)
 {
   return gtsam::Pose3(toGtsam(msg.rotation), toGtsam(msg.translation));
 }
@@ -94,7 +94,7 @@ gtsam::Pose3 toGtsam(const geometry_msgs::msg::Transform & msg)
  * @param msg The input Wrench message.
  * @return The resulting gtsam::Vector6 [fx, fy, fz, tx, ty, tz].
  */
-gtsam::Vector6 toGtsam(const geometry_msgs::msg::Wrench & msg)
+inline gtsam::Vector6 toGtsam(const geometry_msgs::msg::Wrench & msg)
 {
   gtsam::Vector6 v;
   v << msg.force.x, msg.force.y, msg.force.z, msg.torque.x, msg.torque.y, msg.torque.z;
@@ -106,7 +106,7 @@ gtsam::Vector6 toGtsam(const geometry_msgs::msg::Wrench & msg)
  * @param cov The input 3x3 covariance array.
  * @return The resulting gtsam::Matrix33.
  */
-gtsam::Matrix33 toGtsam(const std::array<double, 9> & cov)
+inline gtsam::Matrix33 toGtsam(const std::array<double, 9> & cov)
 {
   gtsam::Matrix33 m;
   for (int i = 0; i < 3; ++i) {
@@ -122,7 +122,7 @@ gtsam::Matrix33 toGtsam(const std::array<double, 9> & cov)
  * @param cov The input 6x6 covariance array.
  * @return The resulting gtsam::Matrix66.
  */
-gtsam::Matrix66 toGtsam(const std::array<double, 36> & cov)
+inline gtsam::Matrix66 toGtsam(const std::array<double, 36> & cov)
 {
   gtsam::Matrix66 m;
   for (int i = 0; i < 6; ++i) {
@@ -138,7 +138,7 @@ gtsam::Matrix66 toGtsam(const std::array<double, 36> & cov)
  * @param v The input vector.
  * @return The resulting gtsam::Vector.
  */
-gtsam::Vector toGtsam(const std::vector<double> & v)
+inline gtsam::Vector toGtsam(const std::vector<double> & v)
 {
   gtsam::Vector gtsam_v(v.size());
   for (size_t i = 0; i < v.size(); ++i) {
@@ -152,7 +152,7 @@ gtsam::Vector toGtsam(const std::vector<double> & v)
  * @param cov The input 6x6 covariance array.
  * @return The resulting gtsam::Matrix33.
  */
-gtsam::Matrix33 toGtsam3x3(const std::array<double, 36> & cov)
+inline gtsam::Matrix33 toGtsam3x3(const std::array<double, 36> & cov)
 {
   gtsam::Matrix33 m;
   for (int i = 0; i < 3; ++i) {
@@ -168,7 +168,7 @@ gtsam::Matrix33 toGtsam3x3(const std::array<double, 36> & cov)
  * @param sigmas The input vector of standard deviations.
  * @return The resulting gtsam::Matrix (diagonal with sigmas squared).
  */
-gtsam::Matrix toGtsamSquaredDiagonal(const std::vector<double> & sigmas)
+inline gtsam::Matrix toGtsamSquaredDiagonal(const std::vector<double> & sigmas)
 {
   gtsam::Vector squared(sigmas.size());
   for (size_t i = 0; i < sigmas.size(); ++i) {
@@ -182,7 +182,7 @@ gtsam::Matrix toGtsamSquaredDiagonal(const std::vector<double> & sigmas)
  * @param diag_elements The input vector of diagonal elements.
  * @return The resulting gtsam::Matrix.
  */
-gtsam::Matrix toGtsamDiagonal(const std::vector<double> & diag_elements)
+inline gtsam::Matrix toGtsamDiagonal(const std::vector<double> & diag_elements)
 {
   gtsam::Vector v(diag_elements.size());
   for (size_t i = 0; i < diag_elements.size(); ++i) {
@@ -196,7 +196,7 @@ gtsam::Matrix toGtsamDiagonal(const std::vector<double> & diag_elements)
  * @param gtsam_obj The input GTSAM Point3.
  * @return The resulting geometry_msgs::msg::Point.
  */
-geometry_msgs::msg::Point toPointMsg(const gtsam::Point3 & gtsam_obj)
+inline geometry_msgs::msg::Point toPointMsg(const gtsam::Point3 & gtsam_obj)
 {
   geometry_msgs::msg::Point msg;
   msg.x = gtsam_obj.x();
@@ -210,7 +210,7 @@ geometry_msgs::msg::Point toPointMsg(const gtsam::Point3 & gtsam_obj)
  * @param gtsam_obj The input GTSAM Vector3.
  * @return The resulting geometry_msgs::msg::Vector3.
  */
-geometry_msgs::msg::Vector3 toVectorMsg(const gtsam::Vector3 & gtsam_obj)
+inline geometry_msgs::msg::Vector3 toVectorMsg(const gtsam::Vector3 & gtsam_obj)
 {
   geometry_msgs::msg::Vector3 msg;
   msg.x = gtsam_obj.x();
@@ -224,7 +224,7 @@ geometry_msgs::msg::Vector3 toVectorMsg(const gtsam::Vector3 & gtsam_obj)
  * @param gtsam_obj The input GTSAM Rot3.
  * @return The resulting geometry_msgs::msg::Quaternion.
  */
-geometry_msgs::msg::Quaternion toQuatMsg(const gtsam::Rot3 & gtsam_obj)
+inline geometry_msgs::msg::Quaternion toQuatMsg(const gtsam::Rot3 & gtsam_obj)
 {
   gtsam::Quaternion q = gtsam_obj.toQuaternion();
   geometry_msgs::msg::Quaternion msg;
@@ -240,7 +240,7 @@ geometry_msgs::msg::Quaternion toQuatMsg(const gtsam::Rot3 & gtsam_obj)
  * @param gtsam_obj The input GTSAM Pose3.
  * @return The resulting geometry_msgs::msg::Pose.
  */
-geometry_msgs::msg::Pose toPoseMsg(const gtsam::Pose3 & gtsam_obj)
+inline geometry_msgs::msg::Pose toPoseMsg(const gtsam::Pose3 & gtsam_obj)
 {
   geometry_msgs::msg::Pose msg;
   msg.position = toPointMsg(gtsam_obj.translation());
@@ -254,7 +254,7 @@ geometry_msgs::msg::Pose toPoseMsg(const gtsam::Pose3 & gtsam_obj)
  * @param cov The input GTSAM Matrix33.
  * @return The resulting std::array<double, 36>.
  */
-std::array<double, 36> toCovariance36Msg(const gtsam::Matrix33 & cov)
+inline std::array<double, 36> toCovariance36Msg(const gtsam::Matrix33 & cov)
 {
   std::array<double, 36> msg;
   msg.fill(0.0);
@@ -271,7 +271,7 @@ std::array<double, 36> toCovariance36Msg(const gtsam::Matrix33 & cov)
  * @param cov The input GTSAM Matrix66.
  * @return The resulting std::array<double, 36>.
  */
-std::array<double, 36> toCovariance36Msg(const gtsam::Matrix66 & cov)
+inline std::array<double, 36> toCovariance36Msg(const gtsam::Matrix66 & cov)
 {
   std::array<double, 36> msg;
   for (int i = 0; i < 6; ++i) {
@@ -287,7 +287,7 @@ std::array<double, 36> toCovariance36Msg(const gtsam::Matrix66 & cov)
  * @param cov The input GTSAM Matrix66 (rot, pos order).
  * @return The resulting std::array<double, 36> (pos, rot order).
  */
-std::array<double, 36> toPoseCovarianceMsg(const gtsam::Matrix66 & cov)
+inline std::array<double, 36> toPoseCovarianceMsg(const gtsam::Matrix66 & cov)
 {
   std::array<double, 36> msg;
   for (int i = 0; i < 3; ++i) {
