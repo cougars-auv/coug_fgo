@@ -1,5 +1,5 @@
 evo
 matplotlib
-numpy
 pandas
 seaborn
+scienceplots

@@ -1,7 +1,5 @@
 cm-super
 dvipng
-latexmk
-texlive-extra-utils
 texlive-latex-base
 texlive-latex-extra
 texlive-publishers
