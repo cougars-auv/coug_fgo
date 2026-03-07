@@ -100,12 +100,12 @@ protected:
   /**
    * @brief The background loop run by the dedicated frontend thread.
    */
-  void frontendLoop();
+  void processFrontend();
 
   /**
    * @brief The background loop run by the dedicated backend thread.
    */
-  void backendLoop();
+  void processBackend();
 
   // --- Setup ---
   /**

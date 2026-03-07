@@ -233,8 +233,8 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions & options)
   setupRosInterfaces();
   core_ = std::make_unique<FactorGraphCore>(params_);
   state_initializer_ = std::make_unique<utils::StateInitializer>(params_);
-  frontend_thread_ = std::thread(&FactorGraphNode::frontendLoop, this);
-  backend_thread_ = std::thread(&FactorGraphNode::backendLoop, this);
+  frontend_thread_ = std::thread(&FactorGraphNode::processFrontend, this);
+  backend_thread_ = std::thread(&FactorGraphNode::processBackend, this);
 
   RCLCPP_INFO(get_logger(), "Startup complete! Waiting for sensor messages...");
 }
@@ -399,7 +399,7 @@ void FactorGraphNode::publishGraphMetrics(const rclcpp::Time & timestamp)
   graph_metrics_pub_->publish(metrics_msg);
 }
 
-void FactorGraphNode::frontendLoop()
+void FactorGraphNode::processFrontend()
 {
   while (is_running_.load()) {
     std::unique_lock<std::mutex> lock(frontend_trigger_mutex_);
@@ -439,7 +439,7 @@ void FactorGraphNode::frontendLoop()
   }
 }
 
-void FactorGraphNode::backendLoop()
+void FactorGraphNode::processBackend()
 {
   while (is_running_.load()) {
     std::unique_lock<std::mutex> lock(backend_trigger_mutex_);
