@@ -34,6 +34,7 @@ COLORS = {
     "UKF": "#8172B2",
     "EKF": "#937860",
     "DVL": "#DA8BC3",
+    "GT": "#000000",
 }
 NAME_MAPPING = {
     "global": "FL-B",
@@ -119,7 +120,8 @@ def plot_auv(evo_agent_dir, output_dir, auv_name):
         )
         add_start_end_markers(ax, gt_traj, COLORS["GT"])
 
-    plt.legend(frameon=True)
+    legend = plt.legend(frameon=True)
+    legend.set_zorder(100)
 
     output_path = Path(output_dir) / f"{auv_name}_trajectories.png"
     fig.savefig(output_path, dpi=300, bbox_inches="tight")
