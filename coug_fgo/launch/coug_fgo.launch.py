@@ -173,11 +173,40 @@ def generate_launch_description():
                     },
                 ],
             ),
-            # TURTLMap-based FGO for real-time comparison
+            # ISAM2 (comparison)
             Node(
                 package="coug_fgo",
                 executable="factor_graph",
-                name="factor_graph_node_tm",
+                name="factor_graph_node_isam2",
+                condition=IfCondition(LaunchConfiguration("compare")),
+                parameters=[
+                    fleet_params,
+                    auv_params,
+                    {
+                        "use_sim_time": use_sim_time,
+                        "map_frame": "map",
+                        "odom_frame": odom_frame,
+                        "base_frame": base_link_frame,
+                        "target_frame": dvl_link_frame,
+                        "imu.parameter_frame": imu_link_frame,
+                        "dvl.parameter_frame": dvl_link_frame,
+                        "depth.parameter_frame": depth_link_frame,
+                        "gps.parameter_frame": gps_link_frame,
+                        "mag.parameter_frame": imu_link_frame,
+                        "ahrs.parameter_frame": imu_link_frame,
+                        "dynamics.parameter_frame": com_link_frame,
+                        "global_odom_topic": "odometry/global_isam2",
+                        "smoothed_path_topic": "smoothed_path_isam2",
+                        "publish_global_tf": False,
+                        "solver_type": "ISAM2",
+                    },
+                ],
+            ),
+            # TURTLMap (comparison)
+            Node(
+                package="coug_fgo",
+                executable="factor_graph",
+                name="factor_graph_node_pi",
                 condition=IfCondition(LaunchConfiguration("compare")),
                 parameters=[
                     fleet_params,
@@ -196,8 +225,8 @@ def generate_launch_description():
                         "ahrs.parameter_frame": imu_link_frame,
                         "dynamics.parameter_frame": com_link_frame,
                         "max_update_rate": 4.0,
-                        "global_odom_topic": "odometry/global_tm",
-                        "smoothed_path_topic": "smoothed_path_tm",
+                        "global_odom_topic": "odometry/global_pi",
+                        "smoothed_path_topic": "smoothed_path_pi",
                         "publish_global_tf": False,
                         "experimental.enable_dvl_preintegration": True,
                     },
@@ -271,24 +300,6 @@ def generate_launch_description():
                 parameters=[{"use_sim_time": use_sim_time}],
             ),
             # --- Robot Localization Pipeline ---
-            # https://github.com/CCNYRoboticsLab/imu_tools/tree/humble/imu_filter_madgwick
-            Node(
-                package="imu_filter_madgwick",
-                executable="imu_filter_madgwick_node",
-                name="imu_filter_madgwick_node",
-                parameters=[
-                    fleet_params,
-                    auv_params,
-                    {
-                        "use_sim_time": use_sim_time,
-                    },
-                ],
-                remappings=[
-                    ("imu/data_raw", "imu/data_raw"),
-                    ("imu/data", "imu/data"),
-                    ("imu/mag", "imu/mag"),
-                ],
-            ),
             # https://docs.ros.org/en/melodic/api/robot_localization/html/state_estimation_nodes.html
             Node(
                 package="robot_localization",

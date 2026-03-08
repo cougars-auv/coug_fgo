@@ -24,21 +24,23 @@ import scienceplots  # noqa: F401
 
 plt.style.use(["science", "ieee"])
 
-ALGORITHMS = ["FGO", "TM", "EKF", "UKF", "IEKF", "DVL"]
+ALGORITHMS = ["FL-B", "iSAM2-B", "FL-PI", "EKF", "UKF", "IEKF", "DVL"]
 COLORS = {
-    "FGO": "#4C72B0",
-    "TM": "#DD8452",
-    "EKF": "#55A868",
-    "UKF": "#C44E52",
-    "IEKF": "#8172B2",
-    "DVL": "#FFC107",
+    "FL-B": "#55A868",
+    "iSAM2-B": "#DD8452",
+    "FL-PI": "#4C72B0",
+    "IEKF": "#C44E52",
+    "UKF": "#8172B2",
+    "EKF": "#937860",
+    "DVL": "#DA8BC3",
 }
 NAME_MAPPING = {
-    "global": "FGO",
-    "global_tm": "TM",
-    "global_ekf": "EKF",
-    "global_ukf": "UKF",
+    "global": "FL-B",
+    "global_isam2": "iSAM2-B",
+    "global_pi": "FL-PI",
     "global_iekf": "IEKF",
+    "global_ukf": "UKF",
+    "global_ekf": "EKF",
     "dvl": "DVL",
 }
 

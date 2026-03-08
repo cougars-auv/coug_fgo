@@ -800,8 +800,8 @@ std::optional<OptimizeResult> FactorGraphCore::optimize()
   result.target_time = batch_target_time;
 
   // --- Detect Processing Overflow ---
-  size_t num_keyframes = batch_timestamps.size() / 3;
-  if (num_keyframes > 1) {
+  result.num_keyframes = batch_timestamps.size() / 3;
+  if (result.num_keyframes > 1) {
     result.processing_overflow = true;
   }
 

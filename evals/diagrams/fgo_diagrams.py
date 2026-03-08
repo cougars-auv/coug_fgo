@@ -26,12 +26,12 @@ plt.rcParams["font.family"] = "serif"
 # %%
 COLOR_VAR = "#B5CBE6"
 COLOR_PRIOR = "#4C72B0"
-COLOR_FACTOR_DEPTH = "#FFC107"
+COLOR_FACTOR_DEPTH = "#DD8452"
 COLOR_FACTOR_HEADING = "#C44E52"
 COLOR_FACTOR_GPS = "#55A868"
 COLOR_FACTOR_DVL = "#8172B2"
 COLOR_FACTOR_IMU = "#000000"
-COLOR_FACTOR_DYNAMICS = "#DD8452"
+COLOR_FACTOR_DYNAMICS = "#DA8BC3"
 
 style_var = {"facecolor": COLOR_VAR, "edgecolor": "black"}
 style_prior = {"facecolor": COLOR_PRIOR, "edgecolor": "black"}
@@ -166,7 +166,7 @@ for i in range(4):
     pgm.add_edge(f"v{i}", f"dvl{i}")
 
 pgm.render()
-# pgm.figure.savefig(OUTPUT_DIR / "fgo_dvl_binary.pdf", bbox_inches="tight")
+pgm.figure.savefig(OUTPUT_DIR / "fgo_dvl_binary.pdf", bbox_inches="tight")
 pgm.figure.savefig(OUTPUT_DIR / "fgo_dvl_binary.png", bbox_inches="tight", dpi=300)
 
 # %%
@@ -190,7 +190,7 @@ for i in range(4):
         pgm_between.add_edge(f"dvlb{i}", f"x{i+1}")
 
 pgm_between.render()
-# pgm_between.figure.savefig(OUTPUT_DIR / "fgo_dvl_between.pdf", bbox_inches="tight")
+pgm_between.figure.savefig(OUTPUT_DIR / "fgo_dvl_between.pdf", bbox_inches="tight")
 pgm_between.figure.savefig(
     OUTPUT_DIR / "fgo_dvl_between.png", bbox_inches="tight", dpi=300
 )
@@ -233,7 +233,7 @@ for i in range(4):
         pgm_dynamics.add_edge(f"v{i+1}", f"dynamics{i}")
 
 pgm_dynamics.render()
-# pgm_dynamics.figure.savefig(OUTPUT_DIR / "fgo_dynamics.pdf", bbox_inches="tight")
+pgm_dynamics.figure.savefig(OUTPUT_DIR / "fgo_dynamics.pdf", bbox_inches="tight")
 pgm_dynamics.figure.savefig(
     OUTPUT_DIR / "fgo_dynamics.png", bbox_inches="tight", dpi=300
 )

@@ -51,7 +51,7 @@ factor_graph_node:
   # --- ROS Topics and Frames ---
   imu_topic:
     type: string
-    default_value: "imu/data_raw"
+    default_value: "imu/data"
   gps_odom_topic:
     type: string
     default_value: "odometry/gps"

@@ -207,7 +207,15 @@ void FactorGraphNode::setupRosInterfaces()
     diagnostic_updater_.setHardwareID(clean_ns + "/factor_graph_node");
 
     std::string prefix = clean_ns.empty() ? "" : "[" + clean_ns + "] ";
-    std::string suffix = params_.experimental.enable_dvl_preintegration ? " (TM)" : "";
+
+    std::string suffix;
+    if (params_.experimental.enable_dvl_preintegration) {
+      suffix = " (FL-PI)";
+    } else if (params_.solver_type == "ISAM2") {
+      suffix = " (iSAM2-B)";
+    } else {
+      suffix = "";
+    }
 
     std::string sensor_task = prefix + "Sensor Inputs" + suffix;
     diagnostic_updater_.add(sensor_task, this, &FactorGraphNode::checkSensorInputs);
