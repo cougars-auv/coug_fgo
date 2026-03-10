@@ -198,6 +198,7 @@ def generate_launch_description():
                         "global_odom_topic": "odometry/global_isam2",
                         "smoothed_path_topic": "smoothed_path_isam2",
                         "publish_global_tf": False,
+                        "publish_smoothed_path": False,
                         "solver_type": "ISAM2",
                     },
                 ],
