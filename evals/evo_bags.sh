@@ -45,7 +45,7 @@ evo_args=()
 evo_config set save_traj_in_zip true &>/dev/null
 
 AGENTS=("coug0sim" "coug1sim" "coug2sim" "blue0sim" "bluerov2")
-SUFFIXES=("odometry/global" "odometry/global_isam2" "odometry/global_pi" "odometry/global_iekf" "odometry/global_ukf" "odometry/global_ekf" "odometry/dvl")
+SUFFIXES=("odometry/global" "odometry/global_isam2" "odometry/global_lpi" "odometry/global_tpi" "odometry/global_iekf" "odometry/global_ukf" "odometry/global_ekf" "odometry/dvl")
 
 for bag_path in ${bags_to_eval}; do
   echo "" && gum style --foreground 75 --bold "Processing ${bag_path}..."

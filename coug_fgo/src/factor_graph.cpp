@@ -123,7 +123,7 @@ void FactorGraphNode::setupRosInterfaces()
       try_lookup_tf(target_T_depth_tf_, child, "depth");
       depth_queue_.push(msg);
 
-      if (params_.experimental.enable_dvl_preintegration) {
+      if (params_.experimental.enable_loose_dvl_preintegration) {
         {
           std::scoped_lock lock(frontend_trigger_mutex_);
           frontend_trigger_ = true;
@@ -178,7 +178,7 @@ void FactorGraphNode::setupRosInterfaces()
       try_lookup_tf(target_T_dvl_tf_, child, "DVL");
       dvl_queue_.push(msg);
 
-      if (!params_.experimental.enable_dvl_preintegration) {
+      if (!params_.experimental.enable_loose_dvl_preintegration) {
         {
           std::scoped_lock lock(frontend_trigger_mutex_);
           frontend_trigger_ = true;
@@ -209,8 +209,8 @@ void FactorGraphNode::setupRosInterfaces()
     std::string prefix = clean_ns.empty() ? "" : "[" + clean_ns + "] ";
 
     std::string suffix;
-    if (params_.experimental.enable_dvl_preintegration) {
-      suffix = " (FL-PI)";
+    if (params_.experimental.enable_loose_dvl_preintegration) {
+      suffix = " (FL-LPI)";
     } else if (params_.solver_type == "ISAM2") {
       suffix = " (iSAM2-B)";
     } else {
@@ -544,7 +544,7 @@ void FactorGraphNode::initializeGraph()
 void FactorGraphNode::updateGraph()
 {
   rclcpp::Time target_time{0, 0, RCL_ROS_TIME};
-  if (params_.experimental.enable_dvl_preintegration) {
+  if (params_.experimental.enable_loose_dvl_preintegration) {
     if (!depth_queue_.empty()) {
       target_time = rclcpp::Time(depth_queue_.back()->header.stamp);
     } else {

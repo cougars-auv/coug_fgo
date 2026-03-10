@@ -105,7 +105,7 @@ void FactorGraphCore::initialize(
   // --- Initialize Preintegrators ---
   imu_preintegrator_ = std::make_unique<gtsam::PreintegratedCombinedMeasurements>(
     configureImuPreintegration(state_init), prev_imu_bias_);
-  if (params_.experimental.enable_dvl_preintegration) {
+  if (params_.experimental.enable_loose_dvl_preintegration) {
     dvl_preintegrator_ = std::make_unique<utils::DvlPreintegrator>();
     dvl_preintegrator_->reset(prev_pose_.rotation());
 
@@ -539,7 +539,7 @@ gtsam::Rot3 FactorGraphCore::getInterpolatedOrientation(
   return toGtsam((*(it_after - 1))->orientation).slerp(alpha, toGtsam((*it_after)->orientation));
 }
 
-void FactorGraphCore::addPreintegratedDvlFactor(
+void FactorGraphCore::addLoosePreintegratedDvlFactor(
   gtsam::NonlinearFactorGraph & graph,
   const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & dvl_msgs,
   const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
@@ -677,7 +677,7 @@ std::optional<UpdateResult> FactorGraphCore::update(
       return rclcpp::Time(a->header.stamp) < rclcpp::Time(b->header.stamp);
     };
   std::sort(msgs.imu.begin(), msgs.imu.end(), by_time);
-  if (params_.experimental.enable_dvl_preintegration) {
+  if (params_.experimental.enable_loose_dvl_preintegration) {
     std::sort(msgs.dvl.begin(), msgs.dvl.end(), by_time);
   }
 
@@ -708,11 +708,11 @@ std::optional<UpdateResult> FactorGraphCore::update(
       }
     };
 
-  if (params_.experimental.enable_dvl_preintegration) {
+  if (params_.experimental.enable_loose_dvl_preintegration) {
     if (msgs.dvl.empty() && !params_.experimental.enable_pseudo_dvl_w_imu) {
       addDropoutFactors(new_graph);
     } else {
-      addPreintegratedDvlFactor(
+      addLoosePreintegratedDvlFactor(
         new_graph, msgs.dvl, msgs.imu, target_time, result.unused_dvl);
     }
   } else {

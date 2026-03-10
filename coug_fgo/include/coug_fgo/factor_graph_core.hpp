@@ -243,7 +243,7 @@ private:
    * @param target_time Integration endpoint timestamp.
    * @param[out] unused_dvl Messages with timestamps beyond target_time for re-queueing.
    */
-  void addPreintegratedDvlFactor(
+  void addLoosePreintegratedDvlFactor(
     gtsam::NonlinearFactorGraph & graph,
     const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & dvl_msgs,
     const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
