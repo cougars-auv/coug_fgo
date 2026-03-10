@@ -25,7 +25,7 @@ import scienceplots  # noqa: F401
 sns.reset_orig()
 plt.style.use(["science", "ieee"])
 
-ALGORITHMS = ["FL-B", "iSAM2-B", "FL-PI", "EKF", "UKF", "IEKF", "DVL"]
+ALGORITHMS = ["FL-B", "iSAM2-B", "FL-PI", "IEKF", "UKF", "EKF", "DVL"]
 COLORS = {
     "FL-B": "#55A868",
     "iSAM2-B": "#DD8452",
