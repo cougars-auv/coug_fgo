@@ -806,7 +806,7 @@ std::optional<OptimizeResult> FactorGraphCore::optimize()
   }
 
   // --- Smoother Optimization ---
-  auto opt_start = std::chrono::high_resolution_clock::now();
+  auto total_start = std::chrono::high_resolution_clock::now();
   result.new_factors = batch_graph.size();
 
   if (inc_smoother_) {
@@ -883,9 +883,9 @@ std::optional<OptimizeResult> FactorGraphCore::optimize()
     }
   }
 
-  auto opt_end = std::chrono::high_resolution_clock::now();
-  result.cov_duration = std::chrono::duration<double>(opt_end - cov_start).count();
-  result.opt_duration = std::chrono::duration<double>(opt_end - opt_start).count();
+  auto total_end = std::chrono::high_resolution_clock::now();
+  result.cov_duration = std::chrono::duration<double>(total_end - cov_start).count();
+  result.total_duration = std::chrono::duration<double>(total_end - total_start).count();
 
   // --- Export Smoothed Path ---
   if (params_.publish_smoothed_path) {

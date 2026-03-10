@@ -200,7 +200,7 @@ protected:
   rclcpp::Time last_opt_time_{0, 0, RCL_ROS_TIME};
 
   // --- Diagnostics State ---
-  std::atomic<double> last_opt_duration_{0.0};
+  std::atomic<double> last_total_duration_{0.0};
   std::atomic<double> last_smoother_duration_{0.0};
   std::atomic<double> last_cov_duration_{0.0};
   std::atomic<bool> processing_overflow_{false};

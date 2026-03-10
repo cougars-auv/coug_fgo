@@ -94,5 +94,5 @@ for bag_path in ${bags_to_eval}; do
 done
 
 python3 $(dirname "$0")/plots/trajectory_plot.py
+python3 $(dirname "$0")/plots/timing_plot.py
 python3 $(dirname "$0")/plots/benchmark_plot.py
-# python3 $(dirname "$0")/plots/timing_plot.py

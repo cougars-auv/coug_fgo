@@ -25,7 +25,7 @@ import scienceplots  # noqa: F401
 sns.reset_orig()
 plt.style.use(["science", "ieee"])
 
-ALGORITHMS = ["FL-B", "iSAM2-B", "FL-LPI", "FL-TPI", "IEKF", "UKF", "EKF", "DVL"]
+ALGORITHMS = ["DVL", "EKF", "UKF", "IEKF", "FL-TPI", "FL-LPI", "iSAM2-B", "FL-B"]
 COLORS = {
     "FL-B": "#55A868",
     "iSAM2-B": "#DD8452",
@@ -35,6 +35,7 @@ COLORS = {
     "UKF": "#937860",
     "EKF": "#DA8BC3",
     "DVL": "#64B5CD",
+    "GT": "#000000",
 }
 NAME_MAPPING = {
     "global": "FL-B",
@@ -144,7 +145,7 @@ def main():
             if agent_dir.is_dir():
                 plot_auv(str(agent_dir), str(bag_dir), agent_dir.name)
 
-    print(f"Plots saved to 'evo' directories in {bags_root}")
+    print(f"Plots saved to bag directories in {bags_root}")
 
 
 if __name__ == "__main__":

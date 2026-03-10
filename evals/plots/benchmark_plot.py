@@ -94,7 +94,7 @@ def generate_plots(data_map, output_dir):
             fig, ax = plt.subplots()
 
             plot_func = sns.violinplot if plot_type == "violin" else sns.boxplot
-            kwargs = {"inner": "box"} if plot_type == "violin" else {}
+            kwargs = {"inner": "box", "linewidth": 0.5} if plot_type == "violin" else {}
 
             plot_func(
                 x="Algorithm",

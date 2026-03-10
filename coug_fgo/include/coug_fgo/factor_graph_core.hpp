@@ -58,7 +58,7 @@ struct OptimizeResult
   gtsam::Values all_estimates;
   rclcpp::Time target_time{0, 0, RCL_ROS_TIME};
 
-  double opt_duration = 0.0;
+  double total_duration = 0.0;
   double smoother_duration = 0.0;
   double cov_duration = 0.0;
   bool processing_overflow = false;

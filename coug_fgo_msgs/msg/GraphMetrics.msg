@@ -1,6 +1,6 @@
 std_msgs/Header header
 
-float64 opt_duration
+float64 total_duration
 float64 smoother_duration
 float64 cov_duration
 

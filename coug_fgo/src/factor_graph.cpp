@@ -397,7 +397,7 @@ void FactorGraphNode::publishGraphMetrics(const rclcpp::Time & timestamp)
   coug_fgo_msgs::msg::GraphMetrics metrics_msg;
   metrics_msg.header.stamp = timestamp;
 
-  metrics_msg.opt_duration = last_opt_duration_.load();
+  metrics_msg.total_duration = last_total_duration_.load();
   metrics_msg.smoother_duration = last_smoother_duration_.load();
   metrics_msg.cov_duration = last_cov_duration_.load();
   metrics_msg.new_factors = static_cast<uint32_t>(new_factors_.load());
@@ -591,7 +591,7 @@ void FactorGraphNode::optimizeGraph()
     if (!result) {return;}
 
     // --- Update Diagnostics State ---
-    last_opt_duration_.store(result->opt_duration);
+    last_total_duration_.store(result->total_duration);
     last_smoother_duration_.store(result->smoother_duration);
     last_cov_duration_.store(result->cov_duration);
     new_factors_.store(result->new_factors);
@@ -701,7 +701,7 @@ void FactorGraphNode::checkProcessingOverflow(diagnostic_updater::DiagnosticStat
   } else {
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "No processing overflow detected.");
   }
-  stat.add("Optimization Duration (s)", last_opt_duration_.load());
+  stat.add("Total Duration (s)", last_total_duration_.load());
   stat.add("Smoother Duration (s)", last_smoother_duration_.load());
   stat.add("Covariance Duration (s)", last_cov_duration_.load());
 
