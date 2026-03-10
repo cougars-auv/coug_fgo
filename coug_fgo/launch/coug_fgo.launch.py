@@ -224,7 +224,7 @@ def generate_launch_description():
                         "mag.parameter_frame": imu_link_frame,
                         "ahrs.parameter_frame": imu_link_frame,
                         "dynamics.parameter_frame": com_link_frame,
-                        # "max_update_rate": 4.0,
+                        "max_update_rate": 4.0,
                         "global_odom_topic": "odometry/global_lpi",
                         "smoothed_path_topic": "smoothed_path_lpi",
                         "publish_global_tf": False,
