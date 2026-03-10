@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /**
- * @file constant_velocity_factor.hpp
+ * @file const_vel_factor.hpp
  * @brief GTSAM factor for enforcing constant body-frame velocity.
  * @author Nelson Durrant
  * @date Jan 2026
@@ -35,29 +35,29 @@ namespace coug_fgo::factors
 {
 
 /**
- * @class ConstantVelocityFactor
+ * @class ConstVelFactor
  * @brief GTSAM factor for enforcing constant body-frame velocity.
  */
-class ConstantVelocityFactor : public gtsam::NoiseModelFactor4<gtsam::Pose3, gtsam::Vector3,
+class ConstVelFactor : public gtsam::NoiseModelFactor4<gtsam::Pose3, gtsam::Vector3,
     gtsam::Pose3, gtsam::Vector3>
 {
 public:
   /**
-   * @brief Constructor for ConstantVelocityFactor.
+   * @brief Constructor for ConstVelFactor.
    * @param pose_key1 GTSAM key for the starting pose (state i).
    * @param vel_key1 GTSAM key for the starting velocity (state i).
    * @param pose_key2 GTSAM key for the ending pose (state j).
    * @param vel_key2 GTSAM key for the ending velocity (state j).
    * @param noise_model The noise model for the constraint.
    */
-  ConstantVelocityFactor(
+  ConstVelFactor(
     gtsam::Key pose_key1, gtsam::Key vel_key1,
     gtsam::Key pose_key2, gtsam::Key vel_key2,
     const gtsam::SharedNoiseModel & noise_model)
   : NoiseModelFactor4<gtsam::Pose3, gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>(
       noise_model, pose_key1, vel_key1, pose_key2, vel_key2) {}
 
-  ~ConstantVelocityFactor() override {}
+  ~ConstVelFactor() override {}
 
   /**
    * @brief Evaluates the error and Jacobians for the factor.

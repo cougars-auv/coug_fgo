@@ -13,8 +13,8 @@
 // limitations under the License.
 
 /**
- * @file test_constant_velocity_factor.cpp
- * @brief Unit tests for constant_velocity_factor.hpp.
+ * @file test_const_vel_factor.cpp
+ * @brief Unit tests for const_vel_factor.hpp.
  * @author Nelson Durrant (w Gemini 3 Pro)
  * @date Jan 2026
  */
@@ -26,19 +26,19 @@
 #include <functional>
 #include <optional>
 
-#include "coug_fgo/factors/constant_velocity_factor.hpp"
+#include "coug_fgo/factors/const_vel_factor.hpp"
 
 /**
  * @brief Verify error evaluation logic.
  */
-TEST(ConstantVelocityFactorTest, ErrorEvaluation) {
+TEST(ConstVelFactorTest, ErrorEvaluation) {
   gtsam::Key poseKey1 = gtsam::symbol_shorthand::X(1);
   gtsam::Key velKey1 = gtsam::symbol_shorthand::V(1);
   gtsam::Key poseKey2 = gtsam::symbol_shorthand::X(2);
   gtsam::Key velKey2 = gtsam::symbol_shorthand::V(2);
   gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(3, 0.1);
 
-  coug_fgo::factors::ConstantVelocityFactor factor(
+  coug_fgo::factors::ConstVelFactor factor(
     poseKey1, velKey1, poseKey2, velKey2, model);
 
   // Zero error when both keyframes share the same body-frame velocity
@@ -70,14 +70,14 @@ TEST(ConstantVelocityFactorTest, ErrorEvaluation) {
 /**
  * @brief Verify Jacobians against numerical differentiation.
  */
-TEST(ConstantVelocityFactorTest, Jacobians) {
+TEST(ConstVelFactorTest, Jacobians) {
   gtsam::Key poseKey1 = gtsam::symbol_shorthand::X(1);
   gtsam::Key velKey1 = gtsam::symbol_shorthand::V(1);
   gtsam::Key poseKey2 = gtsam::symbol_shorthand::X(2);
   gtsam::Key velKey2 = gtsam::symbol_shorthand::V(2);
   gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(3, 0.1);
 
-  coug_fgo::factors::ConstantVelocityFactor factor(
+  coug_fgo::factors::ConstVelFactor factor(
     poseKey1, velKey1, poseKey2, velKey2, model);
 
   gtsam::Pose3 pose1(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1, 2, 3));

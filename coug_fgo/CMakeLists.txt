@@ -107,12 +107,12 @@ if(BUILD_TESTING)
   )
   target_link_libraries(test_auv_dynamics_factor gtsam)
 
-  ament_add_gtest(test_constant_velocity_factor test/test_constant_velocity_factor.cpp)
-  target_include_directories(test_constant_velocity_factor PUBLIC
+  ament_add_gtest(test_const_vel_factor test/test_const_vel_factor.cpp)
+  target_include_directories(test_const_vel_factor PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     ${GTSAM_EIGEN_INCLUDE_DIR}
   )
-  target_link_libraries(test_constant_velocity_factor gtsam)
+  target_link_libraries(test_const_vel_factor gtsam)
 
   ament_add_gtest(test_conversions test/test_conversions.cpp)
   target_include_directories(test_conversions PUBLIC

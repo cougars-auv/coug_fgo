@@ -197,7 +197,7 @@ private:
    * @param graph The target factor graph.
    * @param target_time The current keyframe timestamp.
    */
-  void addConstantVelocityFactor(
+  void addConstVelFactor(
     gtsam::NonlinearFactorGraph & graph,
     const rclcpp::Time & target_time);
 

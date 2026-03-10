@@ -36,7 +36,7 @@
 #include "coug_fgo/factors/ahrs_factor.hpp"
 #include "coug_fgo/factors/mag_factor.hpp"
 #include "coug_fgo/factors/auv_dynamics_factor.hpp"
-#include "coug_fgo/factors/constant_velocity_factor.hpp"
+#include "coug_fgo/factors/const_vel_factor.hpp"
 #include "coug_fgo/utils/conversions.hpp"
 
 using coug_fgo::factors::DepthFactorArm;
@@ -46,7 +46,7 @@ using coug_fgo::factors::Gps2dFactorArm;
 using coug_fgo::factors::AhrsYawFactorArm;
 using coug_fgo::factors::MagFactorArm;
 using coug_fgo::factors::AuvDynamicsFactorArm;
-using coug_fgo::factors::ConstantVelocityFactor;
+using coug_fgo::factors::ConstVelFactor;
 using coug_fgo::utils::toGtsam;
 using coug_fgo::utils::toGtsam3x3;
 using coug_fgo::utils::toGtsamDiagonal;
@@ -403,7 +403,7 @@ void FactorGraphCore::addDvlFactor(
     toGtsam(dvl_msg->twist.twist.linear), dvl_noise);
 }
 
-void FactorGraphCore::addConstantVelocityFactor(
+void FactorGraphCore::addConstVelFactor(
   gtsam::NonlinearFactorGraph & graph,
   const rclcpp::Time & target_time)
 {
@@ -416,7 +416,7 @@ void FactorGraphCore::addConstantVelocityFactor(
 
   RCLCPP_DEBUG(kLogger, "Adding constant velocity factor at step %zu", current_step_);
 
-  graph.emplace_shared<ConstantVelocityFactor>(
+  graph.emplace_shared<ConstVelFactor>(
     X(prev_step_), V(prev_step_),
     X(current_step_), V(current_step_),
     zero_accel_noise
@@ -704,7 +704,7 @@ std::optional<UpdateResult> FactorGraphCore::update(
       if (use_dynamics) {
         addAuvDynamicsFactor(g, msgs.wrench, target_time);
       } else if (use_const_vel) {
-        addConstantVelocityFactor(g, target_time);
+        addConstVelFactor(g, target_time);
       }
     };
 
@@ -724,7 +724,7 @@ std::optional<UpdateResult> FactorGraphCore::update(
       if (params_.dynamics.enable_dynamics) {
         addAuvDynamicsFactor(new_graph, msgs.wrench, target_time);
       } else if (params_.const_vel.enable_const_vel) {
-        addConstantVelocityFactor(new_graph, target_time);
+        addConstVelFactor(new_graph, target_time);
       }
     }
   }
