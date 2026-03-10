@@ -1,5 +1,0 @@
-evo
-matplotlib
-pandas
-seaborn
-scienceplots
