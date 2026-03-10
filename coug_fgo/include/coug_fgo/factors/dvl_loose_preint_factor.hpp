@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /**
- * @file dvl_preintegrated_factor.hpp
+ * @file dvl_loose_preint_factor.hpp
  * @brief GTSAM factor for preintegrated DVL translation measurements with a lever arm.
  * @author Nelson Durrant
  * @date Jan 2026
@@ -33,24 +33,25 @@ namespace coug_fgo::factors
 {
 
 /**
- * @class DvlPreintegratedFactorArm
- * @brief GTSAM factor for preintegrated DVL translation measurements with a lever arm.
+ * @class DvlLoosePreintFactorArm
+ * @brief GTSAM factor for loosely-coupled preintegrated DVL translation measurements
+ * with a lever arm.
  */
-class DvlPreintegratedFactorArm : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>
+class DvlLoosePreintFactorArm : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>
 {
   gtsam::Pose3 target_P_sensor_;
   gtsam::Vector3 i_p_j_measured_;
 
 public:
   /**
-   * @brief Constructor for DvlPreintegratedFactorArm.
+   * @brief Constructor for DvlLoosePreintFactorArm.
    * @param pose_key_i GTSAM key for the starting AUV pose.
    * @param pose_key_j GTSAM key for the ending AUV pose.
    * @param target_T_sensor The static transformation from target to sensor.
    * @param measured_translation The preintegrated translation measurement.
    * @param noise_model The noise model for the measurement.
    */
-  DvlPreintegratedFactorArm(
+  DvlLoosePreintFactorArm(
     gtsam::Key pose_key_i, gtsam::Key pose_key_j,
     const gtsam::Pose3 & target_T_sensor,
     const gtsam::Vector3 & measured_translation,

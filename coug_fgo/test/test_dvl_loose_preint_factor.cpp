@@ -13,8 +13,8 @@
 // limitations under the License.
 
 /**
- * @file test_dvl_preintegrated_factor.cpp
- * @brief Unit tests for dvl_preintegrated_factor.hpp.
+ * @file test_dvl_loose_preint_factor.hpp
+ * @brief Unit tests for dvl_loose_preint_factor.hpp.
  * @author Nelson Durrant (w Gemini 3 Pro)
  * @date Jan 2026
  */
@@ -26,18 +26,18 @@
 #include <functional>
 #include <optional>
 
-#include "coug_fgo/factors/dvl_preintegrated_factor.hpp"
+#include "coug_fgo/factors/dvl_loose_preint_factor.hpp"
 
 /**
  * @brief Verify error evaluation logic and lever arm correction.
  */
-TEST(DvlPreintegratedFactorArmTest, ErrorEvaluation) {
+TEST(DvlLoosePreintFactorArmTest, ErrorEvaluation) {
   gtsam::Key poseIKey = gtsam::symbol_shorthand::X(1);
   gtsam::Key poseJKey = gtsam::symbol_shorthand::X(2);
   gtsam::Vector3 measured_translation(1.0, 0.0, 0.0);
   gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(3, 0.1);
   gtsam::Pose3 target_P_sensor = gtsam::Pose3::Identity();
-  coug_fgo::factors::DvlPreintegratedFactorArm factor(
+  coug_fgo::factors::DvlLoosePreintFactorArm factor(
     poseIKey, poseJKey, target_P_sensor, measured_translation, model);
 
   // Non-zero error when no translation occurred but measurement is non-zero
@@ -64,7 +64,7 @@ TEST(DvlPreintegratedFactorArmTest, ErrorEvaluation) {
 
   // Sensor mounting transform is compensated in displacement prediction
   gtsam::Pose3 target_P_sensor_arm(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(0, 0, 1));
-  coug_fgo::factors::DvlPreintegratedFactorArm factor_arm(
+  coug_fgo::factors::DvlLoosePreintFactorArm factor_arm(
     poseIKey, poseJKey, target_P_sensor_arm, gtsam::Vector3(0, -1, 0), model);
 
   pose_i = gtsam::Pose3::Identity();
@@ -84,13 +84,13 @@ TEST(DvlPreintegratedFactorArmTest, ErrorEvaluation) {
 /**
  * @brief Verify Jacobians against numerical differentiation.
  */
-TEST(DvlPreintegratedFactorArmTest, Jacobians) {
+TEST(DvlLoosePreintFactorArmTest, Jacobians) {
   gtsam::Key poseIKey = gtsam::symbol_shorthand::X(1);
   gtsam::Key poseJKey = gtsam::symbol_shorthand::X(2);
   gtsam::Vector3 measured_translation(1.0, 0.5, -0.2);
   gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(3, 0.1);
   gtsam::Pose3 target_P_sensor_2(gtsam::Rot3::Ypr(0.1, 0, 0), gtsam::Point3(0.5, 0.5, 0.5));
-  coug_fgo::factors::DvlPreintegratedFactorArm factor(
+  coug_fgo::factors::DvlLoosePreintFactorArm factor(
     poseIKey, poseJKey, target_P_sensor_2, measured_translation, model);
 
   gtsam::Pose3 pose_i = gtsam::Pose3(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1, 2, 3));

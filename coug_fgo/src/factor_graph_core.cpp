@@ -31,7 +31,7 @@
 
 #include "coug_fgo/factors/depth_factor.hpp"
 #include "coug_fgo/factors/dvl_factor.hpp"
-#include "coug_fgo/factors/dvl_preintegrated_factor.hpp"
+#include "coug_fgo/factors/dvl_loose_preint_factor.hpp"
 #include "coug_fgo/factors/gps_factor.hpp"
 #include "coug_fgo/factors/ahrs_factor.hpp"
 #include "coug_fgo/factors/mag_factor.hpp"
@@ -41,7 +41,7 @@
 
 using coug_fgo::factors::DepthFactorArm;
 using coug_fgo::factors::DvlFactorArm;
-using coug_fgo::factors::DvlPreintegratedFactorArm;
+using coug_fgo::factors::DvlLoosePreintFactorArm;
 using coug_fgo::factors::Gps2dFactorArm;
 using coug_fgo::factors::AhrsYawFactorArm;
 using coug_fgo::factors::MagFactorArm;
@@ -456,7 +456,7 @@ void FactorGraphCore::addAuvDynamicsFactor(
     dynamics_noise);
 }
 
-void FactorGraphCore::addPreintegratedImuFactor(
+void FactorGraphCore::addImuPreintFactor(
   gtsam::NonlinearFactorGraph & graph,
   const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
   const rclcpp::Time & target_time,
@@ -539,7 +539,7 @@ gtsam::Rot3 FactorGraphCore::getInterpolatedOrientation(
   return toGtsam((*(it_after - 1))->orientation).slerp(alpha, toGtsam((*it_after)->orientation));
 }
 
-void FactorGraphCore::addLoosePreintegratedDvlFactor(
+void FactorGraphCore::addDvlLoosePreintFactor(
   gtsam::NonlinearFactorGraph & graph,
   const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & dvl_msgs,
   const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
@@ -654,7 +654,7 @@ void FactorGraphCore::addLoosePreintegratedDvlFactor(
 
   RCLCPP_DEBUG(kLogger, "Adding preintegrated DVL factor at step %zu", current_step_);
 
-  graph.emplace_shared<DvlPreintegratedFactorArm>(
+  graph.emplace_shared<DvlLoosePreintFactorArm>(
     X(prev_step_), X(current_step_),
     tfs_.target_T_dvl,
     dvl_preintegrator_->delta(),
@@ -688,7 +688,7 @@ std::optional<UpdateResult> FactorGraphCore::update(
 
   UpdateResult result;
 
-  addPreintegratedImuFactor(new_graph, msgs.imu, target_time, result.unused_imu);
+  addImuPreintFactor(new_graph, msgs.imu, target_time, result.unused_imu);
   if (params_.gps.enable_gps) {addGpsFactor(new_graph, msgs.gps);}
   addDepthFactor(new_graph, msgs.depth);
   if (params_.mag.enable_mag) {addMagFactor(new_graph, msgs.mag);}
@@ -712,7 +712,7 @@ std::optional<UpdateResult> FactorGraphCore::update(
     if (msgs.dvl.empty() && !params_.experimental.enable_pseudo_dvl_w_imu) {
       addDropoutFactors(new_graph);
     } else {
-      addLoosePreintegratedDvlFactor(
+      addDvlLoosePreintFactor(
         new_graph, msgs.dvl, msgs.imu, target_time, result.unused_dvl);
     }
   } else {

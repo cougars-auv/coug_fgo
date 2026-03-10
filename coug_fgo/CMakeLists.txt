@@ -164,12 +164,12 @@ if(BUILD_TESTING)
   )
   target_link_libraries(test_dvl_factor gtsam)
 
-  ament_add_gtest(test_dvl_preintegrated_factor test/test_dvl_preintegrated_factor.cpp)
-  target_include_directories(test_dvl_preintegrated_factor PUBLIC
+  ament_add_gtest(test_dvl_loose_preint_factor test/test_dvl_loose_preint_factor.cpp)
+  target_include_directories(test_dvl_loose_preint_factor PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     ${GTSAM_EIGEN_INCLUDE_DIR}
   )
-  target_link_libraries(test_dvl_preintegrated_factor gtsam)
+  target_link_libraries(test_dvl_loose_preint_factor gtsam)
 
   ament_add_gtest(test_dvl_preintegrator test/test_dvl_preintegrator.cpp)
   target_include_directories(test_dvl_preintegrator PUBLIC
