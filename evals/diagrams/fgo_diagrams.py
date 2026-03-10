@@ -145,7 +145,8 @@ pgm.add_node(
 pgm.add_edge("x2", "gps")
 
 # %%
-pgm_between = copy.deepcopy(pgm)
+pgm_preint_loose = copy.deepcopy(pgm)
+pgm_preint_tight = copy.deepcopy(pgm)
 pgm_dynamics = copy.deepcopy(pgm)
 
 # %%
@@ -170,14 +171,14 @@ pgm.figure.savefig(OUTPUT_DIR / "fgo_dvl_binary.pdf", bbox_inches="tight")
 pgm.figure.savefig(OUTPUT_DIR / "fgo_dvl_binary.png", bbox_inches="tight", dpi=300)
 
 # %%
-# Between DVL Factors
+# Loose Preintegrated DVL Factors
 for i in range(4):
     x_pos = start_x + (i * col_spacing)
 
     if i < 3:
         mid_x = x_pos + (col_spacing / 2)
 
-        pgm_between.add_node(
+        pgm_preint_loose.add_node(
             f"dvlb{i}",
             f"$f^\\mathcal{{D}}_{{{i}{i+1}}}$",
             mid_x,
@@ -186,13 +187,44 @@ for i in range(4):
             plot_params=style_factor_dvl,
             offset=[0, 3],
         )
-        pgm_between.add_edge(f"x{i}", f"dvlb{i}")
-        pgm_between.add_edge(f"dvlb{i}", f"x{i+1}")
+        pgm_preint_loose.add_edge(f"x{i}", f"dvlb{i}")
+        pgm_preint_loose.add_edge(f"dvlb{i}", f"x{i+1}")
 
-pgm_between.render()
-pgm_between.figure.savefig(OUTPUT_DIR / "fgo_dvl_between.pdf", bbox_inches="tight")
-pgm_between.figure.savefig(
-    OUTPUT_DIR / "fgo_dvl_between.png", bbox_inches="tight", dpi=300
+pgm_preint_loose.render()
+pgm_preint_loose.figure.savefig(
+    OUTPUT_DIR / "fgo_dvl_preint_loose.pdf", bbox_inches="tight"
+)
+pgm_preint_loose.figure.savefig(
+    OUTPUT_DIR / "fgo_dvl_preint_loose.png", bbox_inches="tight", dpi=300
+)
+
+# %%
+# Tight Preintegrated DVL Factors
+for i in range(4):
+    x_pos = start_x + (i * col_spacing)
+
+    if i < 3:
+        mid_x = x_pos + (col_spacing / 2)
+
+        pgm_preint_tight.add_node(
+            f"dvlb{i}",
+            f"$f^\\mathcal{{D}}_{{{i}{i+1}}}$",
+            mid_x,
+            2.5,
+            fixed=True,
+            plot_params=style_factor_dvl,
+            offset=[0, 5],
+        )
+        pgm_preint_tight.add_edge(f"x{i}", f"dvlb{i}")
+        pgm_preint_tight.add_edge(f"dvlb{i}", f"x{i+1}")
+        pgm_preint_tight.add_edge(f"b{i}", f"dvlb{i}")
+
+pgm_preint_tight.render()
+pgm_preint_tight.figure.savefig(
+    OUTPUT_DIR / "fgo_dvl_preint_tight.pdf", bbox_inches="tight"
+)
+pgm_preint_tight.figure.savefig(
+    OUTPUT_DIR / "fgo_dvl_preint_tight.png", bbox_inches="tight", dpi=300
 )
 
 # %%
