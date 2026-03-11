@@ -158,7 +158,9 @@ void FactorGraphNode::setupRosInterfaces()
       sensor_options);
   }
 
-  if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) {
+  if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only ||
+    params_.experimental.enable_loose_dvl_preintegration)
+  {
     ahrs_sub_ = create_subscription<sensor_msgs::msg::Imu>(
       params_.ahrs_topic, rclcpp::SensorDataQoS(),
       [this, try_lookup_tf](const sensor_msgs::msg::Imu::SharedPtr msg) {
@@ -489,7 +491,8 @@ void FactorGraphNode::initializeGraph()
   bool depth_ok = !target_T_depth_tf_.header.frame_id.empty();
   bool mag_ok = !(params_.mag.enable_mag || params_.mag.enable_mag_init_only) ||
     !target_T_mag_tf_.header.frame_id.empty();
-  bool ahrs_ok = !(params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) ||
+  bool ahrs_ok = !(params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only ||
+    params_.experimental.enable_loose_dvl_preintegration) ||
     !target_T_ahrs_tf_.header.frame_id.empty();
   bool dvl_ok = !target_T_dvl_tf_.header.frame_id.empty();
 

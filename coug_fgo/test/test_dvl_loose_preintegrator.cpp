@@ -13,31 +13,31 @@
 // limitations under the License.
 
 /**
- * @file test_dvl_preintegrator.cpp
- * @brief Unit tests for dvl_preintegrator.hpp.
+ * @file test_dvl_loose_preintegrator.cpp
+ * @brief Unit tests for dvl_loose_preintegrator.hpp.
  * @author Nelson Durrant (w Gemini 3 Pro)
  * @date Jan 2026
  */
 
 #include <gtest/gtest.h>
 
-#include "coug_fgo/utils/dvl_preintegrator.hpp"
+#include "coug_fgo/utils/dvl_loose_preintegrator.hpp"
 
 /**
- * @class DvlPreintegratorTest
- * @brief Test fixture for DvlPreintegrator tests.
+ * @class DvlLoosePreintegratorTest
+ * @brief Test fixture for DvlLoosePreintegrator tests.
  */
-class DvlPreintegratorTest : public ::testing::Test
+class DvlLoosePreintegratorTest : public ::testing::Test
 {
 protected:
-  coug_fgo::utils::DvlPreintegrator integrator;
+  coug_fgo::utils::DvlLoosePreintegrator integrator;
   gtsam::Matrix3 measured_cov = gtsam::Matrix3::Identity() * 0.01;
 };
 
 /**
  * @brief Verify initialization state.
  */
-TEST_F(DvlPreintegratorTest, Initialization) {
+TEST_F(DvlLoosePreintegratorTest, Initialization) {
   EXPECT_TRUE(integrator.delta().isZero());
   EXPECT_TRUE(integrator.covariance().isZero());
 }
@@ -45,7 +45,7 @@ TEST_F(DvlPreintegratorTest, Initialization) {
 /**
  * @brief Verify integration of stationary measurements.
  */
-TEST_F(DvlPreintegratorTest, StationaryIntegration) {
+TEST_F(DvlLoosePreintegratorTest, StationaryIntegration) {
   gtsam::Vector3 vel(0, 0, 0);
   gtsam::Rot3 orient = gtsam::Rot3::Identity();
   for (int i = 0; i < 10; ++i) {
@@ -58,7 +58,7 @@ TEST_F(DvlPreintegratorTest, StationaryIntegration) {
 /**
  * @brief Verify constant velocity integration.
  */
-TEST_F(DvlPreintegratorTest, ConstantVelocityX) {
+TEST_F(DvlLoosePreintegratorTest, ConstantVelocityX) {
   gtsam::Vector3 vel(1.0, 0, 0);
   gtsam::Rot3 orient = gtsam::Rot3::Identity();
   for (int i = 0; i < 10; ++i) {
@@ -74,7 +74,7 @@ TEST_F(DvlPreintegratorTest, ConstantVelocityX) {
 /**
  * @brief Verify integration with orientation changes.
  */
-TEST_F(DvlPreintegratorTest, RotatedIntegration) {
+TEST_F(DvlLoosePreintegratorTest, RotatedIntegration) {
   gtsam::Vector3 vel(1.0, 0, 0);
   gtsam::Rot3 orient = gtsam::Rot3::Yaw(M_PI_2);
 
@@ -89,7 +89,7 @@ TEST_F(DvlPreintegratorTest, RotatedIntegration) {
 /**
  * @brief Verify reset functionality.
  */
-TEST_F(DvlPreintegratorTest, Reset) {
+TEST_F(DvlLoosePreintegratorTest, Reset) {
   integrator.integrateMeasurement(gtsam::Vector3(1, 0, 0), gtsam::Rot3(), 1.0, measured_cov);
   // After integration, delta is nonzero
   EXPECT_FALSE(integrator.delta().isZero());

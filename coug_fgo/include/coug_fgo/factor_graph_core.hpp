@@ -35,7 +35,7 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include "coug_fgo/factor_graph_parameters.hpp"
-#include "coug_fgo/utils/dvl_preintegrator.hpp"
+#include "coug_fgo/utils/dvl_loose_preintegrator.hpp"
 #include "coug_fgo/utils/state_initializer.hpp"
 #include "coug_fgo/utils/types.hpp"
 
@@ -226,20 +226,21 @@ private:
     std::deque<sensor_msgs::msg::Imu::SharedPtr> & unused_imu);
 
   /**
-   * @brief Interpolates IMU-derived orientation at a target timestamp via SLERP.
-   * @param imu_msgs Time-sorted IMU messages bracketing the target time.
+   * @brief Interpolates AHRS-derived orientation at a target timestamp via SLERP.
+   * @param imu_msgs Time-sorted AHRS messages bracketing the target time.
    * @param target_time The desired interpolation timestamp.
    * @return The interpolated rotation as a GTSAM Rot3.
    */
   gtsam::Rot3 getInterpolatedOrientation(
-    const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
+    const std::deque<sensor_msgs::msg::Imu::SharedPtr> & ahrs_msgs,
     const rclcpp::Time & target_time);
 
   /**
-   * @brief Integrates DVL measurements (rotated via IMU) and adds a preintegrated DVL factor.
+   * @brief Integrates DVL measurements (rotated via AHRS) and adds a preintegrated DVL factor.
    * @param graph The target factor graph.
    * @param dvl_msgs Drained, time-sorted DVL messages.
-   * @param imu_msgs Drained IMU messages for orientation interpolation.
+   * @param imu_msgs Drained IMU messages for psuedo-measurements.
+   * @param ahrs_msgs Drained AHRS messages for orientation interpolation.
    * @param target_time Integration endpoint timestamp.
    * @param[out] unused_dvl Messages with timestamps beyond target_time for re-queueing.
    */
@@ -247,6 +248,7 @@ private:
     gtsam::NonlinearFactorGraph & graph,
     const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & dvl_msgs,
     const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
+    const std::deque<sensor_msgs::msg::Imu::SharedPtr> & ahrs_msgs,
     const rclcpp::Time & target_time,
     std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & unused_dvl);
 
@@ -258,7 +260,7 @@ private:
   std::unique_ptr<gtsam::IncrementalFixedLagSmoother> inc_smoother_;
   std::unique_ptr<gtsam::ISAM2> isam_;
   std::unique_ptr<gtsam::PreintegratedCombinedMeasurements> imu_preintegrator_;
-  std::unique_ptr<utils::DvlPreintegrator> dvl_preintegrator_;
+  std::unique_ptr<utils::DvlLoosePreintegrator> dvl_loose_preintegrator_;
 
   // --- State Estimates ---
   size_t prev_step_ = 0;

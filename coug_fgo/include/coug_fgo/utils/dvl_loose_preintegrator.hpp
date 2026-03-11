@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /**
- * @file dvl_preintegrator.hpp
+ * @file dvl_loose_preintegrator.hpp
  * @brief Utility for preintegrating DVL velocity measurements into relative translation.
  * @author Nelson Durrant
  * @date Jan 2026
@@ -30,16 +30,17 @@ namespace coug_fgo::utils
 {
 
 /**
- * @class DvlPreintegrator
- * @brief Utility for preintegrating DVL velocity measurements into relative translation.
+ * @class DvlLoosePreintegrator
+ * @brief Utility for preintegrating loosely-coupled DVL velocity measurements
+ * into relative translation.
  */
-class DvlPreintegrator
+class DvlLoosePreintegrator
 {
 public:
   /**
-   * @brief Constructor for DvlPreintegrator.
+   * @brief Constructor for DvlLoosePreintegrator.
    */
-  DvlPreintegrator() {reset(gtsam::Rot3());}
+  DvlLoosePreintegrator() {reset(gtsam::Rot3());}
 
   /**
    * @brief Resets the preintegrator state.

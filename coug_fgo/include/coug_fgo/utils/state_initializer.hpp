@@ -72,7 +72,9 @@ public:
       if (params_.mag.enable_mag || params_.mag.enable_mag_init_only) {
         initial_mag_ = queues.mag.back();
       }
-      if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) {
+      if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only ||
+        params_.experimental.enable_loose_dvl_preintegration)
+      {
         initial_ahrs_ = queues.ahrs.back();
       }
       initial_dvl_ = queues.dvl.back();
