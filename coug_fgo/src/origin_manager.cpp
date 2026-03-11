@@ -326,7 +326,7 @@ void OriginManagerNode::checkNavSatFix(diagnostic_updater::DiagnosticStatusWrapp
     (this->get_clock()->now().seconds() - last_navsat_time_.load()) : -1.0;
   stat.add("Time Since Last (s)", time_since);
 
-  if (time_since > params_.timeout_threshold || last_navsat_time_.load() == 0.0) {
+  if (time_since > params_.diagnostic_timeout_threshold || last_navsat_time_.load() == 0.0) {
     stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "GPS is offline.");
   }
   if (last_fix_status_.load() == sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX) {

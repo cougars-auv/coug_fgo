@@ -131,7 +131,9 @@ void FactorGraphNode::setupRosInterfaces()
         frontend_cv_.notify_one();
       } else {
         double time_since_dvl = (get_clock()->now() - dvl_queue_.getLastTime()).seconds();
-        if (state_.load() == State::RUNNING && time_since_dvl > params_.dvl.timeout_threshold) {
+        if (state_.load() == State::RUNNING &&
+        time_since_dvl > params_.dvl.dropout_timeout_threshold)
+        {
           RCLCPP_WARN_THROTTLE(
             get_logger(), *get_clock(), 5000,
             "DVL timed out (%.2fs)! Using depth sensor to trigger keyframes.",
@@ -662,25 +664,25 @@ void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrap
 
   check_queue(
     "IMU", imu_queue_.size(), imu_queue_.getLastTime(), true, true,
-    params_.imu.timeout_threshold);
+    params_.imu.diagnostic_timeout_threshold);
   check_queue(
     "GPS", gps_queue_.size(), gps_queue_.getLastTime(), params_.gps.enable_gps, false,
-    params_.gps.timeout_threshold);
+    params_.gps.diagnostic_timeout_threshold);
   check_queue(
     "Depth", depth_queue_.size(), depth_queue_.getLastTime(), true, true,
-    params_.depth.timeout_threshold);
+    params_.depth.diagnostic_timeout_threshold);
   check_queue(
     "Mag", mag_queue_.size(), mag_queue_.getLastTime(), params_.mag.enable_mag, false,
-    params_.mag.timeout_threshold);
+    params_.mag.diagnostic_timeout_threshold);
   check_queue(
     "AHRS", ahrs_queue_.size(), ahrs_queue_.getLastTime(), params_.ahrs.enable_ahrs, false,
-    params_.ahrs.timeout_threshold);
+    params_.ahrs.diagnostic_timeout_threshold);
   check_queue(
     "DVL", dvl_queue_.size(), dvl_queue_.getLastTime(), true, true,
-    params_.dvl.timeout_threshold);
+    params_.dvl.diagnostic_timeout_threshold);
   check_queue(
     "Wrench", wrench_queue_.size(), wrench_queue_.getLastTime(), params_.dynamics.enable_dynamics,
-    false, params_.dynamics.timeout_threshold);
+    false, params_.dynamics.diagnostic_timeout_threshold);
 }
 
 void FactorGraphNode::checkGraphState(diagnostic_updater::DiagnosticStatusWrapper & stat)
