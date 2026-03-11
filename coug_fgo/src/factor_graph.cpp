@@ -123,7 +123,7 @@ void FactorGraphNode::setupRosInterfaces()
       try_lookup_tf(target_T_depth_tf_, child, "depth");
       depth_queue_.push(msg);
 
-      if (params_.experimental.enable_loose_dvl_preintegration) {
+      if (params_.comparison.enable_loose_dvl_preintegration) {
         {
           std::scoped_lock lock(frontend_trigger_mutex_);
           frontend_trigger_ = true;
@@ -159,7 +159,7 @@ void FactorGraphNode::setupRosInterfaces()
   }
 
   if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only ||
-    params_.experimental.enable_loose_dvl_preintegration)
+    params_.comparison.enable_loose_dvl_preintegration)
   {
     ahrs_sub_ = create_subscription<sensor_msgs::msg::Imu>(
       params_.ahrs_topic, rclcpp::SensorDataQoS(),
@@ -180,7 +180,7 @@ void FactorGraphNode::setupRosInterfaces()
       try_lookup_tf(target_T_dvl_tf_, child, "DVL");
       dvl_queue_.push(msg);
 
-      if (!params_.experimental.enable_loose_dvl_preintegration) {
+      if (!params_.comparison.enable_loose_dvl_preintegration) {
         {
           std::scoped_lock lock(frontend_trigger_mutex_);
           frontend_trigger_ = true;
@@ -211,7 +211,7 @@ void FactorGraphNode::setupRosInterfaces()
     std::string prefix = clean_ns.empty() ? "" : "[" + clean_ns + "] ";
 
     std::string suffix;
-    if (params_.experimental.enable_loose_dvl_preintegration) {
+    if (params_.comparison.enable_loose_dvl_preintegration) {
       suffix = " (FL-LPI)";
     } else if (params_.solver_type == "ISAM2") {
       suffix = " (iSAM2-B)";
@@ -492,7 +492,7 @@ void FactorGraphNode::initializeGraph()
   bool mag_ok = !(params_.mag.enable_mag || params_.mag.enable_mag_init_only) ||
     !target_T_mag_tf_.header.frame_id.empty();
   bool ahrs_ok = !(params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only ||
-    params_.experimental.enable_loose_dvl_preintegration) ||
+    params_.comparison.enable_loose_dvl_preintegration) ||
     !target_T_ahrs_tf_.header.frame_id.empty();
   bool dvl_ok = !target_T_dvl_tf_.header.frame_id.empty();
 
@@ -547,7 +547,7 @@ void FactorGraphNode::initializeGraph()
 void FactorGraphNode::updateGraph()
 {
   rclcpp::Time target_time{0, 0, RCL_ROS_TIME};
-  if (params_.experimental.enable_loose_dvl_preintegration) {
+  if (params_.comparison.enable_loose_dvl_preintegration) {
     if (!depth_queue_.empty()) {
       target_time = rclcpp::Time(depth_queue_.back()->header.stamp);
     } else {

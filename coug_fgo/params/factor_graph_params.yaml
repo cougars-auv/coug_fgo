@@ -363,8 +363,8 @@ factor_graph_node:
       type: double_array
       default_value: [0.001, 0.001, 0.001]
 
-  # --- Experimental Features ---
-  experimental:
+  # --- Comparison Methods ---
+  comparison:
     enable_loose_dvl_preintegration:
       type: bool
       default_value: false

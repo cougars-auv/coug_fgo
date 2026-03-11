@@ -105,7 +105,7 @@ void FactorGraphCore::initialize(
   // --- Initialize Preintegrators ---
   imu_preintegrator_ = std::make_unique<gtsam::PreintegratedCombinedMeasurements>(
     configureImuPreintegration(state_init), prev_imu_bias_);
-  if (params_.experimental.enable_loose_dvl_preintegration) {
+  if (params_.comparison.enable_loose_dvl_preintegration) {
     dvl_loose_preintegrator_ = std::make_unique<utils::DvlLoosePreintegrator>();
     dvl_loose_preintegrator_->reset(prev_pose_.rotation());
 
@@ -602,7 +602,7 @@ void FactorGraphCore::addDvlLoosePreintFactor(
   // Extra measurement to reach exact target time
   if (last_dvl_time < target_time) {
     // TURTLMap-style DVL psuedo-measurement using IMU data
-    if (params_.experimental.enable_pseudo_dvl_w_imu) {
+    if (params_.comparison.enable_pseudo_dvl_w_imu) {
       gtsam::PreintegratedCombinedMeasurements pim = *imu_preintegrator_;
       pim.resetIntegrationAndSetBias(prev_imu_bias_);
 
@@ -678,7 +678,7 @@ std::optional<UpdateResult> FactorGraphCore::update(
       return rclcpp::Time(a->header.stamp) < rclcpp::Time(b->header.stamp);
     };
   std::sort(msgs.imu.begin(), msgs.imu.end(), by_time);
-  if (params_.experimental.enable_loose_dvl_preintegration) {
+  if (params_.comparison.enable_loose_dvl_preintegration) {
     std::sort(msgs.dvl.begin(), msgs.dvl.end(), by_time);
   }
 
@@ -709,8 +709,8 @@ std::optional<UpdateResult> FactorGraphCore::update(
       }
     };
 
-  if (params_.experimental.enable_loose_dvl_preintegration) {
-    if (msgs.dvl.empty() && !params_.experimental.enable_pseudo_dvl_w_imu) {
+  if (params_.comparison.enable_loose_dvl_preintegration) {
+    if (msgs.dvl.empty() && !params_.comparison.enable_pseudo_dvl_w_imu) {
       addDropoutFactors(new_graph);
     } else {
       addDvlLoosePreintFactor(

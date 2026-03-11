@@ -73,7 +73,7 @@ public:
         initial_mag_ = queues.mag.back();
       }
       if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only ||
-        params_.experimental.enable_loose_dvl_preintegration)
+        params_.comparison.enable_loose_dvl_preintegration)
       {
         initial_ahrs_ = queues.ahrs.back();
       }
@@ -103,7 +103,7 @@ public:
         tfs));
     velocity_ = computeInitialVelocity(initial_orientation_target, tfs);
     bias_ = computeInitialBias();
-    if (params_.experimental.enable_loose_dvl_preintegration) {
+    if (params_.comparison.enable_loose_dvl_preintegration) {
       time_ = rclcpp::Time(initial_depth_->header.stamp);
     } else {
       time_ = rclcpp::Time(initial_dvl_->header.stamp);
