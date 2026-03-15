@@ -103,7 +103,9 @@ public:
         tfs));
     velocity_ = computeInitialVelocity(initial_orientation_target, tfs);
     bias_ = computeInitialBias();
-    if (params_.comparison.enable_loose_dvl_preintegration) {
+    if (params_.comparison.enable_loose_dvl_preintegration ||
+      params_.comparison.enable_tight_dvl_preintegration)
+    {
       time_ = rclcpp::Time(initial_depth_->header.stamp);
     } else {
       time_ = rclcpp::Time(initial_dvl_->header.stamp);

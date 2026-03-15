@@ -36,6 +36,7 @@
 
 #include "coug_fgo/factor_graph_parameters.hpp"
 #include "coug_fgo/utils/dvl_loose_preintegrator.hpp"
+#include "coug_fgo/utils/dvl_tight_preintegrator.hpp"
 #include "coug_fgo/utils/state_initializer.hpp"
 #include "coug_fgo/utils/types.hpp"
 
@@ -227,7 +228,7 @@ private:
 
   /**
    * @brief Interpolates AHRS-derived orientation at a target timestamp via SLERP.
-   * @param imu_msgs Time-sorted AHRS messages bracketing the target time.
+   * @param ahrs_msgs Time-sorted AHRS messages bracketing the target time.
    * @param target_time The desired interpolation timestamp.
    * @return The interpolated rotation as a GTSAM Rot3.
    */
@@ -236,7 +237,7 @@ private:
     const rclcpp::Time & target_time);
 
   /**
-   * @brief Integrates DVL measurements (rotated via AHRS) and adds a preintegrated DVL factor.
+   * @brief Integrates DVL measurements (rotated via AHRS) and adds a loosely-coupled preintegrated DVL factor.
    * @param graph The target factor graph.
    * @param dvl_msgs Drained, time-sorted DVL messages.
    * @param imu_msgs Drained IMU messages for psuedo-measurements.
@@ -247,8 +248,22 @@ private:
   void addDvlLoosePreintFactor(
     gtsam::NonlinearFactorGraph & graph,
     const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & dvl_msgs,
-    const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
     const std::deque<sensor_msgs::msg::Imu::SharedPtr> & ahrs_msgs,
+    const rclcpp::Time & target_time,
+    std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & unused_dvl);
+
+  /**
+   * @brief Integrates DVL measurements (rotated via relative IMU rotations) and adds a tightly-coupled preintegrated DVL factor.
+   * @param graph The target factor graph.
+   * @param dvl_msgs Drained, time-sorted DVL messages.
+   * @param imu_msgs Drained, time-sorted IMU messages for relative rotation calculation.
+   * @param target_time Integration endpoint timestamp.
+   * @param[out] unused_dvl Messages with timestamps beyond target_time for re-queueing.
+   */
+  void addDvlTightPreintFactor(
+    gtsam::NonlinearFactorGraph & graph,
+    const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & dvl_msgs,
+    const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
     const rclcpp::Time & target_time,
     std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & unused_dvl);
 
@@ -261,6 +276,7 @@ private:
   std::unique_ptr<gtsam::ISAM2> isam_;
   std::unique_ptr<gtsam::PreintegratedCombinedMeasurements> imu_preintegrator_;
   std::unique_ptr<utils::DvlLoosePreintegrator> dvl_loose_preintegrator_;
+  std::unique_ptr<utils::DvlTightPreintegrator> dvl_tight_preintegrator_;
 
   // --- State Estimates ---
   size_t prev_step_ = 0;

@@ -123,7 +123,9 @@ void FactorGraphNode::setupRosInterfaces()
       try_lookup_tf(target_T_depth_tf_, child, "depth");
       depth_queue_.push(msg);
 
-      if (params_.comparison.enable_loose_dvl_preintegration) {
+      if (params_.comparison.enable_loose_dvl_preintegration ||
+      params_.comparison.enable_tight_dvl_preintegration)
+      {
         {
           std::scoped_lock lock(frontend_trigger_mutex_);
           frontend_trigger_ = true;
@@ -182,7 +184,9 @@ void FactorGraphNode::setupRosInterfaces()
       try_lookup_tf(target_T_dvl_tf_, child, "DVL");
       dvl_queue_.push(msg);
 
-      if (!params_.comparison.enable_loose_dvl_preintegration) {
+      if (!params_.comparison.enable_loose_dvl_preintegration &&
+      !params_.comparison.enable_tight_dvl_preintegration)
+      {
         {
           std::scoped_lock lock(frontend_trigger_mutex_);
           frontend_trigger_ = true;
@@ -215,6 +219,8 @@ void FactorGraphNode::setupRosInterfaces()
     std::string suffix;
     if (params_.comparison.enable_loose_dvl_preintegration) {
       suffix = " (FL-LPI)";
+    } else if (params_.comparison.enable_tight_dvl_preintegration) {
+      suffix = " (FL-TPI)";
     } else if (params_.solver_type == "ISAM2") {
       suffix = " (iSAM2-B)";
     } else {
@@ -244,7 +250,7 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions & options)
 
   setupRosInterfaces();
   core_ = std::make_unique<FactorGraphCore>(params_);
-  state_initializer_ = std::make_unique<utils::StateInitializer>(params_);
+  state_init_ = std::make_unique<utils::StateInitializer>(params_);
   frontend_thread_ = std::thread(&FactorGraphNode::processFrontend, this);
   backend_thread_ = std::thread(&FactorGraphNode::processBackend, this);
 
@@ -289,10 +295,10 @@ void FactorGraphNode::publishGlobalOdom(
   gtsam::Matrix cov_to_pub = pose_covariance;
 
   if (params_.publish_pose_cov) {
-    gtsam::Rot3 R_map_base = pose_base.rotation();
+    gtsam::Rot3 map_R_base = pose_base.rotation();
     gtsam::Matrix66 Rot = gtsam::Matrix66::Zero();
-    Rot.block<3, 3>(0, 0) = R_map_base.matrix();
-    Rot.block<3, 3>(3, 3) = R_map_base.matrix();
+    Rot.block<3, 3>(0, 0) = map_R_base.matrix();
+    Rot.block<3, 3>(3, 3) = map_R_base.matrix();
 
     gtsam::Matrix66 warped_covariance = target_T_base.inverse().AdjointMap() * pose_covariance *
       target_T_base.inverse().AdjointMap().transpose();
@@ -503,7 +509,7 @@ void FactorGraphNode::initializeGraph()
       get_logger(), *get_clock(), 5000, "Waiting for sensor TFs: %s%s%s%s%s%s",
       !imu_ok ? "[IMU] " : "",
       (!gps_ok && params_.gps.enable_gps) ? "[GPS] " : "",
-      (!mag_ok && params_.mag.enable_mag) ? "[Magnetometer] " : "",
+      (!mag_ok && params_.mag.enable_mag) ? "[Mag] " : "",
       (!ahrs_ok && params_.ahrs.enable_ahrs) ? "[AHRS] " : "",
       !depth_ok ? "[Depth] " : "", !dvl_ok ? "[DVL] " : "");
     return;
@@ -530,7 +536,7 @@ void FactorGraphNode::initializeGraph()
   queues.ahrs = ahrs_queue_.drain();
   queues.dvl = dvl_queue_.drain();
   queues.wrench = wrench_queue_.drain();
-  if (!state_initializer_->update(get_clock()->now(), queues)) {
+  if (!state_init_->update(get_clock()->now(), queues)) {
     return;
   }
 
@@ -539,8 +545,8 @@ void FactorGraphNode::initializeGraph()
     toGtsam(target_T_depth_tf_.transform), toGtsam(target_T_mag_tf_.transform),
     toGtsam(target_T_ahrs_tf_.transform), toGtsam(target_T_dvl_tf_.transform),
     toGtsam(target_T_base_tf_.transform), toGtsam(target_T_com_tf_.transform)};
-  state_initializer_->compute(tfs);
-  core_->initialize(*state_initializer_, tfs);
+  state_init_->compute(tfs);
+  core_->initialize(*state_init_, tfs);
 
   state_.store(State::RUNNING);
   RCLCPP_INFO(get_logger(), "Graph initialized successfully!");
@@ -549,7 +555,9 @@ void FactorGraphNode::initializeGraph()
 void FactorGraphNode::updateGraph()
 {
   rclcpp::Time target_time{0, 0, RCL_ROS_TIME};
-  if (params_.comparison.enable_loose_dvl_preintegration) {
+  if (params_.comparison.enable_loose_dvl_preintegration ||
+    params_.comparison.enable_tight_dvl_preintegration)
+  {
     if (!depth_queue_.empty()) {
       target_time = rclcpp::Time(depth_queue_.back()->header.stamp);
     } else {

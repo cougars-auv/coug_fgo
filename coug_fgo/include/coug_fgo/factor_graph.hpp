@@ -192,10 +192,10 @@ protected:
 
   // --- Core ---
   std::unique_ptr<FactorGraphCore> core_;
+  std::unique_ptr<utils::StateInitializer> state_init_;
 
   // --- Node State ---
   std::atomic<State> state_{State::WAITING_FOR_SENSORS};
-  std::unique_ptr<utils::StateInitializer> state_initializer_;
   rclcpp::Time last_update_time_{0, 0, RCL_ROS_TIME};
   rclcpp::Time last_opt_time_{0, 0, RCL_ROS_TIME};
 

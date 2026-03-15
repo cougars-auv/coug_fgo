@@ -14,7 +14,7 @@
 
 /**
  * @file dvl_loose_preintegrator.hpp
- * @brief Utility for preintegrating DVL velocity measurements into relative translation.
+ * @brief Utility for preintegrating loosely-coupled DVL velocity measurements into relative translation.
  * @author Nelson Durrant
  * @date Jan 2026
  */
@@ -31,8 +31,7 @@ namespace coug_fgo::utils
 
 /**
  * @class DvlLoosePreintegrator
- * @brief Utility for preintegrating loosely-coupled DVL velocity measurements
- * into relative translation.
+ * @brief Utility for preintegrating loosely-coupled DVL velocity measurements into relative translation.
  */
 class DvlLoosePreintegrator
 {

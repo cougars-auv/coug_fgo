@@ -32,16 +32,19 @@
 #include "coug_fgo/factors/depth_factor.hpp"
 #include "coug_fgo/factors/dvl_factor.hpp"
 #include "coug_fgo/factors/dvl_loose_preint_factor.hpp"
+#include "coug_fgo/factors/dvl_tight_preint_factor.hpp"
 #include "coug_fgo/factors/gps_factor.hpp"
 #include "coug_fgo/factors/ahrs_factor.hpp"
 #include "coug_fgo/factors/mag_factor.hpp"
 #include "coug_fgo/factors/auv_dynamics_factor.hpp"
 #include "coug_fgo/factors/const_vel_factor.hpp"
 #include "coug_fgo/utils/conversions.hpp"
+#include "coug_fgo/utils/dvl_tight_preintegrator.hpp"
 
 using coug_fgo::factors::DepthFactorArm;
 using coug_fgo::factors::DvlFactorArm;
 using coug_fgo::factors::DvlLoosePreintFactorArm;
+using coug_fgo::factors::DvlTightPreintFactorArm;
 using coug_fgo::factors::Gps2dFactorArm;
 using coug_fgo::factors::AhrsYawFactorArm;
 using coug_fgo::factors::MagFactorArm;
@@ -52,6 +55,7 @@ using coug_fgo::utils::toGtsam3x3;
 using coug_fgo::utils::toGtsamDiagonal;
 using coug_fgo::utils::toGtsamSquaredDiagonal;
 using coug_fgo::utils::DvlLoosePreintegrator;
+using coug_fgo::utils::DvlTightPreintegrator;
 
 using gtsam::symbol_shorthand::B;  // Bias (ax,ay,az,gx,gy,gz)
 using gtsam::symbol_shorthand::V;  // Velocity (x,y,z)
@@ -105,9 +109,21 @@ void FactorGraphCore::initialize(
   // --- Initialize Preintegrators ---
   imu_preintegrator_ = std::make_unique<gtsam::PreintegratedCombinedMeasurements>(
     configureImuPreintegration(state_init), prev_imu_bias_);
+
   if (params_.comparison.enable_loose_dvl_preintegration) {
     dvl_loose_preintegrator_ = std::make_unique<utils::DvlLoosePreintegrator>();
     dvl_loose_preintegrator_->reset(prev_pose_.rotation());
+
+    last_dvl_velocity_ = toGtsam(state_init.initial_dvl_->twist.twist.linear);
+    if (params_.dvl.use_parameter_covariance) {
+      last_dvl_covariance_ = toGtsamSquaredDiagonal(
+        params_.dvl.parameter_covariance.velocity_noise_sigmas).block<3, 3>(0, 0);
+    } else {
+      last_dvl_covariance_ = toGtsam3x3(state_init.initial_dvl_->twist.covariance);
+    }
+  } else if (params_.comparison.enable_tight_dvl_preintegration) {
+    dvl_tight_preintegrator_ = std::make_unique<utils::DvlTightPreintegrator>();
+    dvl_tight_preintegrator_->reset();
 
     last_dvl_velocity_ = toGtsam(state_init.initial_dvl_->twist.twist.linear);
     if (params_.dvl.use_parameter_covariance) {
@@ -428,7 +444,7 @@ void FactorGraphCore::addAuvDynamicsFactor(
   const std::deque<geometry_msgs::msg::WrenchStamped::SharedPtr> & wrench_msgs,
   const rclcpp::Time & target_time)
 {
-  // Implement a zero-order hold (ZOH) for wrench commands
+  // Implements a zero-order hold (ZOH) for wrench commands
   if (!wrench_msgs.empty()) {
     last_wrench_msg_ = wrench_msgs.back();
   }
@@ -542,24 +558,24 @@ gtsam::Rot3 FactorGraphCore::getInterpolatedOrientation(
 void FactorGraphCore::addDvlLoosePreintFactor(
   gtsam::NonlinearFactorGraph & graph,
   const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & dvl_msgs,
-  const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
   const std::deque<sensor_msgs::msg::Imu::SharedPtr> & ahrs_msgs,
   const rclcpp::Time & target_time,
   std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & unused_dvl)
 {
-  if (!dvl_loose_preintegrator_ || imu_msgs.empty() || ahrs_msgs.empty()) {
+  // Implements a zero-order hold (ZOH) for DVL velocity measurements
+  if (!dvl_loose_preintegrator_ || ahrs_msgs.empty()) {
     return;
   }
 
   rclcpp::Time last_dvl_time = prev_time_;
 
-  gtsam::Rot3 target_R_imu = tfs_.target_T_imu.rotation();
+  gtsam::Rot3 target_R_ahrs = tfs_.target_T_ahrs.rotation();
+  gtsam::Rot3 ahrs_R_target = target_R_ahrs.inverse();
   gtsam::Rot3 target_R_dvl = tfs_.target_T_dvl.rotation();
-  gtsam::Rot3 imu_R_target = target_R_imu.inverse();
-  gtsam::Rot3 imu_R_dvl = imu_R_target * target_R_dvl;
 
-  gtsam::Rot3 world_R_imu_prev = getInterpolatedOrientation(ahrs_msgs, prev_time_);
-  dvl_loose_preintegrator_->reset(world_R_imu_prev * imu_R_dvl);
+  gtsam::Rot3 world_R_ahrs_prev = getInterpolatedOrientation(ahrs_msgs, prev_time_);
+  gtsam::Rot3 world_R_target_prev = world_R_ahrs_prev * ahrs_R_target;
+  dvl_loose_preintegrator_->reset(world_R_target_prev);
 
   for (const auto & dvl_msg : dvl_msgs) {
     rclcpp::Time current_dvl_time(dvl_msg->header.stamp);
@@ -575,9 +591,10 @@ void FactorGraphCore::addDvlLoosePreintFactor(
 
     double dt = (current_dvl_time - last_dvl_time).seconds();
     if (dt > 1e-9) {
-      // Integrate DVL measurement alongside interpolated IMU attitude
-      gtsam::Rot3 world_R_imu_cur = getInterpolatedOrientation(ahrs_msgs, current_dvl_time);
-      gtsam::Rot3 world_R_dvl_cur = world_R_imu_cur * imu_R_dvl;
+      // Integrate DVL measurement alongside interpolated AHRS attitude
+      gtsam::Rot3 world_R_ahrs_cur = getInterpolatedOrientation(ahrs_msgs, current_dvl_time);
+      gtsam::Rot3 world_R_target_cur = world_R_ahrs_cur * ahrs_R_target;
+      gtsam::Rot3 world_R_dvl_cur = world_R_target_cur * target_R_dvl;
 
       dvl_loose_preintegrator_->integrateMeasurement(
         last_dvl_velocity_, world_R_dvl_cur, dt,
@@ -601,54 +618,13 @@ void FactorGraphCore::addDvlLoosePreintFactor(
 
   // Extra measurement to reach exact target time
   if (last_dvl_time < target_time) {
-    // TURTLMap-style DVL psuedo-measurement using IMU data
-    if (params_.comparison.enable_pseudo_dvl_w_imu) {
-      gtsam::PreintegratedCombinedMeasurements pim = *imu_preintegrator_;
-      pim.resetIntegrationAndSetBias(prev_imu_bias_);
-
-      rclcpp::Time current_loop_time = last_dvl_time;
-      gtsam::Vector3 last_acc = last_imu_acc_;
-      gtsam::Vector3 last_gyr = last_imu_gyr_;
-
-      for (const auto & msg : imu_msgs) {
-        rclcpp::Time imu_time(msg->header.stamp);
-        if (imu_time <= last_dvl_time) {continue;}
-        if (imu_time > target_time) {break;}
-
-        last_acc = toGtsam(msg->linear_acceleration);
-        last_gyr = toGtsam(msg->angular_velocity);
-        pim.integrateMeasurement(last_acc, last_gyr, (imu_time - current_loop_time).seconds());
-        current_loop_time = imu_time;
-      }
-
-      if (target_time > current_loop_time) {
-        pim.integrateMeasurement(last_acc, last_gyr, (target_time - current_loop_time).seconds());
-      }
-
-      gtsam::Rot3 start_imu_rot = getInterpolatedOrientation(ahrs_msgs, last_dvl_time);
-      gtsam::NavState predicted_state = pim.predict(
-        gtsam::NavState(
-          gtsam::Pose3(start_imu_rot, gtsam::Point3::Zero()),
-          (start_imu_rot * imu_R_dvl).rotate(last_dvl_velocity_)),
-        prev_imu_bias_);
-
-      gtsam::Rot3 dvl_R_imu = imu_R_dvl.inverse();
-      gtsam::Vector3 dvl_body_vel = dvl_R_imu.unrotate(predicted_state.bodyVelocity());
-
+    double dt = (target_time - last_dvl_time).seconds();
+    if (dt > 1e-6) {
+      gtsam::Rot3 cur_ahrs_att = getInterpolatedOrientation(ahrs_msgs, target_time);
+      gtsam::Rot3 cur_target_att = cur_ahrs_att * ahrs_R_target;
+      gtsam::Rot3 cur_dvl_att = cur_target_att * target_R_dvl;
       dvl_loose_preintegrator_->integrateMeasurement(
-        dvl_body_vel, predicted_state.attitude() * imu_R_dvl,
-        (target_time - last_dvl_time).seconds(),
-        gtsam::I_3x3 * 0.02);  // Hard-coded TURTLMap covariance
-
-      last_dvl_velocity_ = dvl_body_vel;
-    } else {
-      double dt = (target_time - last_dvl_time).seconds();
-      if (dt > 1e-6) {
-        gtsam::Rot3 cur_imu_att = getInterpolatedOrientation(ahrs_msgs, target_time);
-        gtsam::Rot3 cur_dvl_att = cur_imu_att * imu_R_dvl;
-        dvl_loose_preintegrator_->integrateMeasurement(
-          last_dvl_velocity_, cur_dvl_att, dt, last_dvl_covariance_);
-      }
+        last_dvl_velocity_, cur_dvl_att, dt, last_dvl_covariance_);
     }
     last_dvl_time = target_time;
   }
@@ -662,6 +638,156 @@ void FactorGraphCore::addDvlLoosePreintFactor(
     gtsam::noiseModel::Gaussian::Covariance(dvl_loose_preintegrator_->covariance()));
 }
 
+void FactorGraphCore::addDvlTightPreintFactor(
+  gtsam::NonlinearFactorGraph & graph,
+  const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & dvl_msgs,
+  const std::deque<sensor_msgs::msg::Imu::SharedPtr> & imu_msgs,
+  const rclcpp::Time & target_time,
+  std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> & unused_dvl)
+{
+  // Implements a zero-order hold (ZOH) for DVL velocity measurements
+  if (!dvl_tight_preintegrator_ || imu_msgs.empty()) {
+    return;
+  }
+
+  rclcpp::Time last_dvl_time = prev_time_;
+  rclcpp::Time last_imu_time = prev_time_;
+
+  gtsam::Rot3 target_R_imu = tfs_.target_T_imu.rotation();
+  gtsam::Rot3 target_R_dvl = tfs_.target_T_dvl.rotation();
+  gtsam::Rot3 imu_R_dvl = target_R_imu.inverse() * target_R_dvl;
+
+  // Fix: Clone the preintegrator safely to reuse the shared parameters pointer
+  auto temp_imu_preint = std::make_unique<gtsam::PreintegratedCombinedMeasurements>(
+    *imu_preintegrator_);
+  temp_imu_preint->resetIntegrationAndSetBias(prev_imu_bias_);
+
+  gtsam::Vector3 current_imu_acc = last_imu_acc_;
+  gtsam::Vector3 current_imu_gyr = last_imu_gyr_;
+  auto imu_it = imu_msgs.begin();
+
+  dvl_tight_preintegrator_->reset();
+
+  for (const auto & dvl_msg : dvl_msgs) {
+    rclcpp::Time current_dvl_time(dvl_msg->header.stamp);
+    if (current_dvl_time > target_time) {
+      unused_dvl.push_back(dvl_msg);
+      continue;
+    }
+
+    if (current_dvl_time <= last_dvl_time) {
+      RCLCPP_DEBUG(kLogger, "DVL message older than last integrated time. Skipping.");
+      continue;
+    }
+
+    double dt = (current_dvl_time - last_dvl_time).seconds();
+    if (dt > 1e-9) {
+      // Step the local IMU preintegrator up to the current DVL time
+      while (imu_it != imu_msgs.end()) {
+        rclcpp::Time imu_time((*imu_it)->header.stamp);
+        if (imu_time > current_dvl_time) {
+          break;
+        }
+        if (imu_time > last_imu_time) {
+          double dt_imu = (imu_time - last_imu_time).seconds();
+          temp_imu_preint->integrateMeasurement(current_imu_acc, current_imu_gyr, dt_imu);
+          last_imu_time = imu_time;
+        }
+        current_imu_acc = toGtsam((*imu_it)->linear_acceleration);
+        current_imu_gyr = toGtsam((*imu_it)->angular_velocity);
+        imu_it++;
+      }
+
+      if (last_imu_time < current_dvl_time) {
+        double dt_rem = (current_dvl_time - last_imu_time).seconds();
+        if (dt_rem > 1e-6) {
+          temp_imu_preint->integrateMeasurement(current_imu_acc, current_imu_gyr, dt_rem);
+        }
+        last_imu_time = current_dvl_time;
+      }
+
+      // Integrate DVL measurement alongside preintegrated IMU relative rotation
+      gtsam::Rot3 delta_R_ik = temp_imu_preint->deltaRij();
+      gtsam::Matrix3 rot_cov_k = temp_imu_preint->preintMeasCov().block<3, 3>(0, 0);
+
+      // Fix: Extract delRdelBiasOmega dynamically using biasCorrectedDelta
+      gtsam::Matrix96 H_bias;
+      temp_imu_preint->biasCorrectedDelta(prev_imu_bias_, H_bias);
+      gtsam::Matrix3 J_bg_k = H_bias.block<3, 3>(0, 3);  // Top-right 3x3 block is dR/dbg
+
+      dvl_tight_preintegrator_->integrateMeasurement(
+        last_dvl_velocity_, delta_R_ik, imu_R_dvl, dt,
+        last_dvl_covariance_, rot_cov_k, J_bg_k);
+
+      last_dvl_velocity_ = toGtsam(dvl_msg->twist.twist.linear);
+
+      if (params_.dvl.use_parameter_covariance) {
+        last_dvl_covariance_ = toGtsamSquaredDiagonal(
+          params_.dvl.parameter_covariance.velocity_noise_sigmas).block<3, 3>(0, 0);
+      } else {
+        last_dvl_covariance_ = toGtsam3x3(dvl_msg->twist.covariance);
+      }
+    }
+    last_dvl_time = current_dvl_time;
+  }
+
+  if (last_dvl_time < target_time) {
+    RCLCPP_DEBUG(kLogger, "No valid DVL measurements found.");
+  }
+
+  // Extra measurement to reach exact target time
+  if (last_dvl_time < target_time) {
+    double dt = (target_time - last_dvl_time).seconds();
+    if (dt > 1e-6) {
+      // Step the local IMU preintegrator up to target_time
+      while (imu_it != imu_msgs.end()) {
+        rclcpp::Time imu_time((*imu_it)->header.stamp);
+        if (imu_time > target_time) {
+          break;
+        }
+        if (imu_time > last_imu_time) {
+          double dt_imu = (imu_time - last_imu_time).seconds();
+          temp_imu_preint->integrateMeasurement(current_imu_acc, current_imu_gyr, dt_imu);
+          last_imu_time = imu_time;
+        }
+        current_imu_acc = toGtsam((*imu_it)->linear_acceleration);
+        current_imu_gyr = toGtsam((*imu_it)->angular_velocity);
+        imu_it++;
+      }
+
+      if (last_imu_time < target_time) {
+        double dt_rem = (target_time - last_imu_time).seconds();
+        if (dt_rem > 1e-6) {
+          temp_imu_preint->integrateMeasurement(current_imu_acc, current_imu_gyr, dt_rem);
+        }
+        last_imu_time = target_time;
+      }
+
+      gtsam::Rot3 delta_R_ik = temp_imu_preint->deltaRij();
+      gtsam::Matrix3 rot_cov_k = temp_imu_preint->preintMeasCov().block<3, 3>(0, 0);
+
+      gtsam::Matrix96 H_bias;
+      temp_imu_preint->biasCorrectedDelta(prev_imu_bias_, H_bias);
+      gtsam::Matrix3 J_bg_k = H_bias.block<3, 3>(0, 3);
+
+      dvl_tight_preintegrator_->integrateMeasurement(
+        last_dvl_velocity_, delta_R_ik, imu_R_dvl, dt,
+        last_dvl_covariance_, rot_cov_k, J_bg_k);
+    }
+    last_dvl_time = target_time;
+  }
+
+  RCLCPP_DEBUG(kLogger, "Adding tight preint DVL factor at step %zu", current_step_);
+
+  graph.emplace_shared<DvlTightPreintFactorArm>(
+    X(prev_step_), X(current_step_), B(prev_step_),
+    tfs_.target_T_imu, tfs_.target_T_dvl,
+    dvl_tight_preintegrator_->delta(),
+    dvl_tight_preintegrator_->preintMeasDerivativeWrtBias(),
+    prev_imu_bias_.gyroscope(),
+    gtsam::noiseModel::Gaussian::Covariance(dvl_tight_preintegrator_->covariance()));
+}
+
 std::optional<UpdateResult> FactorGraphCore::update(
   const rclcpp::Time & target_time,
   utils::QueueBundle & msgs)
@@ -673,13 +799,13 @@ std::optional<UpdateResult> FactorGraphCore::update(
     return std::nullopt;
   }
 
-  // Sort IMU (and DVL) messages
+  // Sort IMU/AHRS messages
   auto by_time = [](const auto & a, const auto & b) {
       return rclcpp::Time(a->header.stamp) < rclcpp::Time(b->header.stamp);
     };
   std::sort(msgs.imu.begin(), msgs.imu.end(), by_time);
   if (params_.comparison.enable_loose_dvl_preintegration) {
-    std::sort(msgs.dvl.begin(), msgs.dvl.end(), by_time);
+    std::sort(msgs.ahrs.begin(), msgs.ahrs.end(), by_time);
   }
 
   // --- Build Factor Graph ---
@@ -709,16 +835,15 @@ std::optional<UpdateResult> FactorGraphCore::update(
       }
     };
 
-  if (params_.comparison.enable_loose_dvl_preintegration) {
-    if (msgs.dvl.empty() && !params_.comparison.enable_pseudo_dvl_w_imu) {
-      addDropoutFactors(new_graph);
-    } else {
-      addDvlLoosePreintFactor(
-        new_graph, msgs.dvl, msgs.imu, msgs.ahrs, target_time, result.unused_dvl);
-    }
+  if (msgs.dvl.empty()) {
+    addDropoutFactors(new_graph);
   } else {
-    if (msgs.dvl.empty()) {
-      addDropoutFactors(new_graph);
+    if (params_.comparison.enable_loose_dvl_preintegration) {
+      addDvlLoosePreintFactor(
+        new_graph, msgs.dvl, msgs.ahrs, target_time, result.unused_dvl);
+    } else if (params_.comparison.enable_tight_dvl_preintegration) {
+      addDvlTightPreintFactor(
+        new_graph, msgs.dvl, msgs.imu, target_time, result.unused_dvl);
     } else {
       addDvlFactor(new_graph, msgs.dvl);
 
@@ -884,9 +1009,8 @@ std::optional<OptimizeResult> FactorGraphCore::optimize()
     }
   }
 
-  auto total_end = std::chrono::high_resolution_clock::now();
-  result.cov_duration = std::chrono::duration<double>(total_end - cov_start).count();
-  result.total_duration = std::chrono::duration<double>(total_end - total_start).count();
+  auto cov_end = std::chrono::high_resolution_clock::now();
+  result.cov_duration = std::chrono::duration<double>(cov_end - cov_start).count();
 
   // --- Export Smoothed Path ---
   if (params_.publish_smoothed_path) {
@@ -896,6 +1020,9 @@ std::optional<OptimizeResult> FactorGraphCore::optimize()
       result.all_estimates = isam_->calculateEstimate();
     }
   }
+
+  auto total_end = std::chrono::high_resolution_clock::now();
+  result.total_duration = std::chrono::duration<double>(total_end - total_start).count();
 
   return result;
 }
