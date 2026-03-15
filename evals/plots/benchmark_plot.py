@@ -76,7 +76,7 @@ def load_data(bags_dir):
 
 
 def generate_plots(data_map, output_dir):
-    for filename, label, suffix in METRICS_CONFIG:
+    for filename, label, prefix in METRICS_CONFIG:
         if filename not in data_map or data_map[filename].empty:
             continue
 
@@ -94,7 +94,11 @@ def generate_plots(data_map, output_dir):
             fig, ax = plt.subplots()
 
             plot_func = sns.violinplot if plot_type == "violin" else sns.boxplot
-            kwargs = {"inner": "box", "linewidth": 0.5} if plot_type == "violin" else {}
+            kwargs = (
+                {"inner": "box", "linewidth": 0.5, "cut": 0}
+                if plot_type == "violin"
+                else {}
+            )
 
             plot_func(
                 x="Algorithm",
@@ -108,7 +112,7 @@ def generate_plots(data_map, output_dir):
             )
 
             ax.set(title="", xlabel="", ylabel=label)
-            save_path = output_dir / f"{plot_type}_{suffix}.png"
+            save_path = output_dir / f"{prefix}_{plot_type}.png"
             fig.savefig(save_path, dpi=300, bbox_inches="tight")
             plt.close(fig)
 

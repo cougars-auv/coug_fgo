@@ -37,7 +37,7 @@ namespace coug_fgo::utils
 
 /**
  * @struct TfBundle
- * @brief Container for TF sensor transformations (GTSAM Pose3).
+ * @brief Container for TF sensor transformations.
  */
 struct TfBundle
 {

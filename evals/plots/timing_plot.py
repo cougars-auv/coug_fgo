@@ -105,7 +105,11 @@ def plot_timing(bag_dir, output_dir, agent_name):
         fig, ax = plt.subplots()
 
         plot_func = sns.violinplot if plot_type == "violin" else sns.boxplot
-        kwargs = {"inner": "box", "linewidth": 0.5} if plot_type == "violin" else {}
+        kwargs = (
+            {"inner": "box", "linewidth": 0.5, "cut": 0}
+            if plot_type == "violin"
+            else {}
+        )
 
         plot_func(
             x="Timing Type",
@@ -120,7 +124,7 @@ def plot_timing(bag_dir, output_dir, agent_name):
         ax.set(title="", xlabel="", ylabel="Duration (s)")
         ax.legend(title=None)
 
-        save_path = Path(output_dir) / f"{plot_type}_{agent_name}_timing.png"
+        save_path = Path(output_dir) / f"{agent_name}_timing_{plot_type}.png"
         fig.savefig(save_path, dpi=300, bbox_inches="tight")
         plt.close(fig)
 

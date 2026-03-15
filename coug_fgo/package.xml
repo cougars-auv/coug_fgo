@@ -4,7 +4,7 @@
   <name>coug_fgo</name>
   <version>0.0.0</version>
   <description>FGO localization and odometry for the CougUV</description>
-  <maintainer email="snelsondurrant@gmail.com">Nelson Durrant</maintainer>
+  <maintainer email="snelsondurrant@gmail.com">snelsondurrant</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

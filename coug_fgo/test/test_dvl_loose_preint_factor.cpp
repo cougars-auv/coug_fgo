@@ -59,7 +59,7 @@ TEST(DvlLoosePreintFactorArmTest, Jacobians) {
 
   gtsam::Matrix actualH1, actualH2;
   factor.evaluateError(pose_i, pose_j, &actualH1, &actualH2);
-  
+
   EXPECT_TRUE(gtsam::assert_equal(expectedH1, actualH1, 1e-5));
   EXPECT_TRUE(gtsam::assert_equal(expectedH2, actualH2, 1e-5));
 }
