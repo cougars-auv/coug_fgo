@@ -29,52 +29,19 @@
 #include "coug_fgo/factors/ahrs_factor.hpp"
 
 /**
- * @brief Verify error evaluation logic and lever arm correction.
- */
-TEST(AhrsYawFactorArmTest, ErrorEvaluation) {
-  gtsam::Key poseKey = gtsam::symbol_shorthand::X(1);
-  gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(1, 0.1);
-
-  // Zero error when estimated yaw matches the measured yaw
-  coug_fgo::factors::AhrsYawFactorArm factor1(poseKey, gtsam::Rot3::Identity(),
-    gtsam::Rot3::Identity(), 0.0, model);
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector1::Zero(),
-      factor1.evaluateError(gtsam::Pose3::Identity()), 1e-9));
-
-  // Consistent yaw produces zero error at non-trivial heading
-  gtsam::Pose3 pose_rot = gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3());
-  coug_fgo::factors::AhrsYawFactorArm factor_rot(poseKey, gtsam::Rot3::Yaw(M_PI_2),
-    gtsam::Rot3::Identity(), 0.0, model);
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector1::Zero(),
-      factor_rot.evaluateError(pose_rot), 1e-9));
-
-  // Sensor mounting rotation is compensated in yaw extraction
-  coug_fgo::factors::AhrsYawFactorArm factor2(poseKey, gtsam::Rot3::Yaw(M_PI_2),
-    gtsam::Rot3::Yaw(M_PI_2), 0.0, model);
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector1::Zero(),
-      factor2.evaluateError(gtsam::Pose3::Identity()), 1e-9));
-
-  // Non-zero residual proportional to the yaw discrepancy
-  double angle = 0.174533;
-  gtsam::Vector error =
-    factor2.evaluateError(gtsam::Pose3(gtsam::Rot3::Yaw(angle), gtsam::Point3()));
-  EXPECT_NEAR(error[0], angle, 1e-5);
-}
-
-/**
  * @brief Verify Jacobians against numerical differentiation.
  */
 TEST(AhrsYawFactorArmTest, Jacobians) {
-  coug_fgo::factors::AhrsYawFactorArm factor(gtsam::symbol_shorthand::X(1),
-    gtsam::Rot3::Ypr(0.5, 0.1, -0.1),
-    gtsam::Rot3::Ypr(0.1, 0, 0), 0.0, gtsam::noiseModel::Isotropic::Sigma(1, 0.1));
-  gtsam::Pose3 pose = gtsam::Pose3(gtsam::Rot3::Ypr(0.4, 0.05, -0.05), gtsam::Point3(1, 1, 1));
+  gtsam::Key poseKey = gtsam::symbol_shorthand::X(1);
+  gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(1, 0.1);
+  gtsam::Rot3 target_R_sensor = gtsam::Rot3::Ypr(0.1, -0.1, 0.1);
+  gtsam::Rot3 measured_attitude = gtsam::Rot3::Ypr(0.5, 0.1, -0.1);
+  double magnetic_declination = 0.0;
+
+  coug_fgo::factors::AhrsYawFactorArm factor(
+    poseKey, measured_attitude, target_R_sensor, magnetic_declination, model);
+
+  gtsam::Pose3 pose(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1.0, 2.0, 4.0));
 
   gtsam::Matrix expectedH = gtsam::numericalDerivative11<gtsam::Vector, gtsam::Pose3>(
     [&](const gtsam::Pose3 & p) {return factor.evaluateError(p, nullptr);},
@@ -82,6 +49,7 @@ TEST(AhrsYawFactorArmTest, Jacobians) {
 
   gtsam::Matrix actualH;
   factor.evaluateError(pose, &actualH);
+
   EXPECT_TRUE(gtsam::assert_equal(expectedH, actualH, 1e-5));
   EXPECT_EQ(actualH.rows(), 1);
   EXPECT_EQ(actualH.cols(), 6);

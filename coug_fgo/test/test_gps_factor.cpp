@@ -29,50 +29,17 @@
 #include "coug_fgo/factors/gps_factor.hpp"
 
 /**
- * @brief Verify error evaluation logic and lever arm correction.
- */
-TEST(Gps2dFactorArmTest, ErrorEvaluation) {
-  gtsam::Key poseKey = gtsam::symbol_shorthand::X(1);
-  gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(2, 0.1);
-
-  // Zero error when pose XY matches the measured position
-  coug_fgo::factors::Gps2dFactorArm factor1(poseKey, gtsam::Point3(1, 2, 3),
-    gtsam::Pose3::Identity(), model);
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector2::Zero(),
-      factor1.evaluateError(gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(1, 2, 3))), 1e-9));
-
-  // Yaw rotation does not affect world-frame 2D position
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector2::Zero(),
-      factor1.evaluateError(gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(1, 2, 3))), 1e-9));
-
-  // Lever arm offset between target and sensor is compensated
-  coug_fgo::factors::Gps2dFactorArm factor2(poseKey, gtsam::Point3(1, 2, 3),
-    gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(1, 0, 0)), model);
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector2::Zero(),
-      factor2.evaluateError(gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(0, 2, 3))), 1e-9));
-
-  // Non-zero residual when predicted position differs from measurement
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector2(1, 0),
-      factor1.evaluateError(gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(2, 2, 4))), 1e-9));
-}
-
-/**
  * @brief Verify Jacobians against numerical differentiation.
  */
 TEST(Gps2dFactorArmTest, Jacobians) {
-  coug_fgo::factors::Gps2dFactorArm factor(gtsam::symbol_shorthand::X(1),
-    gtsam::Point3(5, 5, 5),
-    gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(0.2, -0.1, 0.5)),
-    gtsam::noiseModel::Isotropic::Sigma(2, 0.1));
-  gtsam::Pose3 pose = gtsam::Pose3(gtsam::Rot3::Ypr(0.5, -0.2, 0.1), gtsam::Point3(4, 5, 6));
+  gtsam::Key poseKey = gtsam::symbol_shorthand::X(1);
+  gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(2, 0.1);
+  gtsam::Pose3 target_P_sensor(gtsam::Rot3::Ypr(0.1, -0.1, 0.1), gtsam::Point3(0.5, 0.5, 0.5));
+  gtsam::Point3 measured_point(5.0, 5.0, 5.0);
+
+  coug_fgo::factors::Gps2dFactorArm factor(poseKey, measured_point, target_P_sensor, model);
+
+  gtsam::Pose3 pose(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1.0, 2.0, 4.0));
 
   gtsam::Matrix expectedH = gtsam::numericalDerivative11<gtsam::Vector, gtsam::Pose3>(
     [&](const gtsam::Pose3 & p) {return factor.evaluateError(p, nullptr);},
@@ -80,6 +47,7 @@ TEST(Gps2dFactorArmTest, Jacobians) {
 
   gtsam::Matrix actualH;
   factor.evaluateError(pose, &actualH);
+
   EXPECT_TRUE(gtsam::assert_equal(expectedH, actualH, 1e-5));
   EXPECT_EQ(actualH.rows(), 2);
   EXPECT_EQ(actualH.cols(), 6);

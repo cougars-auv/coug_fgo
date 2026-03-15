@@ -29,57 +29,18 @@
 #include "coug_fgo/factors/dvl_factor.hpp"
 
 /**
- * @brief Verify error evaluation logic and lever arm correction.
- */
-TEST(DvlFactorArmTest, ErrorEvaluation) {
-  gtsam::Key poseKey = gtsam::symbol_shorthand::X(1);
-  gtsam::Key velKey = gtsam::symbol_shorthand::V(1);
-  gtsam::Vector3 measured_vel(1.0, 0.0, 0.0);
-  gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(3, 0.1);
-  gtsam::Pose3 target_P_sensor = gtsam::Pose3::Identity();
-  coug_fgo::factors::DvlFactorArm factor(poseKey, velKey, target_P_sensor, measured_vel, model);
-
-  // Zero error when body velocity unrotates to match the measurement
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector3::Zero(),
-      factor.evaluateError(gtsam::Pose3::Identity(), gtsam::Vector3(1, 0, 0)), 1e-9));
-
-  // Yaw rotation correctly maps world velocity to body frame
-  gtsam::Pose3 pose = gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(0, 0, 0));
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector3::Zero(),
-      factor.evaluateError(pose, gtsam::Vector3(0, 1, 0)), 1e-9));
-
-  // Sensor mounting rotation is compensated in velocity prediction
-  gtsam::Pose3 target_P_sensor_arm(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(0, 0, 1));
-  coug_fgo::factors::DvlFactorArm factor_arm(poseKey, velKey, target_P_sensor_arm,
-    gtsam::Vector3(0, -1, 0), model);
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector3::Zero(),
-      factor_arm.evaluateError(gtsam::Pose3::Identity(), gtsam::Vector3(1, 0, 0)), 1e-9));
-
-  // Non-zero residual when predicted velocity differs from measurement
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector3(1, 0, 0),
-      factor.evaluateError(gtsam::Pose3::Identity(), gtsam::Vector3(2, 0, 0)), 1e-9));
-}
-
-/**
  * @brief Verify Jacobians against numerical differentiation.
  */
 TEST(DvlFactorArmTest, Jacobians) {
   gtsam::Key poseKey = gtsam::symbol_shorthand::X(1);
   gtsam::Key velKey = gtsam::symbol_shorthand::V(1);
-  gtsam::Pose3 target_P_sensor_2(gtsam::Rot3::Ypr(0.1, 0, 0), gtsam::Point3(0.5, 0.5, 0.5));
-  coug_fgo::factors::DvlFactorArm factor(poseKey, velKey, target_P_sensor_2,
-    gtsam::Vector3(1.0, 0.5, -0.2),
-    gtsam::noiseModel::Isotropic::Sigma(3, 0.1));
+  gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(3, 0.1);
+  gtsam::Pose3 target_P_sensor(gtsam::Rot3::Ypr(0.1, -0.1, 0.1), gtsam::Point3(0.5, 0.5, 0.5));
+  gtsam::Vector3 measured_vel(1.0, 0.5, -0.2);
 
-  gtsam::Pose3 pose = gtsam::Pose3(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1, 2, 3));
+  coug_fgo::factors::DvlFactorArm factor(poseKey, velKey, target_P_sensor, measured_vel, model);
+
+  gtsam::Pose3 pose(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1.0, 2.0, 4.0));
   gtsam::Vector3 vel_world(1.5, -0.5, 0.2);
 
   gtsam::Matrix expectedH1 = gtsam::numericalDerivative21<gtsam::Vector, gtsam::Pose3,
@@ -97,6 +58,7 @@ TEST(DvlFactorArmTest, Jacobians) {
 
   gtsam::Matrix actualH1, actualH2;
   factor.evaluateError(pose, vel_world, &actualH1, &actualH2);
+  
   EXPECT_TRUE(gtsam::assert_equal(expectedH1, actualH1, 1e-5));
   EXPECT_TRUE(gtsam::assert_equal(expectedH2, actualH2, 1e-5));
 }

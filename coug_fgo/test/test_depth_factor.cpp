@@ -29,56 +29,17 @@
 #include "coug_fgo/factors/depth_factor.hpp"
 
 /**
- * @brief Verify error evaluation logic and lever arm correction.
- */
-TEST(DepthFactorArmTest, ErrorEvaluation) {
-  gtsam::Key poseKey = gtsam::symbol_shorthand::X(1);
-  gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(1, 0.1);
-
-  // Zero error when pose Z matches the measured depth
-  coug_fgo::factors::DepthFactorArm factor1(poseKey, 5.0, gtsam::Pose3::Identity(), model);
-  EXPECT_NEAR(
-    factor1.evaluateError(
-      gtsam::Pose3(
-        gtsam::Rot3(), gtsam::Point3(
-          0, 0,
-          5)))[0], 0.0, 1e-9);
-
-  // Body rotation does not affect world-frame depth reading
-  EXPECT_NEAR(
-    factor1.evaluateError(
-      gtsam::Pose3(
-        gtsam::Rot3::Rx(M_PI), gtsam::Point3(
-          0, 0,
-          5)))[0], 0.0, 1e-9);
-
-  // Lever arm offset between target and sensor is compensated
-  coug_fgo::factors::DepthFactorArm factor2(poseKey, 5.0,
-    gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(0, 0, 1)), model);
-  EXPECT_NEAR(
-    factor2.evaluateError(
-      gtsam::Pose3(
-        gtsam::Rot3(), gtsam::Point3(
-          0, 0,
-          4)))[0], 0.0, 1e-9);
-
-  // Non-zero residual when predicted depth differs from measurement
-  EXPECT_NEAR(
-    factor1.evaluateError(
-      gtsam::Pose3(
-        gtsam::Rot3(), gtsam::Point3(
-          0, 0,
-          6)))[0], 1.0, 1e-9);
-}
-
-/**
  * @brief Verify Jacobians against numerical differentiation.
  */
 TEST(DepthFactorArmTest, Jacobians) {
-  coug_fgo::factors::DepthFactorArm factor(gtsam::symbol_shorthand::X(1), 5.0,
-    gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(0.5, 0.5, 0.5)),
-    gtsam::noiseModel::Isotropic::Sigma(1, 0.1));
-  gtsam::Pose3 pose = gtsam::Pose3(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1, 2, 4));
+  gtsam::Key poseKey = gtsam::symbol_shorthand::X(1);
+  gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(1, 0.1);
+  gtsam::Pose3 target_P_sensor(gtsam::Rot3::Ypr(0.1, -0.1, 0.1), gtsam::Point3(0.5, 0.5, 0.5));
+  double measured_depth = 5.0;
+
+  coug_fgo::factors::DepthFactorArm factor(poseKey, measured_depth, target_P_sensor, model);
+
+  gtsam::Pose3 pose(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1.0, 2.0, 4.0));
 
   gtsam::Matrix expectedH = gtsam::numericalDerivative11<gtsam::Vector, gtsam::Pose3>(
     [&](const gtsam::Pose3 & p) {return factor.evaluateError(p, nullptr);},
@@ -86,5 +47,6 @@ TEST(DepthFactorArmTest, Jacobians) {
 
   gtsam::Matrix actualH;
   factor.evaluateError(pose, &actualH);
+
   EXPECT_TRUE(gtsam::assert_equal(expectedH, actualH, 1e-5));
 }

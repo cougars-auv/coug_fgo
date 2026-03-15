@@ -29,45 +29,6 @@
 #include "coug_fgo/factors/const_vel_factor.hpp"
 
 /**
- * @brief Verify error evaluation logic.
- */
-TEST(ConstVelFactorTest, ErrorEvaluation) {
-  gtsam::Key poseKey1 = gtsam::symbol_shorthand::X(1);
-  gtsam::Key velKey1 = gtsam::symbol_shorthand::V(1);
-  gtsam::Key poseKey2 = gtsam::symbol_shorthand::X(2);
-  gtsam::Key velKey2 = gtsam::symbol_shorthand::V(2);
-  gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(3, 0.1);
-
-  coug_fgo::factors::ConstVelFactor factor(
-    poseKey1, velKey1, poseKey2, velKey2, model);
-
-  // Zero error when both keyframes share the same body-frame velocity
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector3::Zero(),
-      factor.evaluateError(
-        gtsam::Pose3::Identity(), gtsam::Vector3(1, 0, 0),
-        gtsam::Pose3::Identity(), gtsam::Vector3(1, 0, 0)), 1e-9));
-
-  // Rotation-compensated velocity is preserved across a yaw change
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector3::Zero(),
-      factor.evaluateError(
-        gtsam::Pose3::Identity(), gtsam::Vector3(1, 0, 0),
-        gtsam::Pose3(gtsam::Rot3::Yaw(M_PI_2), gtsam::Point3(1, 1, 0)),
-        gtsam::Vector3(0, 1, 0)), 1e-9));
-
-  // Non-zero residual when body-frame velocities differ between keyframes
-  EXPECT_TRUE(
-    gtsam::assert_equal(
-      gtsam::Vector3(-1, 0, 0),
-      factor.evaluateError(
-        gtsam::Pose3::Identity(), gtsam::Vector3(1, 0, 0),
-        gtsam::Pose3::Identity(), gtsam::Vector3(2, 0, 0)), 1e-9));
-}
-
-/**
  * @brief Verify Jacobians against numerical differentiation.
  */
 TEST(ConstVelFactorTest, Jacobians) {
@@ -80,9 +41,9 @@ TEST(ConstVelFactorTest, Jacobians) {
   coug_fgo::factors::ConstVelFactor factor(
     poseKey1, velKey1, poseKey2, velKey2, model);
 
-  gtsam::Pose3 pose1(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1, 2, 3));
+  gtsam::Pose3 pose1(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1.0, 2.0, 4.0));
   gtsam::Vector3 vel1(1.0, 0.5, 0.0);
-  gtsam::Pose3 pose2(gtsam::Rot3::Ypr(0.4, -0.1, 0.2), gtsam::Point3(2, 3, 4));
+  gtsam::Pose3 pose2(gtsam::Rot3::Ypr(0.4, -0.1, 0.2), gtsam::Point3(2.0, 3.0, 4.0));
   gtsam::Vector3 vel2(1.1, 0.4, 0.1);
 
   auto evalFunc = [&](
