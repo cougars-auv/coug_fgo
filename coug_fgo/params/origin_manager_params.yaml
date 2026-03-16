@@ -23,7 +23,7 @@ origin_manager_node:
   publish_diagnostics:
     type: bool
     default_value: false
-  diagnostic_timeout_threshold:
+  diagnostic_timeout:
     type: double
     default_value: 2.0
 

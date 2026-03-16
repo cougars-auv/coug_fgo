@@ -284,18 +284,18 @@ void FactorGraphNode::publishGlobalOdom(
   const rclcpp::Time & timestamp)
 {
   gtsam::Pose3 target_T_base = toGtsam(target_T_base_tf_.transform);
-  gtsam::Pose3 pose_base = current_pose.compose(target_T_base);
+  gtsam::Pose3 map_T_base = current_pose * target_T_base;
 
   nav_msgs::msg::Odometry odom_msg;
   odom_msg.header.stamp = timestamp;
   odom_msg.header.frame_id = params_.map_frame;
   odom_msg.child_frame_id = params_.base_frame;
-  odom_msg.pose.pose = toPoseMsg(pose_base);
+  odom_msg.pose.pose = toPoseMsg(map_T_base);
 
   gtsam::Matrix cov_to_pub = pose_covariance;
 
   if (params_.publish_pose_cov) {
-    gtsam::Rot3 map_R_base = pose_base.rotation();
+    gtsam::Rot3 map_R_base = map_T_base.rotation();
     gtsam::Matrix66 Rot = gtsam::Matrix66::Zero();
     Rot.block<3, 3>(0, 0) = map_R_base.matrix();
     Rot.block<3, 3>(3, 3) = map_R_base.matrix();
@@ -316,13 +316,13 @@ void FactorGraphNode::broadcastGlobalTf(
 {
   try {
     gtsam::Pose3 target_T_base = toGtsam(target_T_base_tf_.transform);
-    gtsam::Pose3 pose_base = current_pose * target_T_base;
+    gtsam::Pose3 map_T_base = current_pose * target_T_base;
 
     gtsam::Pose3 odom_T_base = toGtsam(
       tf_buffer_->lookupTransform(
         params_.odom_frame, params_.base_frame,
         tf2::TimePointZero).transform);
-    gtsam::Pose3 map_T_odom = pose_base * odom_T_base.inverse();
+    gtsam::Pose3 map_T_odom = map_T_base * odom_T_base.inverse();
 
     geometry_msgs::msg::TransformStamped tf_msg;
     tf_msg.header.stamp = timestamp;
@@ -672,25 +672,25 @@ void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrap
 
   check_queue(
     "IMU", imu_queue_.size(), imu_queue_.getLastTime(), true, true,
-    params_.imu.diagnostic_timeout_threshold);
+    params_.imu.diagnostic_timeout);
   check_queue(
     "GPS", gps_queue_.size(), gps_queue_.getLastTime(), params_.gps.enable_gps, false,
-    params_.gps.diagnostic_timeout_threshold);
+    params_.gps.diagnostic_timeout);
   check_queue(
     "Depth", depth_queue_.size(), depth_queue_.getLastTime(), true, true,
-    params_.depth.diagnostic_timeout_threshold);
+    params_.depth.diagnostic_timeout);
   check_queue(
     "Mag", mag_queue_.size(), mag_queue_.getLastTime(), params_.mag.enable_mag, false,
-    params_.mag.diagnostic_timeout_threshold);
+    params_.mag.diagnostic_timeout);
   check_queue(
     "AHRS", ahrs_queue_.size(), ahrs_queue_.getLastTime(), params_.ahrs.enable_ahrs, false,
-    params_.ahrs.diagnostic_timeout_threshold);
+    params_.ahrs.diagnostic_timeout);
   check_queue(
     "DVL", dvl_queue_.size(), dvl_queue_.getLastTime(), true, true,
-    params_.dvl.diagnostic_timeout_threshold);
+    params_.dvl.diagnostic_timeout);
   check_queue(
     "Wrench", wrench_queue_.size(), wrench_queue_.getLastTime(), params_.dynamics.enable_dynamics,
-    false, params_.dynamics.diagnostic_timeout_threshold);
+    false, params_.dynamics.diagnostic_timeout);
 }
 
 void FactorGraphNode::checkGraphState(diagnostic_updater::DiagnosticStatusWrapper & stat)

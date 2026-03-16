@@ -573,9 +573,9 @@ void FactorGraphCore::addDvlLoosePreintFactor(
   gtsam::Rot3 ahrs_R_target = target_R_ahrs.inverse();
   gtsam::Rot3 target_R_dvl = tfs_.target_T_dvl.rotation();
 
-  gtsam::Rot3 world_R_ahrs_prev = getInterpolatedOrientation(ahrs_msgs, prev_time_);
-  gtsam::Rot3 world_R_target_prev = world_R_ahrs_prev * ahrs_R_target;
-  dvl_loose_preintegrator_->reset(world_R_target_prev);
+  gtsam::Rot3 map_R_ahrs_prev = getInterpolatedOrientation(ahrs_msgs, prev_time_);
+  gtsam::Rot3 map_R_target_prev = map_R_ahrs_prev * ahrs_R_target;
+  dvl_loose_preintegrator_->reset(map_R_target_prev);
 
   for (const auto & dvl_msg : dvl_msgs) {
     rclcpp::Time current_dvl_time(dvl_msg->header.stamp);
@@ -592,12 +592,12 @@ void FactorGraphCore::addDvlLoosePreintFactor(
     double dt = (current_dvl_time - last_dvl_time).seconds();
     if (dt > 1e-9) {
       // Integrate DVL measurement alongside interpolated AHRS attitude
-      gtsam::Rot3 world_R_ahrs_cur = getInterpolatedOrientation(ahrs_msgs, current_dvl_time);
-      gtsam::Rot3 world_R_target_cur = world_R_ahrs_cur * ahrs_R_target;
-      gtsam::Rot3 world_R_dvl_cur = world_R_target_cur * target_R_dvl;
+      gtsam::Rot3 map_R_ahrs_cur = getInterpolatedOrientation(ahrs_msgs, current_dvl_time);
+      gtsam::Rot3 map_R_target_cur = map_R_ahrs_cur * ahrs_R_target;
+      gtsam::Rot3 map_R_dvl_cur = map_R_target_cur * target_R_dvl;
 
       dvl_loose_preintegrator_->integrateMeasurement(
-        last_dvl_velocity_, world_R_dvl_cur, dt,
+        last_dvl_velocity_, map_R_dvl_cur, dt,
         last_dvl_covariance_);
 
       last_dvl_velocity_ = toGtsam(dvl_msg->twist.twist.linear);

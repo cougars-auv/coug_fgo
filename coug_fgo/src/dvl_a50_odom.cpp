@@ -147,7 +147,7 @@ void DvlA50OdomNode::checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper 
     (this->get_clock()->now().seconds() - last_dvl_time_.load()) : -1.0;
   stat.add("Time Since Last (s)", time_since);
 
-  if (time_since > params_.diagnostic_timeout_threshold || last_dvl_time_.load() == 0.0) {
+  if (time_since > params_.diagnostic_timeout || last_dvl_time_.load() == 0.0) {
     stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "DVL DR is offline.");
   }
 }
