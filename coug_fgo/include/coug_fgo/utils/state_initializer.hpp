@@ -96,12 +96,12 @@ public:
    */
   void compute(const TfBundle & tfs)
   {
-    gtsam::Rot3 initial_orientation_target = computeInitialOrientation(tfs);
+    gtsam::Rot3 map_R_target = computeInitialOrientation(tfs);
     pose_ = gtsam::Pose3(
-      initial_orientation_target, computeInitialPosition(
-        initial_orientation_target,
+      map_R_target, computeInitialPosition(
+        map_R_target,
         tfs));
-    velocity_ = computeInitialVelocity(initial_orientation_target, tfs);
+    velocity_ = computeInitialVelocity(map_R_target, tfs);
     bias_ = computeInitialBias();
     if (params_.comparison.enable_loose_dvl_preintegration ||
       params_.comparison.enable_tight_dvl_preintegration)
@@ -243,7 +243,7 @@ private:
   /**
    * @brief Computes initial orientation from accelerometer tilt and heading sensors.
    * @param tfs SE(3) sensor transforms for lever arm compensation.
-   * @return Initial rotation of the target frame in the world frame.
+   * @return Initial rotation of the target frame in the map frame.
    */
   gtsam::Rot3 computeInitialOrientation(const TfBundle & tfs)
   {
@@ -268,15 +268,15 @@ private:
 
     if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) {
       // Account for AHRS sensor rotation
-      gtsam::Rot3 R_target_sensor = tfs.target_T_ahrs.rotation();
-      gtsam::Rot3 R_world_sensor = toGtsam(initial_ahrs_->orientation);
-      gtsam::Rot3 R_world_target_measured = R_world_sensor * R_target_sensor.inverse();
-      yaw = R_world_target_measured.yaw() + params_.ahrs.mag_declination_radians;
+      gtsam::Rot3 target_R_ahrs = tfs.target_T_ahrs.rotation();
+      gtsam::Rot3 map_R_ahrs = toGtsam(initial_ahrs_->orientation);
+      gtsam::Rot3 map_R_target_measured = map_R_ahrs * target_R_ahrs.inverse();
+      yaw = map_R_target_measured.yaw() + params_.ahrs.mag_declination_radians;
     } else if (params_.mag.enable_mag || params_.mag.enable_mag_init_only) {
       // Account for magnetometer rotation
-      gtsam::Rot3 R_target_sensor = tfs.target_T_mag.rotation();
+      gtsam::Rot3 target_R_mag = tfs.target_T_mag.rotation();
       gtsam::Vector3 mag_sensor = toGtsam(initial_mag_->magnetic_field);
-      gtsam::Vector3 mag_target = R_target_sensor * mag_sensor;
+      gtsam::Vector3 mag_target = target_R_mag * mag_sensor;
 
       // Use the tilt-compensated magnetic vector
       gtsam::Rot3 R_rp = gtsam::Rot3::Ypr(0.0, pitch, roll);
@@ -295,61 +295,61 @@ private:
 
   /**
    * @brief Computes initial position using GPS and depth with lever arm compensation.
-   * @param initial_orientation_target The computed initial rotation.
+   * @param map_R_target The computed initial rotation.
    * @param tfs SE(3) sensor transforms for lever arm compensation.
-   * @return Initial position of the target frame in the world frame.
+   * @return Initial position of the target frame in the map frame.
    */
   gtsam::Point3 computeInitialPosition(
-    const gtsam::Rot3 & initial_orientation_target,
+    const gtsam::Rot3 & map_R_target,
     const TfBundle & tfs)
   {
-    gtsam::Point3 P_world_base(
+    gtsam::Point3 map_p_base(
       params_.prior.parameter_priors.initial_position[0],
       params_.prior.parameter_priors.initial_position[1],
       params_.prior.parameter_priors.initial_position[2]);
 
     if (params_.prior.use_parameter_priors) {
       gtsam::Point3 target_p_base = tfs.target_T_base.translation();
-      return P_world_base - initial_orientation_target.rotate(target_p_base);
+      return map_p_base - map_R_target.rotate(target_p_base);
     }
 
-    gtsam::Point3 initial_position_target = P_world_base;
+    gtsam::Point3 map_p_target = map_p_base;
     if (params_.gps.enable_gps || params_.gps.enable_gps_init_only) {
       // Account for GPS lever arm
-      gtsam::Point3 world_p_target_gps = initial_orientation_target.rotate(
+      gtsam::Point3 map_p_target_gps = map_R_target.rotate(
         tfs.target_T_gps.translation());
-      initial_position_target = toGtsam(initial_gps_->pose.pose.position) - world_p_target_gps;
+      map_p_target = toGtsam(initial_gps_->pose.pose.position) - map_p_target_gps;
     }
 
     // Account for depth lever arm
-    gtsam::Point3 world_t_target_depth =
-      initial_orientation_target.rotate(tfs.target_T_depth.translation());
-    initial_position_target.z() = initial_depth_->pose.pose.position.z - world_t_target_depth.z();
+    gtsam::Point3 map_p_target_depth =
+      map_R_target.rotate(tfs.target_T_depth.translation());
+    map_p_target.z() = initial_depth_->pose.pose.position.z - map_p_target_depth.z();
 
-    return initial_position_target;
+    return map_p_target;
   }
 
   /**
-   * @brief Computes initial world-frame velocity from DVL body-frame measurements.
-   * @param initial_orientation_target The computed initial rotation.
+   * @brief Computes initial map-frame velocity from DVL body-frame measurements.
+   * @param map_R_target The computed initial rotation.
    * @param tfs SE(3) sensor transforms for lever arm compensation.
-   * @return Initial velocity of the target frame in the world frame.
+   * @return Initial velocity of the target frame in the map frame.
    */
   gtsam::Vector3 computeInitialVelocity(
-    const gtsam::Rot3 & initial_orientation_target,
+    const gtsam::Rot3 & map_R_target,
     const TfBundle & tfs)
   {
     if (params_.prior.use_parameter_priors) {
-      gtsam::Vector3 v_base = toGtsam(params_.prior.parameter_priors.initial_velocity);
-      gtsam::Vector3 v_target = tfs.target_T_base.rotation().rotate(v_base);
-      return initial_orientation_target.rotate(v_target);
+      gtsam::Vector3 base_v_base = toGtsam(params_.prior.parameter_priors.initial_velocity);
+      gtsam::Vector3 target_v_target = tfs.target_T_base.rotation().rotate(base_v_base);
+      return map_R_target.rotate(target_v_target);
     }
 
     // Account for DVL lever arm
     gtsam::Vector3 target_v_dvl = tfs.target_T_dvl.rotation() * toGtsam(
       initial_dvl_->twist.twist.linear);
 
-    return initial_orientation_target.rotate(target_v_dvl);
+    return map_R_target.rotate(target_v_dvl);
   }
 
   /**
