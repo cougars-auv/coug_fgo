@@ -23,13 +23,15 @@ repos:
         exclude: \.md$
       - id: end-of-file-fixer
       - id: mixed-line-ending
+      - id: check-added-large-files
+        args: ["--maxkb=10000"]
       - id: check-yaml
       - id: check-json
+      - id: check-xml
+      - id: check-toml
       - id: check-case-conflict
       - id: check-merge-conflict
       - id: check-symlinks
-      - id: check-added-large-files
-        args: ["--maxkb=10000"]
       - id: detect-private-key
       - id: forbid-submodules
 
@@ -104,14 +106,6 @@ repos:
         name: ament_copyright
         entry: ament_copyright
         language: system
-        exclude: |
-          (?x)^(
-              .*\.json|
-              .*\.yaml|
-              .*\.yml|
-              .*\.xml|
-              .*\.repos|
-              .*\.txt|
-              .*LICENSE|
-              .*/setup\.py
-          )$
+        files: ^ros2_ws/src/
+        types_or: [c++, c, python]
+        exclude: /setup\.py$
