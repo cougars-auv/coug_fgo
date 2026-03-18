@@ -155,5 +155,7 @@ ament_auto_package(
   launch
   config
   params
+  rviz
+  plotjuggler
   USE_SCOPED_HEADER_INSTALL_DIR
 )
