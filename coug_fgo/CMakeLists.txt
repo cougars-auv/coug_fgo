@@ -88,9 +88,6 @@ target_link_libraries(dvl_a50_odom factor_graph_component)
 
 # --- Testing ---
 if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  ament_lint_auto_find_test_dependencies()
-
   find_package(ament_cmake_gtest REQUIRED)
 
   ament_add_gtest(test_ahrs_factor test/test_ahrs_factor.cpp)
