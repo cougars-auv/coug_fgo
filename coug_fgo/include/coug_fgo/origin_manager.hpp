@@ -21,8 +21,9 @@
 
 #pragma once
 
-#include <geodesy/utm.h>
+#include <cmath>
 #include <math.h>
+#include <geodesy/utm.h>
 
 #include <atomic>
 #include <diagnostic_updater/diagnostic_updater.hpp>
