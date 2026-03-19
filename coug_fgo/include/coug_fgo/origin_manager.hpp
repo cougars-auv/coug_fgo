@@ -21,7 +21,6 @@
 
 #pragma once
 
-#include <geodesy/utm.h>
 #include <math.h>
 
 #include <atomic>
@@ -36,6 +35,7 @@
 #include <vector>
 
 #include "coug_fgo/origin_manager_parameters.hpp"
+#include "geodesy/utm.h"  // clang-format fix
 
 namespace coug_fgo {
 
