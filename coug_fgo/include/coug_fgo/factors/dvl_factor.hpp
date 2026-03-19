@@ -30,19 +30,17 @@
 using gtsam::symbol_shorthand::V;  // Velocity (x,y,z)
 using gtsam::symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
 
-namespace coug_fgo::factors
-{
+namespace coug_fgo::factors {
 
 /**
  * @class DvlFactorArm
  * @brief GTSAM factor for DVL velocity measurements with a lever arm.
  */
-class DvlFactorArm : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Vector3>
-{
+class DvlFactorArm : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Vector3> {
   gtsam::Pose3 target_P_sensor_;
   gtsam::Vector3 sensor_v_measured_;
 
-public:
+ public:
   /**
    * @brief Constructor for DvlFactorArm.
    * @param pose_key GTSAM key for the starting AUV pose.
@@ -51,14 +49,11 @@ public:
    * @param measured_velocity_sensor The velocity measurement in the sensor frame.
    * @param noise_model The noise model for the measurement.
    */
-  DvlFactorArm(
-    gtsam::Key pose_key, gtsam::Key vel_key,
-    const gtsam::Pose3 & target_T_sensor,
-    const gtsam::Vector3 & measured_velocity_sensor,
-    const gtsam::SharedNoiseModel & noise_model)
-  : NoiseModelFactor2<gtsam::Pose3, gtsam::Vector3>(noise_model, pose_key, vel_key),
-    sensor_v_measured_(measured_velocity_sensor)
-  {
+  DvlFactorArm(gtsam::Key pose_key, gtsam::Key vel_key, const gtsam::Pose3& target_T_sensor,
+               const gtsam::Vector3& measured_velocity_sensor,
+               const gtsam::SharedNoiseModel& noise_model)
+      : NoiseModelFactor2<gtsam::Pose3, gtsam::Vector3>(noise_model, pose_key, vel_key),
+        sensor_v_measured_(measured_velocity_sensor) {
     target_P_sensor_ = target_T_sensor;
   }
 
@@ -70,18 +65,15 @@ public:
    * @param H_vel Optional Jacobian matrix with respect to velocity.
    * @return The 3D error vector (measured - predicted).
    */
-  gtsam::Vector evaluateError(
-    const gtsam::Pose3 & pose,
-    const gtsam::Vector3 & vel_world,
-    gtsam::OptionalMatrixType H_pose = nullptr,
-    gtsam::OptionalMatrixType H_vel = nullptr) const override
-  {
+  gtsam::Vector evaluateError(const gtsam::Pose3& pose, const gtsam::Vector3& vel_world,
+                              gtsam::OptionalMatrixType H_pose = nullptr,
+                              gtsam::OptionalMatrixType H_vel = nullptr) const override {
     // Predict the velocity measurement
     gtsam::Matrix33 H_unrotate_R = gtsam::Matrix33::Zero();
     gtsam::Matrix33 H_unrotate_v = gtsam::Matrix33::Zero();
 
     gtsam::Vector3 vel_target = pose.rotation().unrotate(
-      vel_world, H_pose ? &H_unrotate_R : nullptr, H_vel ? &H_unrotate_v : nullptr);
+        vel_world, H_pose ? &H_unrotate_R : nullptr, H_vel ? &H_unrotate_v : nullptr);
 
     gtsam::Rot3 R_target_sensor = target_P_sensor_.rotation();
     gtsam::Vector3 predicted_vel_sensor = R_target_sensor.unrotate(vel_target);

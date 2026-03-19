@@ -22,33 +22,30 @@
 #pragma once
 
 #include <atomic>
-#include <memory>
-#include <string>
-
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <dvl_msgs/msg/dvl.hpp>
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
+#include <memory>
 #include <rclcpp/rclcpp.hpp>
+#include <string>
 
 #include "coug_fgo/dvl_a50_twist_parameters.hpp"
 
-namespace coug_fgo
-{
+namespace coug_fgo {
 
 /**
  * @class DvlA50TwistNode
  * @brief ROS 2 node that converts raw DVL velocity data to a twist message.
  */
-class DvlA50TwistNode : public rclcpp::Node
-{
-public:
+class DvlA50TwistNode : public rclcpp::Node {
+ public:
   /**
    * @brief Constructs the node and sets up DVL velocity conversion.
    * @param options The node options.
    */
-  explicit DvlA50TwistNode(const rclcpp::NodeOptions & options);
+  explicit DvlA50TwistNode(const rclcpp::NodeOptions& options);
 
-protected:
+ protected:
   /**
    * @brief Callback for receiving new DVL data.
    * @param msg The incoming DVL message.
@@ -61,13 +58,13 @@ protected:
    * @return The converted TwistWithCovarianceStamped message.
    */
   geometry_msgs::msg::TwistWithCovarianceStamped convertToTwist(
-    const dvl_msgs::msg::DVL::SharedPtr msg);
+      const dvl_msgs::msg::DVL::SharedPtr msg);
 
   /**
    * @brief Diagnostic task to report the status of the DVL data.
    * @param stat The diagnostic status wrapper.
    */
-  void checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper & stat);
+  void checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper& stat);
 
   // --- ROS Interfaces ---
   rclcpp::Subscription<dvl_msgs::msg::DVL>::SharedPtr dvl_sub_;

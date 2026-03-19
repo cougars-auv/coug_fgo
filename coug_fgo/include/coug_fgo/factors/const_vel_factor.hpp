@@ -31,17 +31,15 @@
 using gtsam::symbol_shorthand::V;  // Velocity (x,y,z)
 using gtsam::symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
 
-namespace coug_fgo::factors
-{
+namespace coug_fgo::factors {
 
 /**
  * @class ConstVelFactor
  * @brief GTSAM factor for enforcing constant body-frame velocity.
  */
-class ConstVelFactor : public gtsam::NoiseModelFactor4<gtsam::Pose3, gtsam::Vector3,
-    gtsam::Pose3, gtsam::Vector3>
-{
-public:
+class ConstVelFactor
+    : public gtsam::NoiseModelFactor4<gtsam::Pose3, gtsam::Vector3, gtsam::Pose3, gtsam::Vector3> {
+ public:
   /**
    * @brief Constructor for ConstVelFactor.
    * @param pose_key1 GTSAM key for the starting pose (state i).
@@ -50,12 +48,10 @@ public:
    * @param vel_key2 GTSAM key for the ending velocity (state j).
    * @param noise_model The noise model for the constraint.
    */
-  ConstVelFactor(
-    gtsam::Key pose_key1, gtsam::Key vel_key1,
-    gtsam::Key pose_key2, gtsam::Key vel_key2,
-    const gtsam::SharedNoiseModel & noise_model)
-  : NoiseModelFactor4<gtsam::Pose3, gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>(
-      noise_model, pose_key1, vel_key1, pose_key2, vel_key2) {}
+  ConstVelFactor(gtsam::Key pose_key1, gtsam::Key vel_key1, gtsam::Key pose_key2,
+                 gtsam::Key vel_key2, const gtsam::SharedNoiseModel& noise_model)
+      : NoiseModelFactor4<gtsam::Pose3, gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>(
+            noise_model, pose_key1, vel_key1, pose_key2, vel_key2) {}
 
   ~ConstVelFactor() override {}
 
@@ -71,25 +67,21 @@ public:
    * @param H4 Optional Jacobian matrix.
    * @return The 3D error vector.
    */
-  gtsam::Vector evaluateError(
-    const gtsam::Pose3 & pose_key1, const gtsam::Vector3 & vel_key1,
-    const gtsam::Pose3 & pose_key2, const gtsam::Vector3 & vel_key2,
-    gtsam::OptionalMatrixType H_pose1 = nullptr,
-    gtsam::OptionalMatrixType H_vel1 = nullptr,
-    gtsam::OptionalMatrixType H_pose2 = nullptr,
-    gtsam::OptionalMatrixType H_vel2 = nullptr) const override
-  {
+  gtsam::Vector evaluateError(const gtsam::Pose3& pose_key1, const gtsam::Vector3& vel_key1,
+                              const gtsam::Pose3& pose_key2, const gtsam::Vector3& vel_key2,
+                              gtsam::OptionalMatrixType H_pose1 = nullptr,
+                              gtsam::OptionalMatrixType H_vel1 = nullptr,
+                              gtsam::OptionalMatrixType H_pose2 = nullptr,
+                              gtsam::OptionalMatrixType H_vel2 = nullptr) const override {
     // Predict the velocity measurements
     gtsam::Matrix33 J_R1_v1 = gtsam::Matrix33::Zero();
     gtsam::Matrix33 J_v1 = gtsam::Matrix33::Zero();
     gtsam::Matrix33 J_R2_v2 = gtsam::Matrix33::Zero();
     gtsam::Matrix33 J_v2 = gtsam::Matrix33::Zero();
-    gtsam::Vector3 v_body1 = pose_key1.rotation().unrotate(
-      vel_key1, H_pose1 ? &J_R1_v1 : nullptr,
-      H_vel1 ? &J_v1 : nullptr);
-    gtsam::Vector3 v_body2 = pose_key2.rotation().unrotate(
-      vel_key2, H_pose2 ? &J_R2_v2 : nullptr,
-      H_vel2 ? &J_v2 : nullptr);
+    gtsam::Vector3 v_body1 = pose_key1.rotation().unrotate(vel_key1, H_pose1 ? &J_R1_v1 : nullptr,
+                                                           H_vel1 ? &J_v1 : nullptr);
+    gtsam::Vector3 v_body2 = pose_key2.rotation().unrotate(vel_key2, H_pose2 ? &J_R2_v2 : nullptr,
+                                                           H_vel2 ? &J_v2 : nullptr);
 
     // 3D velocity difference residual
     gtsam::Vector3 error = v_body1 - v_body2;

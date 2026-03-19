@@ -38,24 +38,24 @@ TEST(DvlLoosePreintFactorArmTest, Jacobians) {
   gtsam::Pose3 target_P_sensor(gtsam::Rot3::Ypr(0.1, -0.1, 0.1), gtsam::Point3(0.5, 0.5, 0.5));
   gtsam::Vector3 measured_translation(1.0, 0.5, -0.2);
 
-  coug_fgo::factors::DvlLoosePreintFactorArm factor(
-    poseIKey, poseJKey, target_P_sensor, measured_translation, model);
+  coug_fgo::factors::DvlLoosePreintFactorArm factor(poseIKey, poseJKey, target_P_sensor,
+                                                    measured_translation, model);
 
   gtsam::Pose3 pose_i(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1.0, 2.0, 4.0));
   gtsam::Pose3 pose_j(gtsam::Rot3::Ypr(-0.2, 0.4, 0.1), gtsam::Point3(2.0, 3.0, 2.5));
 
-  gtsam::Matrix expectedH1 = gtsam::numericalDerivative21<gtsam::Vector, gtsam::Pose3,
-      gtsam::Pose3>(
-    [&](const gtsam::Pose3 & pi, const gtsam::Pose3 & pj) {
-      return factor.evaluateError(pi, pj, nullptr, nullptr);
-    },
-    pose_i, pose_j, 1e-5);
-  gtsam::Matrix expectedH2 = gtsam::numericalDerivative22<gtsam::Vector, gtsam::Pose3,
-      gtsam::Pose3>(
-    [&](const gtsam::Pose3 & pi, const gtsam::Pose3 & pj) {
-      return factor.evaluateError(pi, pj, nullptr, nullptr);
-    },
-    pose_i, pose_j, 1e-5);
+  gtsam::Matrix expectedH1 =
+      gtsam::numericalDerivative21<gtsam::Vector, gtsam::Pose3, gtsam::Pose3>(
+          [&](const gtsam::Pose3& pi, const gtsam::Pose3& pj) {
+            return factor.evaluateError(pi, pj, nullptr, nullptr);
+          },
+          pose_i, pose_j, 1e-5);
+  gtsam::Matrix expectedH2 =
+      gtsam::numericalDerivative22<gtsam::Vector, gtsam::Pose3, gtsam::Pose3>(
+          [&](const gtsam::Pose3& pi, const gtsam::Pose3& pj) {
+            return factor.evaluateError(pi, pj, nullptr, nullptr);
+          },
+          pose_i, pose_j, 1e-5);
 
   gtsam::Matrix actualH1, actualH2;
   factor.evaluateError(pose_i, pose_j, &actualH1, &actualH2);

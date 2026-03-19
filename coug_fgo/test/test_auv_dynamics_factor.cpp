@@ -45,32 +45,35 @@ TEST(AuvDynamicsFactorArmTest, Jacobians) {
   gtsam::Vector3 control_force(2.0, -1.0, 0.5);
   gtsam::Pose3 target_P_sensor(gtsam::Rot3::Ypr(0.1, -0.1, 0.1), gtsam::Point3(0.5, 0.5, 0.5));
 
-  coug_fgo::factors::AuvDynamicsFactorArm factor(
-    poseKey1, velKey1, poseKey2, velKey2, dt, control_force, target_P_sensor,
-    mass, linear_drag, quad_drag, model);
+  coug_fgo::factors::AuvDynamicsFactorArm factor(poseKey1, velKey1, poseKey2, velKey2, dt,
+                                                 control_force, target_P_sensor, mass, linear_drag,
+                                                 quad_drag, model);
 
   gtsam::Pose3 pose1(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1.0, 2.0, 4.0));
   gtsam::Vector3 vel1(1.0, -0.5, 0.2);
   gtsam::Pose3 pose2(gtsam::Rot3::Ypr(0.4, -0.1, 0.2), gtsam::Point3(2.0, 3.0, 4.0));
   gtsam::Vector3 vel2(1.1, -0.4, 0.25);
 
-  auto evalFunc = [&](
-    const gtsam::Pose3 & p1, const gtsam::Vector3 & v1,
-    const gtsam::Pose3 & p2, const gtsam::Vector3 & v2) {
-      return factor.evaluateError(p1, v1, p2, v2, nullptr, nullptr, nullptr, nullptr);
-    };
+  auto evalFunc = [&](const gtsam::Pose3& p1, const gtsam::Vector3& v1, const gtsam::Pose3& p2,
+                      const gtsam::Vector3& v2) {
+    return factor.evaluateError(p1, v1, p2, v2, nullptr, nullptr, nullptr, nullptr);
+  };
 
-  gtsam::Matrix expectedH1 = gtsam::numericalDerivative41<gtsam::Vector, gtsam::Pose3,
-      gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>(evalFunc, pose1, vel1, pose2, vel2, 1e-5);
+  gtsam::Matrix expectedH1 =
+      gtsam::numericalDerivative41<gtsam::Vector, gtsam::Pose3, gtsam::Vector3, gtsam::Pose3,
+                                   gtsam::Vector3>(evalFunc, pose1, vel1, pose2, vel2, 1e-5);
 
-  gtsam::Matrix expectedH2 = gtsam::numericalDerivative42<gtsam::Vector, gtsam::Pose3,
-      gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>(evalFunc, pose1, vel1, pose2, vel2, 1e-5);
+  gtsam::Matrix expectedH2 =
+      gtsam::numericalDerivative42<gtsam::Vector, gtsam::Pose3, gtsam::Vector3, gtsam::Pose3,
+                                   gtsam::Vector3>(evalFunc, pose1, vel1, pose2, vel2, 1e-5);
 
-  gtsam::Matrix expectedH3 = gtsam::numericalDerivative43<gtsam::Vector, gtsam::Pose3,
-      gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>(evalFunc, pose1, vel1, pose2, vel2, 1e-5);
+  gtsam::Matrix expectedH3 =
+      gtsam::numericalDerivative43<gtsam::Vector, gtsam::Pose3, gtsam::Vector3, gtsam::Pose3,
+                                   gtsam::Vector3>(evalFunc, pose1, vel1, pose2, vel2, 1e-5);
 
-  gtsam::Matrix expectedH4 = gtsam::numericalDerivative44<gtsam::Vector, gtsam::Pose3,
-      gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>(evalFunc, pose1, vel1, pose2, vel2, 1e-5);
+  gtsam::Matrix expectedH4 =
+      gtsam::numericalDerivative44<gtsam::Vector, gtsam::Pose3, gtsam::Vector3, gtsam::Pose3,
+                                   gtsam::Vector3>(evalFunc, pose1, vel1, pose2, vel2, 1e-5);
 
   gtsam::Matrix actualH1, actualH2, actualH3, actualH4;
   factor.evaluateError(pose1, vel1, pose2, vel2, &actualH1, &actualH2, &actualH3, &actualH4);

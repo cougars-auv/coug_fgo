@@ -43,18 +43,18 @@ TEST(DvlFactorArmTest, Jacobians) {
   gtsam::Pose3 pose(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1.0, 2.0, 4.0));
   gtsam::Vector3 vel_world(1.5, -0.5, 0.2);
 
-  gtsam::Matrix expectedH1 = gtsam::numericalDerivative21<gtsam::Vector, gtsam::Pose3,
-      gtsam::Vector3>(
-    [&](const gtsam::Pose3 & p, const gtsam::Vector3 & v) {
-      return factor.evaluateError(p, v, nullptr, nullptr);
-    },
-    pose, vel_world, 1e-5);
-  gtsam::Matrix expectedH2 = gtsam::numericalDerivative22<gtsam::Vector, gtsam::Pose3,
-      gtsam::Vector3>(
-    [&](const gtsam::Pose3 & p, const gtsam::Vector3 & v) {
-      return factor.evaluateError(p, v, nullptr, nullptr);
-    },
-    pose, vel_world, 1e-5);
+  gtsam::Matrix expectedH1 =
+      gtsam::numericalDerivative21<gtsam::Vector, gtsam::Pose3, gtsam::Vector3>(
+          [&](const gtsam::Pose3& p, const gtsam::Vector3& v) {
+            return factor.evaluateError(p, v, nullptr, nullptr);
+          },
+          pose, vel_world, 1e-5);
+  gtsam::Matrix expectedH2 =
+      gtsam::numericalDerivative22<gtsam::Vector, gtsam::Pose3, gtsam::Vector3>(
+          [&](const gtsam::Pose3& p, const gtsam::Vector3& v) {
+            return factor.evaluateError(p, v, nullptr, nullptr);
+          },
+          pose, vel_world, 1e-5);
 
   gtsam::Matrix actualH1, actualH2;
   factor.evaluateError(pose, vel_world, &actualH1, &actualH2);

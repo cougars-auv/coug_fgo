@@ -29,19 +29,17 @@
 
 using gtsam::symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
 
-namespace coug_fgo::factors
-{
+namespace coug_fgo::factors {
 
 /**
  * @class DepthFactorArm
  * @brief GTSAM factor for depth measurements (Z-axis) with a lever arm.
  */
-class DepthFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3>
-{
+class DepthFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
   double depth_measured_;
   gtsam::Point3 target_p_sensor_;
 
-public:
+ public:
   /**
    * @brief Constructor for DepthFactorArm.
    * @param pose_key GTSAM key for the AUV pose.
@@ -49,12 +47,9 @@ public:
    * @param target_T_sensor The static transformation from target to sensor.
    * @param noise_model The noise model for the measurement.
    */
-  DepthFactorArm(
-    gtsam::Key pose_key, double measured_depth,
-    const gtsam::Pose3 & target_T_sensor, const gtsam::SharedNoiseModel & noise_model)
-  : NoiseModelFactor1<gtsam::Pose3>(noise_model, pose_key),
-    depth_measured_(measured_depth)
-  {
+  DepthFactorArm(gtsam::Key pose_key, double measured_depth, const gtsam::Pose3& target_T_sensor,
+                 const gtsam::SharedNoiseModel& noise_model)
+      : NoiseModelFactor1<gtsam::Pose3>(noise_model, pose_key), depth_measured_(measured_depth) {
     target_p_sensor_ = target_T_sensor.translation();
   }
 
@@ -64,10 +59,8 @@ public:
    * @param H Optional Jacobian matrix.
    * @return The 1D error vector (measured - predicted).
    */
-  gtsam::Vector evaluateError(
-    const gtsam::Pose3 & pose,
-    gtsam::OptionalMatrixType H = nullptr) const override
-  {
+  gtsam::Vector evaluateError(const gtsam::Pose3& pose,
+                              gtsam::OptionalMatrixType H = nullptr) const override {
     // Predict the depth measurement
     gtsam::Matrix36 H_full = gtsam::Matrix36::Zero();
     gtsam::Point3 p_sensor_est = pose.transformFrom(target_p_sensor_, H ? &H_full : nullptr);

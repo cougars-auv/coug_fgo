@@ -24,24 +24,22 @@
 #include <gtsam/base/Matrix.h>
 #include <gtsam/base/Vector.h>
 #include <gtsam/geometry/Pose3.h>
-#include <gtsam/navigation/ImuBias.h>
 #include <gtsam/inference/Symbol.h>
+#include <gtsam/navigation/ImuBias.h>
 #include <gtsam/nonlinear/NonlinearFactor.h>
 
-using gtsam::symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
 using gtsam::symbol_shorthand::B;  // ImuBias (ax,ay,az,gx,gy,gz)
+using gtsam::symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
 
-namespace coug_fgo::factors
-{
+namespace coug_fgo::factors {
 
 /**
  * @class DvlTightPreintFactorArm
  * @brief GTSAM factor for tightly-coupled preintegrated DVL translation measurements
  * with a lever arm.
  */
-class DvlTightPreintFactorArm : public gtsam::NoiseModelFactor3<gtsam::Pose3, gtsam::Pose3,
-    gtsam::imuBias::ConstantBias>
-{
+class DvlTightPreintFactorArm
+    : public gtsam::NoiseModelFactor3<gtsam::Pose3, gtsam::Pose3, gtsam::imuBias::ConstantBias> {
   gtsam::Pose3 target_P_imu_;
   gtsam::Pose3 target_P_dvl_;
   gtsam::Pose3 imu_P_dvl_;
@@ -49,7 +47,7 @@ class DvlTightPreintFactorArm : public gtsam::NoiseModelFactor3<gtsam::Pose3, gt
   gtsam::Matrix3 dp_ij_dbias_;
   gtsam::Vector3 gyro_bias_hat_;
 
-public:
+ public:
   /**
    * @brief Constructor for DvlTightPreintFactorArm.
    * @param pose_key_i GTSAM key for the starting AUV pose.
@@ -62,20 +60,16 @@ public:
    * @param gyro_bias_hat The gyro bias estimate used during pre-integration.
    * @param noise_model The noise model for the measurement.
    */
-  DvlTightPreintFactorArm(
-    gtsam::Key pose_key_i, gtsam::Key pose_key_j, gtsam::Key bias_key_i,
-    const gtsam::Pose3 & target_T_imu,
-    const gtsam::Pose3 & target_T_dvl,
-    const gtsam::Vector3 & measured_translation,
-    const gtsam::Matrix3 & dp_ij_dbias,
-    const gtsam::Vector3 & gyro_bias_hat,
-    gtsam::SharedNoiseModel noise_model)
-  : gtsam::NoiseModelFactor3<gtsam::Pose3, gtsam::Pose3, gtsam::imuBias::ConstantBias>(
-      noise_model, pose_key_i, pose_key_j, bias_key_i),
-    i_p_j_measured_(measured_translation),
-    dp_ij_dbias_(dp_ij_dbias),
-    gyro_bias_hat_(gyro_bias_hat)
-  {
+  DvlTightPreintFactorArm(gtsam::Key pose_key_i, gtsam::Key pose_key_j, gtsam::Key bias_key_i,
+                          const gtsam::Pose3& target_T_imu, const gtsam::Pose3& target_T_dvl,
+                          const gtsam::Vector3& measured_translation,
+                          const gtsam::Matrix3& dp_ij_dbias, const gtsam::Vector3& gyro_bias_hat,
+                          gtsam::SharedNoiseModel noise_model)
+      : gtsam::NoiseModelFactor3<gtsam::Pose3, gtsam::Pose3, gtsam::imuBias::ConstantBias>(
+            noise_model, pose_key_i, pose_key_j, bias_key_i),
+        i_p_j_measured_(measured_translation),
+        dp_ij_dbias_(dp_ij_dbias),
+        gyro_bias_hat_(gyro_bias_hat) {
     target_P_imu_ = target_T_imu;
     target_P_dvl_ = target_T_dvl;
     imu_P_dvl_ = target_P_imu_.between(target_P_dvl_);
@@ -91,14 +85,11 @@ public:
    * @param H_bias_i Optional Jacobian matrix with respect to bias_i.
    * @return The 3D error vector (predicted - measured).
    */
-  gtsam::Vector evaluateError(
-    const gtsam::Pose3 & pose_i,
-    const gtsam::Pose3 & pose_j,
-    const gtsam::imuBias::ConstantBias & bias_i,
-    gtsam::OptionalMatrixType H_pose_i = nullptr,
-    gtsam::OptionalMatrixType H_pose_j = nullptr,
-    gtsam::OptionalMatrixType H_bias_i = nullptr) const override
-  {
+  gtsam::Vector evaluateError(const gtsam::Pose3& pose_i, const gtsam::Pose3& pose_j,
+                              const gtsam::imuBias::ConstantBias& bias_i,
+                              gtsam::OptionalMatrixType H_pose_i = nullptr,
+                              gtsam::OptionalMatrixType H_pose_j = nullptr,
+                              gtsam::OptionalMatrixType H_bias_i = nullptr) const override {
     gtsam::Vector3 gyro_bias_update = bias_i.gyroscope() - gyro_bias_hat_;
     gtsam::Vector3 corrected_i_p_j = i_p_j_measured_ + (dp_ij_dbias_ * gyro_bias_update);
 
@@ -114,10 +105,8 @@ public:
 
     gtsam::Matrix36 H_pij_posei = gtsam::Matrix36::Zero();
     gtsam::Matrix33 H_pij_tj = gtsam::Matrix33::Zero();
-    gtsam::Point3 p_ij = pose_imu_i.transformTo(
-      t_j,
-      H_pose_i ? &H_pij_posei : nullptr,
-      H_pose_j ? &H_pij_tj : nullptr);
+    gtsam::Point3 p_ij = pose_imu_i.transformTo(t_j, H_pose_i ? &H_pij_posei : nullptr,
+                                                H_pose_j ? &H_pij_tj : nullptr);
 
     gtsam::Point3 p_ID = imu_P_dvl_.translation();
     gtsam::Vector3 pred_p_ij = p_ij - p_ID;

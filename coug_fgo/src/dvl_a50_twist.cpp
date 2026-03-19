@@ -22,29 +22,25 @@
 #include "coug_fgo/dvl_a50_twist.hpp"
 
 #include <cmath>
-
 #include <rclcpp_components/register_node_macro.hpp>
 
-namespace coug_fgo
-{
+namespace coug_fgo {
 
-DvlA50TwistNode::DvlA50TwistNode(const rclcpp::NodeOptions & options)
-: Node("dvl_a50_twist_node", options),
-  diagnostic_updater_(this)
-{
+DvlA50TwistNode::DvlA50TwistNode(const rclcpp::NodeOptions& options)
+    : Node("dvl_a50_twist_node", options), diagnostic_updater_(this) {
   RCLCPP_INFO(get_logger(), "Starting DVL A50 Twist Node...");
 
-  param_listener_ = std::make_shared<dvl_a50_twist_node::ParamListener>(
-    get_node_parameters_interface());
+  param_listener_ =
+      std::make_shared<dvl_a50_twist_node::ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
 
   // --- ROS Interfaces ---
   dvl_sub_ = create_subscription<dvl_msgs::msg::DVL>(
-    params_.input_topic, rclcpp::SensorDataQoS(),
-    std::bind(&DvlA50TwistNode::dvlCallback, this, std::placeholders::_1));
+      params_.input_topic, rclcpp::SensorDataQoS(),
+      std::bind(&DvlA50TwistNode::dvlCallback, this, std::placeholders::_1));
 
   twist_pub_ = create_publisher<geometry_msgs::msg::TwistWithCovarianceStamped>(
-    params_.output_topic, rclcpp::SystemDefaultsQoS());
+      params_.output_topic, rclcpp::SystemDefaultsQoS());
 
   // --- ROS Diagnostics ---
   if (params_.publish_diagnostics) {
@@ -60,8 +56,7 @@ DvlA50TwistNode::DvlA50TwistNode(const rclcpp::NodeOptions & options)
   RCLCPP_INFO(get_logger(), "Startup complete! Waiting for DVL data...");
 }
 
-void DvlA50TwistNode::dvlCallback(const dvl_msgs::msg::DVL::SharedPtr msg)
-{
+void DvlA50TwistNode::dvlCallback(const dvl_msgs::msg::DVL::SharedPtr msg) {
   last_dvl_time_.store(this->get_clock()->now().seconds());
   last_velocity_valid_.store(msg->velocity_valid);
 
@@ -69,16 +64,14 @@ void DvlA50TwistNode::dvlCallback(const dvl_msgs::msg::DVL::SharedPtr msg)
     double current_time = get_clock()->now().seconds();
     double cycle_period = 1.0 / params_.dropout_frequency;
     if (fmod(current_time, cycle_period) < params_.dropout_duration) {
-      RCLCPP_WARN_THROTTLE(
-        get_logger(), *get_clock(), (int)(cycle_period * 1000),
-        "Simulating DVL dropout...");
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), (int)(cycle_period * 1000),
+                           "Simulating DVL dropout...");
       return;
     }
   }
 
   if (!msg->velocity_valid) {
-    RCLCPP_WARN_THROTTLE(
-      get_logger(), *get_clock(), 1000, "Received invalid DVL velocity.");
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Received invalid DVL velocity.");
     return;
   }
 
@@ -87,8 +80,7 @@ void DvlA50TwistNode::dvlCallback(const dvl_msgs::msg::DVL::SharedPtr msg)
 }
 
 geometry_msgs::msg::TwistWithCovarianceStamped DvlA50TwistNode::convertToTwist(
-  const dvl_msgs::msg::DVL::SharedPtr msg)
-{
+    const dvl_msgs::msg::DVL::SharedPtr msg) {
   geometry_msgs::msg::TwistWithCovarianceStamped twist_msg;
   if (params_.use_parameter_frame) {
     twist_msg.header.frame_id = params_.parameter_frame;
@@ -125,15 +117,14 @@ geometry_msgs::msg::TwistWithCovarianceStamped DvlA50TwistNode::convertToTwist(
   return twist_msg;
 }
 
-void DvlA50TwistNode::checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper & stat)
-{
+void DvlA50TwistNode::checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper& stat) {
   stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "DVL data acquired.");
 
   stat.add("Velocity Valid", last_velocity_valid_.load());
 
-  double time_since =
-    (last_dvl_time_.load() > 0.0) ?
-    (this->get_clock()->now().seconds() - last_dvl_time_.load()) : -1.0;
+  double time_since = (last_dvl_time_.load() > 0.0)
+                          ? (this->get_clock()->now().seconds() - last_dvl_time_.load())
+                          : -1.0;
   stat.add("Time Since Last (s)", time_since);
 
   if (time_since > params_.diagnostic_timeout || last_dvl_time_.load() == 0.0) {

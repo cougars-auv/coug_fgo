@@ -21,39 +21,36 @@
 
 #pragma once
 
-#include <math.h>
 #include <geodesy/utm.h>
+#include <math.h>
 
 #include <atomic>
-#include <string>
-#include <vector>
+#include <diagnostic_updater/diagnostic_updater.hpp>
 #include <memory>
-
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
-#include <sensor_msgs/msg/nav_sat_fix.hpp>
 #include <sensor_msgs/msg/imu.hpp>
-#include <diagnostic_updater/diagnostic_updater.hpp>
+#include <sensor_msgs/msg/nav_sat_fix.hpp>
+#include <string>
+#include <vector>
 
 #include "coug_fgo/origin_manager_parameters.hpp"
 
-namespace coug_fgo
-{
+namespace coug_fgo {
 
 /**
  * @class OriginManagerNode
  * @brief ROS 2 node for AUV fleet origin management.
  */
-class OriginManagerNode : public rclcpp::Node
-{
-public:
+class OriginManagerNode : public rclcpp::Node {
+ public:
   /**
    * @brief Constructs the node and sets up GPS origin management.
    * @param options The node options.
    */
-  explicit OriginManagerNode(const rclcpp::NodeOptions & options);
+  explicit OriginManagerNode(const rclcpp::NodeOptions& options);
 
-protected:
+ protected:
   // --- Logic ---
   /**
    * @brief Callback for incoming NavSatFix messages.
@@ -73,9 +70,8 @@ protected:
    * @param odom_msg The output Odometry message.
    * @return True if conversion was successful, false otherwise.
    */
-  bool convertToEnu(
-    const sensor_msgs::msg::NavSatFix::SharedPtr & msg,
-    nav_msgs::msg::Odometry & odom_msg);
+  bool convertToEnu(const sensor_msgs::msg::NavSatFix::SharedPtr& msg,
+                    nav_msgs::msg::Odometry& odom_msg);
 
   /**
    * @brief Callback for incoming IMU/AHRS messages.
@@ -88,13 +84,13 @@ protected:
    * @brief Diagnostic task to report the status of the GPS origin.
    * @param stat The diagnostic status wrapper.
    */
-  void checkOriginStatus(diagnostic_updater::DiagnosticStatusWrapper & stat);
+  void checkOriginStatus(diagnostic_updater::DiagnosticStatusWrapper& stat);
 
   /**
    * @brief Diagnostic task to report the status of the GPS fix.
    * @param stat The diagnostic status wrapper.
    */
-  void checkNavSatFix(diagnostic_updater::DiagnosticStatusWrapper & stat);
+  void checkNavSatFix(diagnostic_updater::DiagnosticStatusWrapper& stat);
 
   // --- State ---
   sensor_msgs::msg::NavSatFix origin_navsat_;

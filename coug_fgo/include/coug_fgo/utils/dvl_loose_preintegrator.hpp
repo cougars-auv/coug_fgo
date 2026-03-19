@@ -14,7 +14,8 @@
 
 /**
  * @file dvl_loose_preintegrator.hpp
- * @brief Utility for preintegrating loosely-coupled DVL velocity measurements into relative translation.
+ * @brief Utility for preintegrating loosely-coupled DVL velocity measurements into relative
+ * translation.
  * @author Nelson Durrant
  * @date Jan 2026
  */
@@ -26,27 +27,25 @@
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/geometry/Rot3.h>
 
-namespace coug_fgo::utils
-{
+namespace coug_fgo::utils {
 
 /**
  * @class DvlLoosePreintegrator
- * @brief Utility for preintegrating loosely-coupled DVL velocity measurements into relative translation.
+ * @brief Utility for preintegrating loosely-coupled DVL velocity measurements into relative
+ * translation.
  */
-class DvlLoosePreintegrator
-{
-public:
+class DvlLoosePreintegrator {
+ public:
   /**
    * @brief Constructor for DvlLoosePreintegrator.
    */
-  DvlLoosePreintegrator() {reset(gtsam::Rot3());}
+  DvlLoosePreintegrator() { reset(gtsam::Rot3()); }
 
   /**
    * @brief Resets the preintegrator state.
    * @param initial_orientation The orientation at the start of the integration period.
    */
-  void reset(const gtsam::Rot3 & initial_orientation)
-  {
+  void reset(const gtsam::Rot3& initial_orientation) {
     world_R_i_ = initial_orientation;
     i_p_k_ = gtsam::Vector3::Zero();
     covariance_ = gtsam::Matrix3::Zero();
@@ -59,11 +58,9 @@ public:
    * @param dt The time delta since the last measurement.
    * @param measured_cov The measurement noise covariance.
    */
-  void integrateMeasurement(
-    const gtsam::Vector3 & measured_vel,
-    const gtsam::Rot3 & measured_orientation, double dt,
-    const gtsam::Matrix3 & measured_cov)
-  {
+  void integrateMeasurement(const gtsam::Vector3& measured_vel,
+                            const gtsam::Rot3& measured_orientation, double dt,
+                            const gtsam::Matrix3& measured_cov) {
     // Relative rotation from the integration start frame
     gtsam::Rot3 i_R_k = world_R_i_.inverse() * measured_orientation;
 
@@ -80,15 +77,15 @@ public:
    * @brief Gets the preintegrated translation delta.
    * @return The translation delta in the starting frame.
    */
-  gtsam::Vector3 delta() const {return i_p_k_;}
+  gtsam::Vector3 delta() const { return i_p_k_; }
 
   /**
    * @brief Gets the accumulated translation covariance.
    * @return The 3x3 covariance matrix.
    */
-  gtsam::Matrix3 covariance() const {return covariance_;}
+  gtsam::Matrix3 covariance() const { return covariance_; }
 
-private:
+ private:
   gtsam::Rot3 world_R_i_;
   gtsam::Vector3 i_p_k_;
   gtsam::Matrix3 covariance_;

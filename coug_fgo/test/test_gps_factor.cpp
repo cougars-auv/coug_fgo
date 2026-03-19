@@ -42,8 +42,7 @@ TEST(Gps2dFactorArmTest, Jacobians) {
   gtsam::Pose3 pose(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1.0, 2.0, 4.0));
 
   gtsam::Matrix expectedH = gtsam::numericalDerivative11<gtsam::Vector, gtsam::Pose3>(
-    [&](const gtsam::Pose3 & p) {return factor.evaluateError(p, nullptr);},
-    pose, 1e-5);
+      [&](const gtsam::Pose3& p) { return factor.evaluateError(p, nullptr); }, pose, 1e-5);
 
   gtsam::Matrix actualH;
   factor.evaluateError(pose, &actualH);

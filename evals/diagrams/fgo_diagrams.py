@@ -118,7 +118,7 @@ for i in range(4):
 
         pgm.add_node(
             f"imu{i}",
-            f"$f^\\mathcal{{I}}_{{{i}{i+1}}}$",
+            f"$f^\\mathcal{{I}}_{{{i}{i + 1}}}$",
             mid_x,
             2,
             fixed=True,
@@ -128,9 +128,9 @@ for i in range(4):
         pgm.add_edge(f"x{i}", f"imu{i}")
         pgm.add_edge(f"v{i}", f"imu{i}")
         pgm.add_edge(f"b{i}", f"imu{i}")
-        pgm.add_edge(f"imu{i}", f"x{i+1}")
-        pgm.add_edge(f"imu{i}", f"v{i+1}")
-        pgm.add_edge(f"imu{i}", f"b{i+1}")
+        pgm.add_edge(f"imu{i}", f"x{i + 1}")
+        pgm.add_edge(f"imu{i}", f"v{i + 1}")
+        pgm.add_edge(f"imu{i}", f"b{i + 1}")
 
 x_pos_gps = start_x + (2 * col_spacing)
 pgm.add_node(
@@ -180,7 +180,7 @@ for i in range(4):
 
         pgm_preint_loose.add_node(
             f"dvlb{i}",
-            f"$f^\\mathcal{{D}}_{{{i}{i+1}}}$",
+            f"$f^\\mathcal{{D}}_{{{i}{i + 1}}}$",
             mid_x,
             3,
             fixed=True,
@@ -188,7 +188,7 @@ for i in range(4):
             offset=[0, 3],
         )
         pgm_preint_loose.add_edge(f"x{i}", f"dvlb{i}")
-        pgm_preint_loose.add_edge(f"dvlb{i}", f"x{i+1}")
+        pgm_preint_loose.add_edge(f"dvlb{i}", f"x{i + 1}")
 
 pgm_preint_loose.render()
 pgm_preint_loose.figure.savefig(
@@ -208,7 +208,7 @@ for i in range(4):
 
         pgm_preint_tight.add_node(
             f"dvlb{i}",
-            f"$f^\\mathcal{{D}}_{{{i}{i+1}}}$",
+            f"$f^\\mathcal{{D}}_{{{i}{i + 1}}}$",
             mid_x,
             2.5,
             fixed=True,
@@ -216,7 +216,7 @@ for i in range(4):
             offset=[0, 5],
         )
         pgm_preint_tight.add_edge(f"x{i}", f"dvlb{i}")
-        pgm_preint_tight.add_edge(f"dvlb{i}", f"x{i+1}")
+        pgm_preint_tight.add_edge(f"dvlb{i}", f"x{i + 1}")
         pgm_preint_tight.add_edge(f"b{i}", f"dvlb{i}")
 
 pgm_preint_tight.render()
@@ -252,7 +252,7 @@ for i in range(4):
 
         pgm_dynamics.add_node(
             f"dynamics{i}",
-            f"$f^\\mathcal{{M}}_{{{i}{i+1}}}$",
+            f"$f^\\mathcal{{M}}_{{{i}{i + 1}}}$",
             mid_x,
             2.5,
             fixed=True,
@@ -260,9 +260,9 @@ for i in range(4):
             offset=[0, 5],
         )
         pgm_dynamics.add_edge(f"x{i}", f"dynamics{i}")
-        pgm_dynamics.add_edge(f"dynamics{i}", f"x{i+1}")
+        pgm_dynamics.add_edge(f"dynamics{i}", f"x{i + 1}")
         pgm_dynamics.add_edge(f"v{i}", f"dynamics{i}")
-        pgm_dynamics.add_edge(f"v{i+1}", f"dynamics{i}")
+        pgm_dynamics.add_edge(f"v{i + 1}", f"dynamics{i}")
 
 pgm_dynamics.render()
 pgm_dynamics.figure.savefig(OUTPUT_DIR / "fgo_dynamics.pdf", bbox_inches="tight")

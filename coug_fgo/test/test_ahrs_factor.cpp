@@ -38,14 +38,13 @@ TEST(AhrsYawFactorArmTest, Jacobians) {
   gtsam::Rot3 measured_attitude = gtsam::Rot3::Ypr(0.5, 0.1, -0.1);
   double magnetic_declination = 0.0;
 
-  coug_fgo::factors::AhrsYawFactorArm factor(
-    poseKey, measured_attitude, target_R_sensor, magnetic_declination, model);
+  coug_fgo::factors::AhrsYawFactorArm factor(poseKey, measured_attitude, target_R_sensor,
+                                             magnetic_declination, model);
 
   gtsam::Pose3 pose(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1.0, 2.0, 4.0));
 
   gtsam::Matrix expectedH = gtsam::numericalDerivative11<gtsam::Vector, gtsam::Pose3>(
-    [&](const gtsam::Pose3 & p) {return factor.evaluateError(p, nullptr);},
-    pose, 1e-5);
+      [&](const gtsam::Pose3& p) { return factor.evaluateError(p, nullptr); }, pose, 1e-5);
 
   gtsam::Matrix actualH;
   factor.evaluateError(pose, &actualH);

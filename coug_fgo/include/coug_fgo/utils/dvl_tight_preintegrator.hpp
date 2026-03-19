@@ -14,7 +14,8 @@
 
 /**
  * @file dvl_tight_preintegrator.hpp
- * @brief Utility for preintegrating tightly-coupled DVL velocity measurements into relative translation.
+ * @brief Utility for preintegrating tightly-coupled DVL velocity measurements into relative
+ * translation.
  * @author Nelson Durrant
  * @date Jan 2026
  */
@@ -26,26 +27,24 @@
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/geometry/Rot3.h>
 
-namespace coug_fgo::utils
-{
+namespace coug_fgo::utils {
 
 /**
  * @class DvlTightPreintegrator
- * @brief Utility for preintegrating tightly-coupled DVL velocity measurements into relative translation.
+ * @brief Utility for preintegrating tightly-coupled DVL velocity measurements into relative
+ * translation.
  */
-class DvlTightPreintegrator
-{
-public:
+class DvlTightPreintegrator {
+ public:
   /**
    * @brief Constructor for DvlTightPreintegrator.
    */
-  DvlTightPreintegrator() {reset();}
+  DvlTightPreintegrator() { reset(); }
 
   /**
    * @brief Resets the preintegrator state.
    */
-  void reset()
-  {
+  void reset() {
     i_p_j_ = gtsam::Vector3::Zero();
     covariance_ = gtsam::Matrix3::Zero();
     dp_ij_dbias_ = gtsam::Matrix3::Zero();
@@ -61,15 +60,10 @@ public:
    * @param rot_cov_k Current rotation covariance from the IMU preintegrator at step k.
    * @param J_bg_k Jacobian of delta_R_ik w.r.t. the gyro bias (from IMU preintegrator).
    */
-  void integrateMeasurement(
-    const gtsam::Vector3 & measured_vel,
-    const gtsam::Rot3 & delta_R_ik,
-    const gtsam::Rot3 & imu_R_dvl,
-    double dt,
-    const gtsam::Matrix3 & measured_cov,
-    const gtsam::Matrix3 & rot_cov_k,
-    const gtsam::Matrix3 & J_bg_k)
-  {
+  void integrateMeasurement(const gtsam::Vector3& measured_vel, const gtsam::Rot3& delta_R_ik,
+                            const gtsam::Rot3& imu_R_dvl, double dt,
+                            const gtsam::Matrix3& measured_cov, const gtsam::Matrix3& rot_cov_k,
+                            const gtsam::Matrix3& J_bg_k) {
     // Calculate velocity in the IMU frame at time k
     gtsam::Vector3 v_Ik = imu_R_dvl.rotate(measured_vel);
 
@@ -85,8 +79,8 @@ public:
     gtsam::Matrix3 J_rot = -delta_R_ik.matrix() * gtsam::skewSymmetric(v_Ik) * dt;
 
     // Propagate combined DVL and Gyroscope uncertainty
-    covariance_ += (J_vel * measured_cov * J_vel.transpose()) +
-      (J_rot * rot_cov_k * J_rot.transpose());
+    covariance_ +=
+        (J_vel * measured_cov * J_vel.transpose()) + (J_rot * rot_cov_k * J_rot.transpose());
 
     // Accumulate first-order Jacobian w.r.t Gyro Bias
     dp_ij_dbias_ += J_rot * J_bg_k;
@@ -96,21 +90,21 @@ public:
    * @brief Gets the preintegrated translation delta.
    * @return The translation delta in the IMU frame at the start of the interval (i).
    */
-  gtsam::Vector3 delta() const {return i_p_j_;}
+  gtsam::Vector3 delta() const { return i_p_j_; }
 
   /**
    * @brief Gets the accumulated translation covariance.
    * @return The 3x3 covariance matrix.
    */
-  gtsam::Matrix3 covariance() const {return covariance_;}
+  gtsam::Matrix3 covariance() const { return covariance_; }
 
   /**
    * @brief Gets the first-order derivative of the preintegrated measurement w.r.t gyro bias.
    * @return The 3x3 Jacobian matrix.
    */
-  gtsam::Matrix3 preintMeasDerivativeWrtBias() const {return dp_ij_dbias_;}
+  gtsam::Matrix3 preintMeasDerivativeWrtBias() const { return dp_ij_dbias_; }
 
-private:
+ private:
   gtsam::Vector3 i_p_j_;
   gtsam::Matrix3 covariance_;
   gtsam::Matrix3 dp_ij_dbias_;

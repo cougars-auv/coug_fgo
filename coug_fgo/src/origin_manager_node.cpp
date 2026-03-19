@@ -21,10 +21,10 @@
 
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
+
 #include "coug_fgo/origin_manager.hpp"
 
-int main(int argc, char * argv[])
-{
+int main(int argc, char* argv[]) {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<coug_fgo::OriginManagerNode>(rclcpp::NodeOptions());
   rclcpp::executors::MultiThreadedExecutor executor;

@@ -29,20 +29,18 @@
 
 using gtsam::symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
 
-namespace coug_fgo::factors
-{
+namespace coug_fgo::factors {
 
 /**
  * @class DvlLoosePreintFactorArm
  * @brief GTSAM factor for loosely-coupled preintegrated DVL translation measurements
  * with a lever arm.
  */
-class DvlLoosePreintFactorArm : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>
-{
+class DvlLoosePreintFactorArm : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3> {
   gtsam::Pose3 target_P_sensor_;
   gtsam::Vector3 i_p_j_measured_;
 
-public:
+ public:
   /**
    * @brief Constructor for DvlLoosePreintFactorArm.
    * @param pose_key_i GTSAM key for the starting AUV pose.
@@ -51,14 +49,12 @@ public:
    * @param measured_translation The preintegrated translation measurement.
    * @param noise_model The noise model for the measurement.
    */
-  DvlLoosePreintFactorArm(
-    gtsam::Key pose_key_i, gtsam::Key pose_key_j,
-    const gtsam::Pose3 & target_T_sensor,
-    const gtsam::Vector3 & measured_translation,
-    gtsam::SharedNoiseModel noise_model)
-  : gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>(noise_model, pose_key_i, pose_key_j),
-    i_p_j_measured_(measured_translation)
-  {
+  DvlLoosePreintFactorArm(gtsam::Key pose_key_i, gtsam::Key pose_key_j,
+                          const gtsam::Pose3& target_T_sensor,
+                          const gtsam::Vector3& measured_translation,
+                          gtsam::SharedNoiseModel noise_model)
+      : gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>(noise_model, pose_key_i, pose_key_j),
+        i_p_j_measured_(measured_translation) {
     target_P_sensor_ = target_T_sensor;
   }
 
@@ -70,27 +66,23 @@ public:
    * @param H_pose_j Optional Jacobian matrix with respect to pose_j.
    * @return The 3D error vector (measured - predicted).
    */
-  gtsam::Vector evaluateError(
-    const gtsam::Pose3 & pose_i,
-    const gtsam::Pose3 & pose_j,
-    gtsam::OptionalMatrixType H_pose_i = nullptr,
-    gtsam::OptionalMatrixType H_pose_j = nullptr) const override
-  {
+  gtsam::Vector evaluateError(const gtsam::Pose3& pose_i, const gtsam::Pose3& pose_j,
+                              gtsam::OptionalMatrixType H_pose_i = nullptr,
+                              gtsam::OptionalMatrixType H_pose_j = nullptr) const override {
     // Predict the translation measurement
     gtsam::Matrix66 H_posei_compose, H_posej_compose;
     gtsam::Pose3 pose_dvl_i =
-      pose_i.compose(target_P_sensor_, H_pose_i ? &H_posei_compose : nullptr);
+        pose_i.compose(target_P_sensor_, H_pose_i ? &H_posei_compose : nullptr);
     gtsam::Pose3 pose_dvl_j =
-      pose_j.compose(target_P_sensor_, H_pose_j ? &H_posej_compose : nullptr);
+        pose_j.compose(target_P_sensor_, H_pose_j ? &H_posej_compose : nullptr);
 
     gtsam::Matrix36 H_tj_posej = gtsam::Matrix36::Zero();
     gtsam::Point3 t_j = pose_dvl_j.translation(H_pose_j ? &H_tj_posej : nullptr);
 
     gtsam::Matrix36 H_pij_posei = gtsam::Matrix36::Zero();
     gtsam::Matrix33 H_pij_tj = gtsam::Matrix33::Zero();
-    gtsam::Point3 p_ij = pose_dvl_i.transformTo(
-      t_j, H_pose_i ? &H_pij_posei : nullptr,
-      H_pose_j ? &H_pij_tj : nullptr);
+    gtsam::Point3 p_ij = pose_dvl_i.transformTo(t_j, H_pose_i ? &H_pij_posei : nullptr,
+                                                H_pose_j ? &H_pij_tj : nullptr);
 
     // 3D translation residual
     gtsam::Vector3 error = p_ij - i_p_j_measured_;

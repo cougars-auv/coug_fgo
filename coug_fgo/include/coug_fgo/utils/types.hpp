@@ -24,23 +24,20 @@
 #include <gtsam/geometry/Pose3.h>
 
 #include <deque>
-#include <memory>
-
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/wrench_stamped.hpp>
+#include <memory>
 #include <nav_msgs/msg/odometry.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/magnetic_field.hpp>
 
-namespace coug_fgo::utils
-{
+namespace coug_fgo::utils {
 
 /**
  * @struct TfBundle
  * @brief Container for TF sensor transformations.
  */
-struct TfBundle
-{
+struct TfBundle {
   gtsam::Pose3 target_T_imu;
   gtsam::Pose3 target_T_gps;
   gtsam::Pose3 target_T_depth;
@@ -55,8 +52,7 @@ struct TfBundle
  * @struct QueueBundle
  * @brief Container for drained sensor message deques.
  */
-struct QueueBundle
-{
+struct QueueBundle {
   std::deque<sensor_msgs::msg::Imu::SharedPtr> imu;
   std::deque<nav_msgs::msg::Odometry::SharedPtr> gps;
   std::deque<nav_msgs::msg::Odometry::SharedPtr> depth;

@@ -22,21 +22,17 @@
 #include "coug_fgo/dvl_a50_odom.hpp"
 
 #include <cmath>
-
 #include <rclcpp_components/register_node_macro.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
-namespace coug_fgo
-{
+namespace coug_fgo {
 
-DvlA50OdomNode::DvlA50OdomNode(const rclcpp::NodeOptions & options)
-: Node("dvl_a50_odom_node", options),
-  diagnostic_updater_(this)
-{
+DvlA50OdomNode::DvlA50OdomNode(const rclcpp::NodeOptions& options)
+    : Node("dvl_a50_odom_node", options), diagnostic_updater_(this) {
   RCLCPP_INFO(get_logger(), "Starting DVL A50 Odom Node...");
 
-  param_listener_ = std::make_shared<dvl_a50_odom_node::ParamListener>(
-    get_node_parameters_interface());
+  param_listener_ =
+      std::make_shared<dvl_a50_odom_node::ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
 
   // --- ROS Interfaces ---
@@ -45,11 +41,11 @@ DvlA50OdomNode::DvlA50OdomNode(const rclcpp::NodeOptions & options)
   tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
   dvl_sub_ = create_subscription<dvl_msgs::msg::DVLDR>(
-    params_.input_topic, rclcpp::SensorDataQoS(),
-    std::bind(&DvlA50OdomNode::dvlCallback, this, std::placeholders::_1));
+      params_.input_topic, rclcpp::SensorDataQoS(),
+      std::bind(&DvlA50OdomNode::dvlCallback, this, std::placeholders::_1));
 
-  odom_pub_ = create_publisher<nav_msgs::msg::Odometry>(
-    params_.output_topic, rclcpp::SystemDefaultsQoS());
+  odom_pub_ =
+      create_publisher<nav_msgs::msg::Odometry>(params_.output_topic, rclcpp::SystemDefaultsQoS());
 
   // --- ROS Diagnostics ---
   if (params_.publish_diagnostics) {
@@ -65,22 +61,19 @@ DvlA50OdomNode::DvlA50OdomNode(const rclcpp::NodeOptions & options)
   RCLCPP_INFO(get_logger(), "Startup complete! Waiting for DVL DR data...");
 }
 
-void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg)
-{
+void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
   last_dvl_time_.store(this->get_clock()->now().seconds());
 
   std::string current_dvl_frame =
-    params_.use_parameter_frame ? params_.parameter_frame : msg->header.frame_id;
+      params_.use_parameter_frame ? params_.parameter_frame : msg->header.frame_id;
 
   geometry_msgs::msg::TransformStamped dvl_T_base_tf;
   try {
-    dvl_T_base_tf = tf_buffer_->lookupTransform(
-      current_dvl_frame, params_.base_frame, tf2::TimePointZero);
-  } catch (const tf2::TransformException & ex) {
-    RCLCPP_WARN_THROTTLE(
-      get_logger(), *get_clock(), 1000,
-      "Could not transform %s to %s: %s",
-      current_dvl_frame.c_str(), params_.base_frame.c_str(), ex.what());
+    dvl_T_base_tf =
+        tf_buffer_->lookupTransform(current_dvl_frame, params_.base_frame, tf2::TimePointZero);
+  } catch (const tf2::TransformException& ex) {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Could not transform %s to %s: %s",
+                         current_dvl_frame.c_str(), params_.base_frame.c_str(), ex.what());
     return;
   }
 
@@ -99,10 +92,7 @@ void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg)
   odom_T_dvl_tf.transform.translation.z = msg->position.z;
 
   tf2::Quaternion q;
-  q.setRPY(
-    msg->roll * M_PI / 180.0,
-    msg->pitch * M_PI / 180.0,
-    msg->yaw * M_PI / 180.0);
+  q.setRPY(msg->roll * M_PI / 180.0, msg->pitch * M_PI / 180.0, msg->yaw * M_PI / 180.0);
   odom_T_dvl_tf.transform.rotation = tf2::toMsg(q);
 
   geometry_msgs::msg::Pose p_base_in_odom;
@@ -138,13 +128,12 @@ void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg)
   }
 }
 
-void DvlA50OdomNode::checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper & stat)
-{
+void DvlA50OdomNode::checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper& stat) {
   stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "DVL DR data acquired.");
 
-  double time_since =
-    (last_dvl_time_.load() > 0.0) ?
-    (this->get_clock()->now().seconds() - last_dvl_time_.load()) : -1.0;
+  double time_since = (last_dvl_time_.load() > 0.0)
+                          ? (this->get_clock()->now().seconds() - last_dvl_time_.load())
+                          : -1.0;
   stat.add("Time Since Last (s)", time_since);
 
   if (time_since > params_.diagnostic_timeout || last_dvl_time_.load() == 0.0) {

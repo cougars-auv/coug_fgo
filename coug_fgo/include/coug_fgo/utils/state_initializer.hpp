@@ -25,10 +25,9 @@
 #include <gtsam/geometry/Rot3.h>
 #include <gtsam/navigation/ImuBias.h>
 
-#include <memory>
-
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/wrench_stamped.hpp>
+#include <memory>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
@@ -38,22 +37,19 @@
 #include "coug_fgo/utils/conversions.hpp"
 #include "coug_fgo/utils/types.hpp"
 
-namespace coug_fgo::utils
-{
+namespace coug_fgo::utils {
 
 /**
  * @class StateInitializer
  * @brief Computes initial state priors for factor graph initialization.
  */
-class StateInitializer
-{
-public:
+class StateInitializer {
+ public:
   /**
    * @brief Constructor for StateInitializer.
    * @param params Node parameters.
    */
-  explicit StateInitializer(const factor_graph_node::Params & params)
-  : params_(params) {}
+  explicit StateInitializer(const factor_graph_node::Params& params) : params_(params) {}
 
   /**
    * @brief Updates the running averages with new data from sensor queues.
@@ -61,8 +57,7 @@ public:
    * @param queues Bundle of sensor message queues.
    * @return True if initialization averaging is complete.
    */
-  bool update(const rclcpp::Time & current_time, QueueBundle & queues)
-  {
+  bool update(const rclcpp::Time& current_time, QueueBundle& queues) {
     if (params_.prior.use_parameter_priors) {
       initial_imu_ = queues.imu.back();
       if (params_.gps.enable_gps || params_.gps.enable_gps_init_only) {
@@ -73,8 +68,7 @@ public:
         initial_mag_ = queues.mag.back();
       }
       if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only ||
-        params_.comparison.enable_loose_dvl_preintegration)
-      {
+          params_.comparison.enable_loose_dvl_preintegration) {
         initial_ahrs_ = queues.ahrs.back();
       }
       initial_dvl_ = queues.dvl.back();
@@ -94,18 +88,13 @@ public:
    * @brief Computes initial pose, velocity, and bias.
    * @param tfs Bundle of core sensor transformations.
    */
-  void compute(const TfBundle & tfs)
-  {
+  void compute(const TfBundle& tfs) {
     gtsam::Rot3 map_R_target = computeInitialOrientation(tfs);
-    pose_ = gtsam::Pose3(
-      map_R_target, computeInitialPosition(
-        map_R_target,
-        tfs));
+    pose_ = gtsam::Pose3(map_R_target, computeInitialPosition(map_R_target, tfs));
     velocity_ = computeInitialVelocity(map_R_target, tfs);
     bias_ = computeInitialBias();
     if (params_.comparison.enable_loose_dvl_preintegration ||
-      params_.comparison.enable_tight_dvl_preintegration)
-    {
+        params_.comparison.enable_tight_dvl_preintegration) {
       time_ = rclcpp::Time(initial_depth_->header.stamp);
     } else {
       time_ = rclcpp::Time(initial_dvl_->header.stamp);
@@ -124,31 +113,30 @@ public:
   sensor_msgs::msg::MagneticField::SharedPtr initial_mag_;
   geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr initial_dvl_;
 
-private:
+ private:
   /**
    * @brief Accumulates running averages from drained sensor message deques.
    * @param queues Bundle of drained sensor message deques to process.
    */
-  void incrementAverages(QueueBundle & queues)
-  {
+  void incrementAverages(QueueBundle& queues) {
     // Average IMU
-    for (const auto & msg : queues.imu) {
+    for (const auto& msg : queues.imu) {
       if (imu_count_ == 0) {
         initial_imu_ = std::make_shared<sensor_msgs::msg::Imu>(*msg);
       } else {
         double n = static_cast<double>(imu_count_ + 1);
         initial_imu_->linear_acceleration.x +=
-          (msg->linear_acceleration.x - initial_imu_->linear_acceleration.x) / n;
+            (msg->linear_acceleration.x - initial_imu_->linear_acceleration.x) / n;
         initial_imu_->linear_acceleration.y +=
-          (msg->linear_acceleration.y - initial_imu_->linear_acceleration.y) / n;
+            (msg->linear_acceleration.y - initial_imu_->linear_acceleration.y) / n;
         initial_imu_->linear_acceleration.z +=
-          (msg->linear_acceleration.z - initial_imu_->linear_acceleration.z) / n;
+            (msg->linear_acceleration.z - initial_imu_->linear_acceleration.z) / n;
         initial_imu_->angular_velocity.x +=
-          (msg->angular_velocity.x - initial_imu_->angular_velocity.x) / n;
+            (msg->angular_velocity.x - initial_imu_->angular_velocity.x) / n;
         initial_imu_->angular_velocity.y +=
-          (msg->angular_velocity.y - initial_imu_->angular_velocity.y) / n;
+            (msg->angular_velocity.y - initial_imu_->angular_velocity.y) / n;
         initial_imu_->angular_velocity.z +=
-          (msg->angular_velocity.z - initial_imu_->angular_velocity.z) / n;
+            (msg->angular_velocity.z - initial_imu_->angular_velocity.z) / n;
         initial_imu_->header.stamp = msg->header.stamp;
       }
       imu_count_++;
@@ -156,17 +144,17 @@ private:
 
     // Average GPS
     if (params_.gps.enable_gps || params_.gps.enable_gps_init_only) {
-      for (const auto & msg : queues.gps) {
+      for (const auto& msg : queues.gps) {
         if (gps_count_ == 0) {
           initial_gps_ = std::make_shared<nav_msgs::msg::Odometry>(*msg);
         } else {
           double n = static_cast<double>(gps_count_ + 1);
           initial_gps_->pose.pose.position.x +=
-            (msg->pose.pose.position.x - initial_gps_->pose.pose.position.x) / n;
+              (msg->pose.pose.position.x - initial_gps_->pose.pose.position.x) / n;
           initial_gps_->pose.pose.position.y +=
-            (msg->pose.pose.position.y - initial_gps_->pose.pose.position.y) / n;
+              (msg->pose.pose.position.y - initial_gps_->pose.pose.position.y) / n;
           initial_gps_->pose.pose.position.z +=
-            (msg->pose.pose.position.z - initial_gps_->pose.pose.position.z) / n;
+              (msg->pose.pose.position.z - initial_gps_->pose.pose.position.z) / n;
           initial_gps_->header.stamp = msg->header.stamp;
         }
         gps_count_++;
@@ -174,30 +162,30 @@ private:
     }
 
     // Average Depth
-    for (const auto & msg : queues.depth) {
+    for (const auto& msg : queues.depth) {
       if (depth_count_ == 0) {
         initial_depth_ = std::make_shared<nav_msgs::msg::Odometry>(*msg);
       } else {
         double n = static_cast<double>(depth_count_ + 1);
         initial_depth_->pose.pose.position.z +=
-          (msg->pose.pose.position.z - initial_depth_->pose.pose.position.z) / n;
+            (msg->pose.pose.position.z - initial_depth_->pose.pose.position.z) / n;
         initial_depth_->header.stamp = msg->header.stamp;
       }
       depth_count_++;
     }
 
     // Average DVL
-    for (const auto & msg : queues.dvl) {
+    for (const auto& msg : queues.dvl) {
       if (dvl_count_ == 0) {
         initial_dvl_ = std::make_shared<geometry_msgs::msg::TwistWithCovarianceStamped>(*msg);
       } else {
         double n = static_cast<double>(dvl_count_ + 1);
         initial_dvl_->twist.twist.linear.x +=
-          (msg->twist.twist.linear.x - initial_dvl_->twist.twist.linear.x) / n;
+            (msg->twist.twist.linear.x - initial_dvl_->twist.twist.linear.x) / n;
         initial_dvl_->twist.twist.linear.y +=
-          (msg->twist.twist.linear.y - initial_dvl_->twist.twist.linear.y) / n;
+            (msg->twist.twist.linear.y - initial_dvl_->twist.twist.linear.y) / n;
         initial_dvl_->twist.twist.linear.z +=
-          (msg->twist.twist.linear.z - initial_dvl_->twist.twist.linear.z) / n;
+            (msg->twist.twist.linear.z - initial_dvl_->twist.twist.linear.z) / n;
         initial_dvl_->header.stamp = msg->header.stamp;
       }
       dvl_count_++;
@@ -205,17 +193,17 @@ private:
 
     // Average Magnetometer
     if (params_.mag.enable_mag || params_.mag.enable_mag_init_only) {
-      for (const auto & msg : queues.mag) {
+      for (const auto& msg : queues.mag) {
         if (mag_count_ == 0) {
           initial_mag_ = std::make_shared<sensor_msgs::msg::MagneticField>(*msg);
         } else {
           double n = static_cast<double>(mag_count_ + 1);
           initial_mag_->magnetic_field.x +=
-            (msg->magnetic_field.x - initial_mag_->magnetic_field.x) / n;
+              (msg->magnetic_field.x - initial_mag_->magnetic_field.x) / n;
           initial_mag_->magnetic_field.y +=
-            (msg->magnetic_field.y - initial_mag_->magnetic_field.y) / n;
+              (msg->magnetic_field.y - initial_mag_->magnetic_field.y) / n;
           initial_mag_->magnetic_field.z +=
-            (msg->magnetic_field.z - initial_mag_->magnetic_field.z) / n;
+              (msg->magnetic_field.z - initial_mag_->magnetic_field.z) / n;
           initial_mag_->header.stamp = msg->header.stamp;
         }
         mag_count_++;
@@ -224,7 +212,7 @@ private:
 
     // Average AHRS
     if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) {
-      for (const auto & msg : queues.ahrs) {
+      for (const auto& msg : queues.ahrs) {
         if (ahrs_count_ == 0) {
           initial_ahrs_ = std::make_shared<sensor_msgs::msg::Imu>(*msg);
           ahrs_ref_ = toGtsam(msg->orientation);
@@ -245,8 +233,7 @@ private:
    * @param tfs SE(3) sensor transforms for lever arm compensation.
    * @return Initial rotation of the target frame in the map frame.
    */
-  gtsam::Rot3 computeInitialOrientation(const TfBundle & tfs)
-  {
+  gtsam::Rot3 computeInitialOrientation(const TfBundle& tfs) {
     double roll = params_.prior.parameter_priors.initial_orientation[0];
     double pitch = params_.prior.parameter_priors.initial_orientation[1];
     double yaw = params_.prior.parameter_priors.initial_orientation[2];
@@ -261,10 +248,8 @@ private:
     gtsam::Vector3 accel_target = tfs.target_T_imu.rotation() * accel_imu;
 
     roll = std::atan2(accel_target.y(), accel_target.z());
-    pitch = std::atan2(
-      -accel_target.x(), std::sqrt(
-        accel_target.y() * accel_target.y() +
-        accel_target.z() * accel_target.z()));
+    pitch = std::atan2(-accel_target.x(), std::sqrt(accel_target.y() * accel_target.y() +
+                                                    accel_target.z() * accel_target.z()));
 
     if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) {
       // Account for AHRS sensor rotation
@@ -283,9 +268,7 @@ private:
       gtsam::Vector3 mag_horizontal = R_rp.unrotate(mag_target);
 
       double measured_yaw = std::atan2(mag_horizontal.y(), mag_horizontal.x());
-      double ref_yaw = std::atan2(
-        params_.mag.reference_field[1],
-        params_.mag.reference_field[0]);
+      double ref_yaw = std::atan2(params_.mag.reference_field[1], params_.mag.reference_field[0]);
 
       yaw = ref_yaw - measured_yaw;
     }
@@ -299,14 +282,10 @@ private:
    * @param tfs SE(3) sensor transforms for lever arm compensation.
    * @return Initial position of the target frame in the map frame.
    */
-  gtsam::Point3 computeInitialPosition(
-    const gtsam::Rot3 & map_R_target,
-    const TfBundle & tfs)
-  {
-    gtsam::Point3 map_p_base(
-      params_.prior.parameter_priors.initial_position[0],
-      params_.prior.parameter_priors.initial_position[1],
-      params_.prior.parameter_priors.initial_position[2]);
+  gtsam::Point3 computeInitialPosition(const gtsam::Rot3& map_R_target, const TfBundle& tfs) {
+    gtsam::Point3 map_p_base(params_.prior.parameter_priors.initial_position[0],
+                             params_.prior.parameter_priors.initial_position[1],
+                             params_.prior.parameter_priors.initial_position[2]);
 
     if (params_.prior.use_parameter_priors) {
       gtsam::Point3 target_p_base = tfs.target_T_base.translation();
@@ -316,14 +295,12 @@ private:
     gtsam::Point3 map_p_target = map_p_base;
     if (params_.gps.enable_gps || params_.gps.enable_gps_init_only) {
       // Account for GPS lever arm
-      gtsam::Point3 map_p_target_gps = map_R_target.rotate(
-        tfs.target_T_gps.translation());
+      gtsam::Point3 map_p_target_gps = map_R_target.rotate(tfs.target_T_gps.translation());
       map_p_target = toGtsam(initial_gps_->pose.pose.position) - map_p_target_gps;
     }
 
     // Account for depth lever arm
-    gtsam::Point3 map_p_target_depth =
-      map_R_target.rotate(tfs.target_T_depth.translation());
+    gtsam::Point3 map_p_target_depth = map_R_target.rotate(tfs.target_T_depth.translation());
     map_p_target.z() = initial_depth_->pose.pose.position.z - map_p_target_depth.z();
 
     return map_p_target;
@@ -335,10 +312,7 @@ private:
    * @param tfs SE(3) sensor transforms for lever arm compensation.
    * @return Initial velocity of the target frame in the map frame.
    */
-  gtsam::Vector3 computeInitialVelocity(
-    const gtsam::Rot3 & map_R_target,
-    const TfBundle & tfs)
-  {
+  gtsam::Vector3 computeInitialVelocity(const gtsam::Rot3& map_R_target, const TfBundle& tfs) {
     if (params_.prior.use_parameter_priors) {
       gtsam::Vector3 base_v_base = toGtsam(params_.prior.parameter_priors.initial_velocity);
       gtsam::Vector3 target_v_target = tfs.target_T_base.rotation().rotate(base_v_base);
@@ -346,8 +320,8 @@ private:
     }
 
     // Account for DVL lever arm
-    gtsam::Vector3 target_v_dvl = tfs.target_T_dvl.rotation() * toGtsam(
-      initial_dvl_->twist.twist.linear);
+    gtsam::Vector3 target_v_dvl =
+        tfs.target_T_dvl.rotation() * toGtsam(initial_dvl_->twist.twist.linear);
 
     return map_R_target.rotate(target_v_dvl);
   }
@@ -356,8 +330,7 @@ private:
    * @brief Computes initial IMU bias from averaged gyroscope readings.
    * @return Initial accelerometer and gyroscope bias estimate.
    */
-  gtsam::imuBias::ConstantBias computeInitialBias()
-  {
+  gtsam::imuBias::ConstantBias computeInitialBias() {
     gtsam::Vector3 init_gyro_bias;
     if (params_.prior.use_parameter_priors) {
       init_gyro_bias = toGtsam(params_.prior.parameter_priors.initial_gyro_bias);
@@ -369,10 +342,10 @@ private:
     return gtsam::imuBias::ConstantBias(init_accel_bias, init_gyro_bias);
   }
 
-  const factor_graph_node::Params & params_;
+  const factor_graph_node::Params& params_;
   rclcpp::Time start_avg_time_{0, 0, RCL_ROS_TIME};
   size_t imu_count_ = 0, gps_count_ = 0, depth_count_ = 0, mag_count_ = 0, ahrs_count_ = 0,
-    dvl_count_ = 0;
+         dvl_count_ = 0;
   gtsam::Rot3 ahrs_ref_;
   gtsam::Vector3 ahrs_log_sum_ = gtsam::Vector3::Zero();
 };

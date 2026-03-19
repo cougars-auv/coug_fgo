@@ -31,17 +31,15 @@
 using gtsam::symbol_shorthand::V;  // Velocity (x,y,z)
 using gtsam::symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
 
-namespace coug_fgo::factors
-{
+namespace coug_fgo::factors {
 
 /**
  * @class AuvDynamicsFactorArm
  * @brief GTSAM factor for enforcing a simplified version of Fossen's equations with a lever arm.
  */
-class AuvDynamicsFactorArm : public gtsam::NoiseModelFactor4<gtsam::Pose3,
-    gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>
-{
-private:
+class AuvDynamicsFactorArm
+    : public gtsam::NoiseModelFactor4<gtsam::Pose3, gtsam::Vector3, gtsam::Pose3, gtsam::Vector3> {
+ private:
   double dt_;
   gtsam::Vector3 body_f_;
   gtsam::Matrix33 mass_;
@@ -49,7 +47,7 @@ private:
   gtsam::Matrix33 quad_drag_;
   gtsam::Matrix33 mass_inv_;
 
-public:
+ public:
   /**
    * @brief Constructor for AuvDynamicsFactorArm.
    * @param pose_key1 GTSAM key for the first pose (state i).
@@ -64,23 +62,17 @@ public:
    * @param quad_drag Quadratic damping coefficient.
    * @param noise_model The noise model for the constraint.
    */
-  AuvDynamicsFactorArm(
-    gtsam::Key pose_key1, gtsam::Key vel_key1,
-    gtsam::Key pose_key2, gtsam::Key vel_key2,
-    double dt,
-    const gtsam::Vector3 & control_force,
-    const gtsam::Pose3 & target_T_sensor,
-    const gtsam::Matrix33 & mass,
-    const gtsam::Matrix33 & linear_drag,
-    const gtsam::Matrix33 & quad_drag,
-    const gtsam::SharedNoiseModel & noise_model)
-  : NoiseModelFactor4<gtsam::Pose3, gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>(
-      noise_model, pose_key1, vel_key1, pose_key2, vel_key2),
-    dt_(dt),
-    mass_(mass),
-    linear_drag_(linear_drag),
-    quad_drag_(quad_drag)
-  {
+  AuvDynamicsFactorArm(gtsam::Key pose_key1, gtsam::Key vel_key1, gtsam::Key pose_key2,
+                       gtsam::Key vel_key2, double dt, const gtsam::Vector3& control_force,
+                       const gtsam::Pose3& target_T_sensor, const gtsam::Matrix33& mass,
+                       const gtsam::Matrix33& linear_drag, const gtsam::Matrix33& quad_drag,
+                       const gtsam::SharedNoiseModel& noise_model)
+      : NoiseModelFactor4<gtsam::Pose3, gtsam::Vector3, gtsam::Pose3, gtsam::Vector3>(
+            noise_model, pose_key1, vel_key1, pose_key2, vel_key2),
+        dt_(dt),
+        mass_(mass),
+        linear_drag_(linear_drag),
+        quad_drag_(quad_drag) {
     body_f_ = target_T_sensor.rotation() * control_force;
     mass_inv_ = mass_.inverse();
   }
@@ -99,28 +91,26 @@ public:
    * @param H4 Optional Jacobian matrix (Vel2).
    * @return The 3D error vector.
    */
-  gtsam::Vector evaluateError(
-    const gtsam::Pose3 & pose1, const gtsam::Vector3 & vel1,
-    const gtsam::Pose3 & pose2, const gtsam::Vector3 & vel2,
-    gtsam::OptionalMatrixType H_pose1 = nullptr,
-    gtsam::OptionalMatrixType H_vel1 = nullptr,
-    gtsam::OptionalMatrixType H_pose2 = nullptr,
-    gtsam::OptionalMatrixType H_vel2 = nullptr) const override
-  {
+  gtsam::Vector evaluateError(const gtsam::Pose3& pose1, const gtsam::Vector3& vel1,
+                              const gtsam::Pose3& pose2, const gtsam::Vector3& vel2,
+                              gtsam::OptionalMatrixType H_pose1 = nullptr,
+                              gtsam::OptionalMatrixType H_vel1 = nullptr,
+                              gtsam::OptionalMatrixType H_pose2 = nullptr,
+                              gtsam::OptionalMatrixType H_vel2 = nullptr) const override {
     // Predict the velocity measurements
     gtsam::Matrix33 J_vb1_R1 = gtsam::Matrix33::Zero();
     gtsam::Matrix33 J_vb1_v1 = gtsam::Matrix33::Zero();
     gtsam::Matrix33 J_vb2_R2 = gtsam::Matrix33::Zero();
     gtsam::Matrix33 J_vb2_v2 = gtsam::Matrix33::Zero();
-    gtsam::Vector3 v_body1 =
-      pose1.rotation().unrotate(vel1, H_pose1 ? &J_vb1_R1 : nullptr, H_vel1 ? &J_vb1_v1 : nullptr);
-    gtsam::Vector3 v_body2 =
-      pose2.rotation().unrotate(vel2, H_pose2 ? &J_vb2_R2 : nullptr, H_vel2 ? &J_vb2_v2 : nullptr);
+    gtsam::Vector3 v_body1 = pose1.rotation().unrotate(vel1, H_pose1 ? &J_vb1_R1 : nullptr,
+                                                       H_vel1 ? &J_vb1_v1 : nullptr);
+    gtsam::Vector3 v_body2 = pose2.rotation().unrotate(vel2, H_pose2 ? &J_vb2_R2 : nullptr,
+                                                       H_vel2 ? &J_vb2_v2 : nullptr);
 
     gtsam::Vector3 abs_v_body1 = v_body1.cwiseAbs();
     gtsam::Matrix33 J_drag_v = gtsam::Matrix33::Zero();
     gtsam::Vector3 drag_force =
-      -(linear_drag_ * v_body1 + quad_drag_ * abs_v_body1.asDiagonal() * v_body1);
+        -(linear_drag_ * v_body1 + quad_drag_ * abs_v_body1.asDiagonal() * v_body1);
 
     if (H_pose1 || H_vel1) {
       J_drag_v = -(linear_drag_ + 2.0 * quad_drag_ * abs_v_body1.asDiagonal());

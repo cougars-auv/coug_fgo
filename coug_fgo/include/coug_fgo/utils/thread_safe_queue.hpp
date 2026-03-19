@@ -23,27 +23,23 @@
 
 #include <deque>
 #include <mutex>
+#include <rclcpp/rclcpp.hpp>
 #include <utility>
 
-#include <rclcpp/rclcpp.hpp>
-
-namespace coug_fgo::utils
-{
+namespace coug_fgo::utils {
 
 /**
  * @class ThreadSafeQueue
  * @brief Utility for thread-safe queue operations.
  */
-template<typename T>
-class ThreadSafeQueue
-{
-public:
+template <typename T>
+class ThreadSafeQueue {
+ public:
   /**
    * @brief Pushes a new item onto the queue.
    * @param value The item to push.
    */
-  void push(const T & value)
-  {
+  void push(const T& value) {
     std::scoped_lock lock(mutex_);
     queue_.push_back(value);
     last_msg_time_ = rclcpp::Time(value->header.stamp);
@@ -53,8 +49,7 @@ public:
    * @brief Drains all items from the queue.
    * @return A deque containing all items that were in the queue.
    */
-  std::deque<T> drain()
-  {
+  std::deque<T> drain() {
     std::deque<T> temp_q;
     {
       std::scoped_lock lock(mutex_);
@@ -67,8 +62,7 @@ public:
    * @brief Checks if the queue is empty.
    * @return True if the queue is empty, false otherwise.
    */
-  bool empty() const
-  {
+  bool empty() const {
     std::scoped_lock lock(mutex_);
     return queue_.empty();
   }
@@ -77,8 +71,7 @@ public:
    * @brief Gets the number of items in the queue.
    * @return The size of the queue.
    */
-  size_t size() const
-  {
+  size_t size() const {
     std::scoped_lock lock(mutex_);
     return queue_.size();
   }
@@ -87,8 +80,7 @@ public:
    * @brief Gets the timestamp of the last message added to the queue.
    * @return The timestamp as rclcpp::Time.
    */
-  rclcpp::Time getLastTime() const
-  {
+  rclcpp::Time getLastTime() const {
     std::scoped_lock lock(mutex_);
     return last_msg_time_;
   }
@@ -97,8 +89,7 @@ public:
    * @brief Restores items to the front of the queue.
    * @param items The items to restore.
    */
-  void restore(const std::deque<T> & items)
-  {
+  void restore(const std::deque<T>& items) {
     std::scoped_lock lock(mutex_);
     queue_.insert(queue_.begin(), items.begin(), items.end());
   }
@@ -108,13 +99,12 @@ public:
    * @return The last item.
    * @throws std::runtime_error if the queue is empty.
    */
-  T back() const
-  {
+  T back() const {
     std::scoped_lock lock(mutex_);
     return queue_.back();
   }
 
-private:
+ private:
   mutable std::mutex mutex_;
   std::deque<T> queue_;
   rclcpp::Time last_msg_time_{0, 0, RCL_ROS_TIME};

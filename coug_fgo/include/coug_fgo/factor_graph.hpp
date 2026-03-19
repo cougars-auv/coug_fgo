@@ -30,57 +30,49 @@
 
 #include <atomic>
 #include <condition_variable>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <thread>
-
+#include <coug_fgo_msgs/msg/graph_metrics.hpp>
+#include <diagnostic_updater/diagnostic_updater.hpp>
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/wrench_stamped.hpp>
+#include <memory>
+#include <mutex>
 #include <nav_msgs/msg/odometry.hpp>
 #include <nav_msgs/msg/path.hpp>
 #include <rclcpp/rclcpp.hpp>
-#include <diagnostic_updater/diagnostic_updater.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/magnetic_field.hpp>
+#include <string>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <thread>
 
 #include "coug_fgo/factor_graph_core.hpp"
 #include "coug_fgo/factor_graph_parameters.hpp"
 #include "coug_fgo/utils/conversions.hpp"
 #include "coug_fgo/utils/state_initializer.hpp"
 #include "coug_fgo/utils/thread_safe_queue.hpp"
-#include <coug_fgo_msgs/msg/graph_metrics.hpp>
 
-
-namespace coug_fgo
-{
+namespace coug_fgo {
 
 /**
  * @class FactorGraphNode
  * @brief ROS 2 node for multi-sensor AUV state estimation via factor graph optimization.
  */
-class FactorGraphNode : public rclcpp::Node
-{
-public:
+class FactorGraphNode : public rclcpp::Node {
+ public:
   /**
    * @brief Constructs the node and launches frontend/backend threads.
    * @param options ROS 2 node options (composable node support).
    */
-  explicit FactorGraphNode(const rclcpp::NodeOptions & options);
+  explicit FactorGraphNode(const rclcpp::NodeOptions& options);
 
   /**
    * @brief Joins worker threads and shuts down gracefully.
    */
   ~FactorGraphNode() override;
 
-  enum class State
-  {
-    WAITING_FOR_SENSORS,
-    RUNNING
-  };
+  enum class State { WAITING_FOR_SENSORS, RUNNING };
 
-protected:
+ protected:
   // --- Main Logic ---
   /**
    * @brief Initializes the factor graph using averaged sensor data or parameters.
@@ -120,28 +112,22 @@ protected:
    * @param pose_covariance The estimation error covariance.
    * @param timestamp The message timestamp.
    */
-  void publishGlobalOdom(
-    const gtsam::Pose3 & current_pose,
-    const gtsam::Matrix & pose_covariance,
-    const rclcpp::Time & timestamp);
+  void publishGlobalOdom(const gtsam::Pose3& current_pose, const gtsam::Matrix& pose_covariance,
+                         const rclcpp::Time& timestamp);
 
   /**
    * @brief Broadcasts the map-to-odom transform.
    * @param current_pose The estimated target pose.
    * @param timestamp The transform timestamp.
    */
-  void broadcastGlobalTf(
-    const gtsam::Pose3 & current_pose,
-    const rclcpp::Time & timestamp);
+  void broadcastGlobalTf(const gtsam::Pose3& current_pose, const rclcpp::Time& timestamp);
 
   /**
    * @brief Publishes the full optimized trajectory path.
    * @param results The final optimized values.
    * @param timestamp The path timestamp.
    */
-  void publishSmoothedPath(
-    const gtsam::Values & results,
-    const rclcpp::Time & timestamp);
+  void publishSmoothedPath(const gtsam::Values& results, const rclcpp::Time& timestamp);
 
   /**
    * @brief Publishes the optimized velocity (at the target frame in the map frame).
@@ -149,10 +135,8 @@ protected:
    * @param vel_covariance The estimation error covariance.
    * @param timestamp The message timestamp.
    */
-  void publishVelocity(
-    const gtsam::Vector3 & current_vel,
-    const gtsam::Matrix & vel_covariance,
-    const rclcpp::Time & timestamp);
+  void publishVelocity(const gtsam::Vector3& current_vel, const gtsam::Matrix& vel_covariance,
+                       const rclcpp::Time& timestamp);
 
   /**
    * @brief Publishes the optimized IMU biases.
@@ -160,35 +144,33 @@ protected:
    * @param imu_bias_covariance The estimation error covariance.
    * @param timestamp The message timestamp.
    */
-  void publishImuBias(
-    const gtsam::imuBias::ConstantBias & current_imu_bias,
-    const gtsam::Matrix & imu_bias_covariance,
-    const rclcpp::Time & timestamp);
+  void publishImuBias(const gtsam::imuBias::ConstantBias& current_imu_bias,
+                      const gtsam::Matrix& imu_bias_covariance, const rclcpp::Time& timestamp);
 
   /**
    * @brief Publishes high-frequency timing and graph metadata.
    * @param timestamp The message timestamp.
    */
-  void publishGraphMetrics(const rclcpp::Time & timestamp);
+  void publishGraphMetrics(const rclcpp::Time& timestamp);
 
   // --- Diagnostics ---
   /**
    * @brief Checks sensor inputs for queue sizes and data freshness.
    * @param stat The diagnostic status wrapper.
    */
-  void checkSensorInputs(diagnostic_updater::DiagnosticStatusWrapper & stat);
+  void checkSensorInputs(diagnostic_updater::DiagnosticStatusWrapper& stat);
 
   /**
    * @brief Checks the overall graph lifecycle state.
    * @param stat The diagnostic status wrapper.
    */
-  void checkGraphState(diagnostic_updater::DiagnosticStatusWrapper & stat);
+  void checkGraphState(diagnostic_updater::DiagnosticStatusWrapper& stat);
 
   /**
    * @brief Checks optimization times for processing overflow.
    * @param stat The diagnostic status wrapper.
    */
-  void checkProcessingOverflow(diagnostic_updater::DiagnosticStatusWrapper & stat);
+  void checkProcessingOverflow(diagnostic_updater::DiagnosticStatusWrapper& stat);
 
   // --- Core ---
   std::unique_ptr<FactorGraphCore> core_;

@@ -26,33 +26,30 @@
 #include <tf2_ros/transform_listener.h>
 
 #include <atomic>
-#include <memory>
-#include <string>
-
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <dvl_msgs/msg/dvldr.hpp>
+#include <memory>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <string>
 
 #include "coug_fgo/dvl_a50_odom_parameters.hpp"
 
-namespace coug_fgo
-{
+namespace coug_fgo {
 
 /**
  * @class DvlA50OdomNode
  * @brief ROS 2 node that converts raw DVL dead-reckoning data to an odometry message.
  */
-class DvlA50OdomNode : public rclcpp::Node
-{
-public:
+class DvlA50OdomNode : public rclcpp::Node {
+ public:
   /**
    * @brief Constructs the node and sets up DVL dead-reckoning conversion.
    * @param options The node options.
    */
-  explicit DvlA50OdomNode(const rclcpp::NodeOptions & options);
+  explicit DvlA50OdomNode(const rclcpp::NodeOptions& options);
 
-protected:
+ protected:
   /**
    * @brief Callback for receiving new DVL DR data.
    * @param msg The incoming DVLDR message.
@@ -63,7 +60,7 @@ protected:
    * @brief Diagnostic task to report the status of the DVL data.
    * @param stat The diagnostic status wrapper.
    */
-  void checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper & stat);
+  void checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper& stat);
 
   // --- ROS Interfaces ---
   rclcpp::Subscription<dvl_msgs::msg::DVLDR>::SharedPtr dvl_sub_;

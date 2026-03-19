@@ -38,14 +38,13 @@ TEST(MagFactorArmTest, Jacobians) {
   gtsam::Vector3 reference_field(0.5, 0.8, -0.2);
   gtsam::Vector3 measured_field(0.4, 0.7, -0.1);
 
-  coug_fgo::factors::MagFactorArm factor(
-    poseKey, measured_field, reference_field, target_R_sensor, model);
+  coug_fgo::factors::MagFactorArm factor(poseKey, measured_field, reference_field, target_R_sensor,
+                                         model);
 
   gtsam::Pose3 pose(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1.0, 2.0, 4.0));
 
   gtsam::Matrix expectedH = gtsam::numericalDerivative11<gtsam::Vector, gtsam::Pose3>(
-    [&](const gtsam::Pose3 & p) {return factor.evaluateError(p, nullptr);},
-    pose, 1e-5);
+      [&](const gtsam::Pose3& p) { return factor.evaluateError(p, nullptr); }, pose, 1e-5);
 
   gtsam::Matrix actualH;
   factor.evaluateError(pose, &actualH);

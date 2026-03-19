@@ -31,20 +31,18 @@
 
 using gtsam::symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
 
-namespace coug_fgo::factors
-{
+namespace coug_fgo::factors {
 
 /**
  * @class MagFactorArm
  * @brief GTSAM factor for magnetometer measurements with a lever arm.
  */
-class MagFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3>
-{
+class MagFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
   gtsam::Point3 sensor_B_measured_;
   gtsam::Point3 world_B_ref_;
   gtsam::Rot3 target_R_sensor_;
 
-public:
+ public:
   /**
    * @brief Constructor for MagFactorArm.
    * @param pose_key GTSAM key for the AUV pose.
@@ -53,16 +51,13 @@ public:
    * @param target_R_sensor The static rotation from target to sensor.
    * @param noise_model The noise model for the measurement (Dimension must be 3).
    */
-  MagFactorArm(
-    gtsam::Key pose_key, const gtsam::Point3 & measured_field,
-    const gtsam::Point3 & reference_field,
-    const gtsam::Rot3 & target_R_sensor, const gtsam::SharedNoiseModel & noise_model)
-  : NoiseModelFactor1<gtsam::Pose3>(noise_model, pose_key),
-    sensor_B_measured_(measured_field),
-    world_B_ref_(reference_field),
-    target_R_sensor_(target_R_sensor)
-  {
-  }
+  MagFactorArm(gtsam::Key pose_key, const gtsam::Point3& measured_field,
+               const gtsam::Point3& reference_field, const gtsam::Rot3& target_R_sensor,
+               const gtsam::SharedNoiseModel& noise_model)
+      : NoiseModelFactor1<gtsam::Pose3>(noise_model, pose_key),
+        sensor_B_measured_(measured_field),
+        world_B_ref_(reference_field),
+        target_R_sensor_(target_R_sensor) {}
 
   /**
    * @brief Evaluates the error and Jacobians for the factor.
@@ -70,14 +65,12 @@ public:
    * @param H Optional Jacobian matrix.
    * @return The 3D error vector (predicted - measured).
    */
-  gtsam::Vector evaluateError(
-    const gtsam::Pose3 & pose,
-    gtsam::OptionalMatrixType H = nullptr) const override
-  {
+  gtsam::Vector evaluateError(const gtsam::Pose3& pose,
+                              gtsam::OptionalMatrixType H = nullptr) const override {
     // Predict the magnetic field in the body and sensor frames
     gtsam::Matrix33 H_unrotate_body = gtsam::Matrix33::Zero();
     gtsam::Point3 predicted_field_body =
-      pose.rotation().unrotate(world_B_ref_, H ? &H_unrotate_body : nullptr);
+        pose.rotation().unrotate(world_B_ref_, H ? &H_unrotate_body : nullptr);
     gtsam::Point3 predicted_field_sensor = target_R_sensor_.unrotate(predicted_field_body);
 
     // 3D magnetic field residual
