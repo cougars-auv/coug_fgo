@@ -64,14 +64,14 @@ for bag_path in ${bags_to_eval}; do
       rm -f "${out_dir}"/*.zip
       echo "" && gum style --foreground 75 --bold "Evaluating ${topic}..."
 
-      # 1. APE (Global Accuracy)
+      # APE (Global Accuracy)
       gum spin --spinner dot --title "Calculating APE (Translation)..." --show-output -- \
         evo_ape bag2 "${bag_path}" "${truth}" "${topic}" -r trans_part "${evo_args[@]}" --save_results "${out_dir}/ape_trans.zip"
 
       gum spin --spinner dot --title "Calculating APE (Rotation)..." --show-output -- \
         evo_ape bag2 "${bag_path}" "${truth}" "${topic}" -r angle_deg "${evo_args[@]}" --save_results "${out_dir}/ape_rot.zip"
 
-      # 2. RPE (Drift)
+      # RPE (Drift)
       gum spin --spinner dot --title "Calculating RPE (Translation)..." --show-output -- \
         evo_rpe bag2 "${bag_path}" "${truth}" "${topic}" -r trans_part "${evo_args[@]}" --delta 1 --delta_unit m --all_pairs --save_results "${out_dir}/rpe_trans.zip"
 
@@ -79,7 +79,6 @@ for bag_path in ${bags_to_eval}; do
         evo_rpe bag2 "${bag_path}" "${truth}" "${topic}" -r angle_deg "${evo_args[@]}" --delta 1 --delta_unit m --all_pairs --save_results "${out_dir}/rpe_rot.zip"
     done
 
-    # 3. Export Benchmarks
     if ls "${bag_path}/evo/${agent}"/*/*/*.zip 1> /dev/null 2>&1; then
       echo "" && gum style --foreground 75 --bold "Exporting ${agent} benchmarks..."
       rm -f "${bag_path}/evo/${agent}/benchmark_"*.csv
