@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Docker CI
+name: Docker Build
 
 on:
   push:
     branches: ["main"]
     paths:
-      - ".github/workflows/docker_ci.yml"
+      - ".github/workflows/docker_build.yml"
       - "**/package.xml"
   workflow_dispatch:
 

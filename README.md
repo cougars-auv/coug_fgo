@@ -1,7 +1,7 @@
 # 🌊 CoUGARs Factor Graph Odometry
 
-[![ROS 2 CI](https://github.com/cougars-auv/coug_fgo/actions/workflows/ros2_ci.yml/badge.svg)](https://github.com/cougars-auv/coug_fgo/actions/workflows/ros2_ci.yml)
-[![Docker CI](https://github.com/cougars-auv/coug_fgo/actions/workflows/docker_ci.yml/badge.svg)](https://github.com/cougars-auv/coug_fgo/actions/workflows/docker_ci.yml)
+[![ROS 2 Build & Test](https://github.com/cougars-auv/coug_fgo/actions/workflows/ros2_build_and_test.yml/badge.svg)](https://github.com/cougars-auv/coug_fgo/actions/workflows/ros2_build_and_test.yml)
+[![Docker Build](https://github.com/cougars-auv/coug_fgo/actions/workflows/docker_build.yml/badge.svg)](https://github.com/cougars-auv/coug_fgo/actions/workflows/docker_build.yml)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/cougars-auv/coug_fgo/main.svg)](https://results.pre-commit.ci/latest/github/cougars-auv/coug_fgo/main)
 [![codecov](https://codecov.io/gh/cougars-auv/coug_fgo/graph/badge.svg?token=OFBQI4IOT1)](https://codecov.io/gh/cougars-auv/coug_fgo)
 
