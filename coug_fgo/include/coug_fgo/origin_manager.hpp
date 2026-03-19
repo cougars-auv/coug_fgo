@@ -21,11 +21,11 @@
 
 #pragma once
 
-#include <cmath>
-#include <math.h>
 #include <geodesy/utm.h>
+#include <math.h>
 
 #include <atomic>
+#include <cmath>
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <memory>
 #include <nav_msgs/msg/odometry.hpp>
