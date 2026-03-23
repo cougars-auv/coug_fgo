@@ -630,7 +630,6 @@ void FactorGraphCore::addDvlTightPreintFactor(
   gtsam::Rot3 target_R_dvl = tfs_.target_T_dvl.rotation();
   gtsam::Rot3 imu_R_dvl = target_R_imu.inverse() * target_R_dvl;
 
-  // Fix: Clone the preintegrator safely to reuse the shared parameters pointer
   auto temp_imu_preint =
       std::make_unique<gtsam::PreintegratedCombinedMeasurements>(*imu_preintegrator_);
   temp_imu_preint->resetIntegrationAndSetBias(prev_imu_bias_);
@@ -640,6 +639,31 @@ void FactorGraphCore::addDvlTightPreintFactor(
   auto imu_it = imu_msgs.begin();
 
   dvl_tight_preintegrator_->reset();
+
+  auto stepImuPreintegrator = [&](const rclcpp::Time& t_end) {
+    while (imu_it != imu_msgs.end()) {
+      rclcpp::Time imu_time((*imu_it)->header.stamp);
+      if (imu_time > t_end) {
+        break;
+      }
+      if (imu_time > last_imu_time) {
+        double dt_imu = (imu_time - last_imu_time).seconds();
+        temp_imu_preint->integrateMeasurement(current_imu_acc, current_imu_gyr, dt_imu);
+        last_imu_time = imu_time;
+      }
+      current_imu_acc = toGtsam((*imu_it)->linear_acceleration);
+      current_imu_gyr = toGtsam((*imu_it)->angular_velocity);
+      imu_it++;
+    }
+
+    if (last_imu_time < t_end) {
+      double dt_rem = (t_end - last_imu_time).seconds();
+      if (dt_rem > 1e-6) {
+        temp_imu_preint->integrateMeasurement(current_imu_acc, current_imu_gyr, dt_rem);
+      }
+      last_imu_time = t_end;
+    }
+  };
 
   for (const auto& dvl_msg : dvl_msgs) {
     rclcpp::Time current_dvl_time(dvl_msg->header.stamp);
@@ -655,38 +679,15 @@ void FactorGraphCore::addDvlTightPreintFactor(
 
     double dt = (current_dvl_time - last_dvl_time).seconds();
     if (dt > 1e-9) {
-      // Step the local IMU preintegrator up to the current DVL time
-      while (imu_it != imu_msgs.end()) {
-        rclcpp::Time imu_time((*imu_it)->header.stamp);
-        if (imu_time > current_dvl_time) {
-          break;
-        }
-        if (imu_time > last_imu_time) {
-          double dt_imu = (imu_time - last_imu_time).seconds();
-          temp_imu_preint->integrateMeasurement(current_imu_acc, current_imu_gyr, dt_imu);
-          last_imu_time = imu_time;
-        }
-        current_imu_acc = toGtsam((*imu_it)->linear_acceleration);
-        current_imu_gyr = toGtsam((*imu_it)->angular_velocity);
-        imu_it++;
-      }
+      stepImuPreintegrator(current_dvl_time);
 
-      if (last_imu_time < current_dvl_time) {
-        double dt_rem = (current_dvl_time - last_imu_time).seconds();
-        if (dt_rem > 1e-6) {
-          temp_imu_preint->integrateMeasurement(current_imu_acc, current_imu_gyr, dt_rem);
-        }
-        last_imu_time = current_dvl_time;
-      }
-
-      // Integrate DVL measurement alongside preintegrated IMU relative rotation
+      // Extract preintegrated IMU relative rotation and Jacobians
       gtsam::Rot3 delta_R_ik = temp_imu_preint->deltaRij();
       gtsam::Matrix3 rot_cov_k = temp_imu_preint->preintMeasCov().block<3, 3>(0, 0);
 
-      // Fix: Extract delRdelBiasOmega dynamically using biasCorrectedDelta
       gtsam::Matrix96 H_bias;
       temp_imu_preint->biasCorrectedDelta(prev_imu_bias_, H_bias);
-      gtsam::Matrix3 J_bg_k = H_bias.block<3, 3>(0, 3);  // Top-right 3x3 block is dR/dbg
+      gtsam::Matrix3 J_bg_k = H_bias.block<3, 3>(0, 3);
 
       dvl_tight_preintegrator_->integrateMeasurement(last_dvl_velocity_, delta_R_ik, imu_R_dvl, dt,
                                                      last_dvl_covariance_, rot_cov_k, J_bg_k);
@@ -712,30 +713,9 @@ void FactorGraphCore::addDvlTightPreintFactor(
   if (last_dvl_time < target_time) {
     double dt = (target_time - last_dvl_time).seconds();
     if (dt > 1e-6) {
-      // Step the local IMU preintegrator up to target_time
-      while (imu_it != imu_msgs.end()) {
-        rclcpp::Time imu_time((*imu_it)->header.stamp);
-        if (imu_time > target_time) {
-          break;
-        }
-        if (imu_time > last_imu_time) {
-          double dt_imu = (imu_time - last_imu_time).seconds();
-          temp_imu_preint->integrateMeasurement(current_imu_acc, current_imu_gyr, dt_imu);
-          last_imu_time = imu_time;
-        }
-        current_imu_acc = toGtsam((*imu_it)->linear_acceleration);
-        current_imu_gyr = toGtsam((*imu_it)->angular_velocity);
-        imu_it++;
-      }
+      stepImuPreintegrator(target_time);
 
-      if (last_imu_time < target_time) {
-        double dt_rem = (target_time - last_imu_time).seconds();
-        if (dt_rem > 1e-6) {
-          temp_imu_preint->integrateMeasurement(current_imu_acc, current_imu_gyr, dt_rem);
-        }
-        last_imu_time = target_time;
-      }
-
+      // Extract preintegrated IMU relative rotation and Jacobians
       gtsam::Rot3 delta_R_ik = temp_imu_preint->deltaRij();
       gtsam::Matrix3 rot_cov_k = temp_imu_preint->preintMeasCov().block<3, 3>(0, 0);
 
