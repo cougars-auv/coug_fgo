@@ -781,9 +781,9 @@ std::optional<UpdateResult> FactorGraphCore::update(double target_time,
     new_values.insert(X(current_step_), pred.pose());
     new_values.insert(V(current_step_), pred.velocity());
     new_values.insert(B(current_step_), prev_imu_bias_);
-    new_timestamps[X(current_step_)] = target_time.seconds();
-    new_timestamps[V(current_step_)] = target_time.seconds();
-    new_timestamps[B(current_step_)] = target_time.seconds();
+    new_timestamps[X(current_step_)] = target_time;
+    new_timestamps[V(current_step_)] = target_time;
+    new_timestamps[B(current_step_)] = target_time;
 
     // --- Reset Preintegrators ---
     imu_preintegrator_->resetIntegrationAndSetBias(prev_imu_bias_);
