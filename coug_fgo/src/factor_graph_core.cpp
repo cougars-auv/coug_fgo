@@ -317,7 +317,7 @@ void FactorGraphCore::addDepthFactor(
 }
 
 void FactorGraphCore::addAhrsFactor(gtsam::NonlinearFactorGraph& graph,
-                                    const std::deque<std::shared_ptr<utils::ImuData>>& ahrs_msgs) {
+                                    const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs) {
   if (ahrs_msgs.empty()) {
     return;
   }
@@ -485,7 +485,7 @@ void FactorGraphCore::addImuPreintFactor(
 }
 
 gtsam::Rot3 FactorGraphCore::getInterpolatedOrientation(
-    const std::deque<std::shared_ptr<utils::ImuData>>& ahrs_msgs,
+    const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs,
     double target_time) {
   auto it_after = std::lower_bound(
       ahrs_msgs.begin(), ahrs_msgs.end(), target_time,
@@ -520,7 +520,7 @@ gtsam::Rot3 FactorGraphCore::getInterpolatedOrientation(
 void FactorGraphCore::addDvlLoosePreintFactor(
     gtsam::NonlinearFactorGraph& graph,
     const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
-    const std::deque<std::shared_ptr<utils::ImuData>>& ahrs_msgs, double target_time,
+    const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs, double target_time,
     std::deque<std::shared_ptr<utils::TwistData>>& unused_dvl) {
   // Implements a zero-order hold (ZOH) for DVL velocity measurements
   if (!dvl_loose_preintegrator_ || ahrs_msgs.empty()) {
