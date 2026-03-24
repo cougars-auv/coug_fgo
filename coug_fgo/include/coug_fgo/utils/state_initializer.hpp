@@ -29,6 +29,7 @@
 
 #include "coug_fgo/factor_graph_parameters.hpp"
 #include "coug_fgo/utils/data_types.hpp"
+#include "coug_fgo/utils/gtsam_conversions.hpp"
 
 namespace coug_fgo::utils {
 
