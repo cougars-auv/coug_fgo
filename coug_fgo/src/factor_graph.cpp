@@ -573,7 +573,7 @@ void FactorGraphNode::updateGraph() {
     target_time = dvl_queue_.getLastTime();
   } else if (active_source == "Depth" && !depth_queue_.empty()) {
     target_time = depth_queue_.getLastTime();
-  } else if (active_source == "Timer") {
+  } else if (active_source == "Timer" && !imu_queue_.empty()) {
     target_time = imu_queue_.getLastTime();
   }
 

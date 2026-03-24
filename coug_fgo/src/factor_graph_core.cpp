@@ -106,8 +106,9 @@ void FactorGraphCore::initialize(const utils::StateInitializer& state_init,
     dvl_loose_preintegrator_ = std::make_unique<utils::DvlLoosePreintegrator>();
     dvl_loose_preintegrator_->reset(prev_pose_.rotation());
 
-    last_dvl_velocity_ = state_init.initial_dvl_->linear_velocity;
-    if (params_.dvl.use_parameter_covariance) {
+    last_dvl_velocity_ =
+        params_.dvl.enable_dvl ? state_init.initial_dvl_->linear_velocity : gtsam::Vector3::Zero();
+    if (params_.dvl.use_parameter_covariance || !params_.dvl.enable_dvl) {
       last_dvl_covariance_ =
           toGtsamSquaredDiagonal(params_.dvl.parameter_covariance.velocity_noise_sigmas)
               .block<3, 3>(0, 0);
@@ -118,8 +119,9 @@ void FactorGraphCore::initialize(const utils::StateInitializer& state_init,
     dvl_tight_preintegrator_ = std::make_unique<utils::DvlTightPreintegrator>();
     dvl_tight_preintegrator_->reset();
 
-    last_dvl_velocity_ = state_init.initial_dvl_->linear_velocity;
-    if (params_.dvl.use_parameter_covariance) {
+    last_dvl_velocity_ =
+        params_.dvl.enable_dvl ? state_init.initial_dvl_->linear_velocity : gtsam::Vector3::Zero();
+    if (params_.dvl.use_parameter_covariance || !params_.dvl.enable_dvl) {
       last_dvl_covariance_ =
           toGtsamSquaredDiagonal(params_.dvl.parameter_covariance.velocity_noise_sigmas)
               .block<3, 3>(0, 0);
