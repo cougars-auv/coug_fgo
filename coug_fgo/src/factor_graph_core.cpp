@@ -199,10 +199,18 @@ void FactorGraphCore::addPriorFactors(const utils::StateInitializer& state_init,
       prior_pose_sigmas(4) = params_.gps.use_parameter_covariance
                                  ? params_.gps.parameter_covariance.position_noise_sigmas[1]
                                  : std::sqrt(state_init.initial_gps_->pose_covariance(1, 1));
+    } else {
+      prior_pose_sigmas(3) = params_.prior.parameter_priors.initial_position_sigmas[0];
+      prior_pose_sigmas(4) = params_.prior.parameter_priors.initial_position_sigmas[1];
     }
-    prior_pose_sigmas(5) = params_.depth.use_parameter_covariance
-                               ? params_.depth.parameter_covariance.position_z_noise_sigma
-                               : std::sqrt(state_init.initial_depth_->pose_covariance(2, 2));
+
+    if (params_.depth.enable_depth) {
+      prior_pose_sigmas(5) = params_.depth.use_parameter_covariance
+                                 ? params_.depth.parameter_covariance.position_z_noise_sigma
+                                 : std::sqrt(state_init.initial_depth_->pose_covariance(2, 2));
+    } else {
+      prior_pose_sigmas(5) = params_.prior.parameter_priors.initial_position_sigmas[2];
+    }
 
     // Add initial orientation prior
     if (params_.ahrs.enable_ahrs) {
@@ -239,12 +247,17 @@ void FactorGraphCore::addPriorFactors(const utils::StateInitializer& state_init,
     auto& sigmas = params_.prior.parameter_priors.initial_velocity_sigmas;
     prior_vel_noise = gtsam::noiseModel::Diagonal::Sigmas(toGtsam(sigmas));
   } else {
-    if (params_.dvl.use_parameter_covariance) {
-      auto& sigmas = params_.dvl.parameter_covariance.velocity_noise_sigmas;
-      prior_vel_noise = gtsam::noiseModel::Diagonal::Sigmas(toGtsam(sigmas));
+    if (params_.dvl.enable_dvl) {
+      if (params_.dvl.use_parameter_covariance) {
+        auto& sigmas = params_.dvl.parameter_covariance.velocity_noise_sigmas;
+        prior_vel_noise = gtsam::noiseModel::Diagonal::Sigmas(toGtsam(sigmas));
+      } else {
+        gtsam::Matrix33 dvl_cov = state_init.initial_dvl_->twist_covariance.block<3, 3>(0, 0);
+        prior_vel_noise = gtsam::noiseModel::Diagonal::Covariance(dvl_cov);
+      }
     } else {
-      gtsam::Matrix33 dvl_cov = state_init.initial_dvl_->twist_covariance.block<3, 3>(0, 0);
-      prior_vel_noise = gtsam::noiseModel::Diagonal::Covariance(dvl_cov);
+      auto& sigmas = params_.prior.parameter_priors.initial_velocity_sigmas;
+      prior_vel_noise = gtsam::noiseModel::Diagonal::Sigmas(toGtsam(sigmas));
     }
   }
 
