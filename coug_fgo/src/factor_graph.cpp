@@ -23,7 +23,8 @@
 
 #include <rclcpp_components/register_node_macro.hpp>
 
-#include "coug_fgo/utils/conversions.hpp"
+#include "coug_fgo/utils/ros_conversions.hpp"
+#include "coug_fgo/utils/gtsam_conversions.hpp"
 
 using coug_fgo::utils::toCovariance36Msg;
 using coug_fgo::utils::toGtsam;
@@ -91,7 +92,13 @@ void FactorGraphNode::setupRosInterfaces() {
           return;
         }
         imu_frame_ = child;
-        imu_queue_.push(msg);
+        auto data = std::make_shared<utils::ImuData>();
+        data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
+        data->linear_acceleration = toGtsam(msg->linear_acceleration);
+        data->angular_velocity = toGtsam(msg->angular_velocity);
+        data->linear_acceleration_covariance = toGtsam(msg->linear_acceleration_covariance);
+        data->angular_velocity_covariance = toGtsam(msg->angular_velocity_covariance);
+        imu_queue_.push(data);
       },
       sensor_options);
 
@@ -102,7 +109,11 @@ void FactorGraphNode::setupRosInterfaces() {
           std::string child =
               params_.gps.use_parameter_frame ? params_.gps.parameter_frame : msg->child_frame_id;
           try_lookup_tf(target_T_gps_tf_, child, "GPS");
-          gps_queue_.push(msg);
+          auto data = std::make_shared<utils::OdometryData>();
+          data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
+          data->pose = toGtsam(msg->pose.pose);
+          data->pose_covariance = toGtsam(msg->pose.covariance);
+          gps_queue_.push(data);
         },
         sensor_options);
   }
@@ -113,7 +124,11 @@ void FactorGraphNode::setupRosInterfaces() {
         std::string child =
             params_.depth.use_parameter_frame ? params_.depth.parameter_frame : msg->child_frame_id;
         try_lookup_tf(target_T_depth_tf_, child, "depth");
-        depth_queue_.push(msg);
+        auto data = std::make_shared<utils::OdometryData>();
+        data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
+        data->pose = toGtsam(msg->pose.pose);
+        data->pose_covariance = toGtsam(msg->pose.covariance);
+        depth_queue_.push(data);
 
         if (params_.comparison.enable_loose_dvl_preintegration ||
             params_.comparison.enable_tight_dvl_preintegration) {
@@ -123,7 +138,7 @@ void FactorGraphNode::setupRosInterfaces() {
           }
           frontend_cv_.notify_one();
         } else {
-          double time_since_dvl = (get_clock()->now() - dvl_queue_.getLastTime()).seconds();
+          double time_since_dvl = get_clock()->now().seconds() - dvl_queue_.getLastTime();
           if (state_.load() == State::RUNNING &&
               time_since_dvl > params_.dvl.dropout_timeout_threshold) {
             RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
@@ -146,7 +161,11 @@ void FactorGraphNode::setupRosInterfaces() {
           std::string child =
               params_.mag.use_parameter_frame ? params_.mag.parameter_frame : msg->header.frame_id;
           try_lookup_tf(target_T_mag_tf_, child, "mag");
-          mag_queue_.push(msg);
+          auto data = std::make_shared<utils::MagneticFieldData>();
+          data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
+          data->magnetic_field = toGtsam(msg->magnetic_field);
+          data->magnetic_field_covariance = toGtsam(msg->magnetic_field_covariance);
+          mag_queue_.push(data);
         },
         sensor_options);
   }
@@ -159,7 +178,11 @@ void FactorGraphNode::setupRosInterfaces() {
           std::string child = params_.ahrs.use_parameter_frame ? params_.ahrs.parameter_frame
                                                                : msg->header.frame_id;
           try_lookup_tf(target_T_ahrs_tf_, child, "AHRS");
-          ahrs_queue_.push(msg);
+          auto data = std::make_shared<utils::AhrsData>();
+          data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
+          data->orientation = toGtsam(msg->orientation);
+          data->orientation_covariance = toGtsam(msg->orientation_covariance);
+          ahrs_queue_.push(data);
         },
         sensor_options);
   }
@@ -170,7 +193,11 @@ void FactorGraphNode::setupRosInterfaces() {
         std::string child =
             params_.dvl.use_parameter_frame ? params_.dvl.parameter_frame : msg->header.frame_id;
         try_lookup_tf(target_T_dvl_tf_, child, "DVL");
-        dvl_queue_.push(msg);
+        auto data = std::make_shared<utils::TwistData>();
+        data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
+        data->linear_velocity = toGtsam(msg->twist.twist.linear);
+        data->twist_covariance = toGtsam(msg->twist.covariance);
+        dvl_queue_.push(data);
 
         if (!params_.comparison.enable_loose_dvl_preintegration &&
             !params_.comparison.enable_tight_dvl_preintegration) {
@@ -191,7 +218,11 @@ void FactorGraphNode::setupRosInterfaces() {
                                   ? params_.dynamics.parameter_frame
                                   : msg->header.frame_id;
           try_lookup_tf(target_T_com_tf_, child, "COM");
-          wrench_queue_.push(msg);
+          auto data = std::make_shared<utils::WrenchData>();
+          data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
+          data->force = toGtsam(msg->wrench.force);
+          data->torque = toGtsam(msg->wrench.torque);
+          wrench_queue_.push(data);
         },
         sensor_options);
   }
@@ -325,7 +356,7 @@ void FactorGraphNode::publishSmoothedPath(const gtsam::Values& results,
 
   gtsam::Pose3 target_T_base = toGtsam(target_T_base_tf_.transform);
 
-  std::map<rclcpp::Time, gtsam::Key> keys_snapshot;
+  std::map<double, gtsam::Key> keys_snapshot;
   {
     std::scoped_lock lock(core_->buffer_mutex);
     keys_snapshot = core_->time_to_key;
@@ -335,7 +366,7 @@ void FactorGraphNode::publishSmoothedPath(const gtsam::Values& results,
     if (results.exists(pair.second)) {
       geometry_msgs::msg::PoseStamped ps;
       ps.header.frame_id = params_.map_frame;
-      ps.header.stamp = pair.first;
+      ps.header.stamp = rclcpp::Time(static_cast<int64_t>(pair.first * 1e9));
       ps.pose = toPoseMsg(results.at<gtsam::Pose3>(pair.second) * target_T_base);
       path_msg.poses.push_back(ps);
     }
@@ -501,7 +532,7 @@ void FactorGraphNode::initializeGraph() {
   queues.ahrs = ahrs_queue_.drain();
   queues.dvl = dvl_queue_.drain();
   queues.wrench = wrench_queue_.drain();
-  if (!state_init_->update(get_clock()->now(), queues)) {
+  if (!state_init_->update(get_clock()->now().seconds(), queues)) {
     return;
   }
 
@@ -517,19 +548,19 @@ void FactorGraphNode::initializeGraph() {
 }
 
 void FactorGraphNode::updateGraph() {
-  rclcpp::Time target_time{0, 0, RCL_ROS_TIME};
+  double target_time = 0.0;
   if (params_.comparison.enable_loose_dvl_preintegration ||
       params_.comparison.enable_tight_dvl_preintegration) {
     if (!depth_queue_.empty()) {
-      target_time = rclcpp::Time(depth_queue_.back()->header.stamp);
+      target_time = depth_queue_.back()->timestamp;
     } else {
       return;
     }
   } else {
     if (!dvl_queue_.empty()) {
-      target_time = rclcpp::Time(dvl_queue_.back()->header.stamp);
+      target_time = dvl_queue_.back()->timestamp;
     } else if (!depth_queue_.empty()) {
-      target_time = rclcpp::Time(depth_queue_.back()->header.stamp);
+      target_time = depth_queue_.back()->timestamp;
     } else {
       return;
     }
@@ -581,26 +612,26 @@ void FactorGraphNode::optimizeGraph() {
     }
 
     // --- Publish Results ---
-    publishGlobalOdom(result->pose, result->pose_cov, result->target_time);
+    publishGlobalOdom(result->pose, result->pose_cov, rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
 
     if (params_.publish_global_tf) {
-      broadcastGlobalTf(result->pose, result->target_time);
+      broadcastGlobalTf(result->pose, rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
     }
 
     if (params_.publish_smoothed_path) {
-      publishSmoothedPath(result->all_estimates, result->target_time);
+      publishSmoothedPath(result->all_estimates, rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
     }
 
     if (params_.publish_velocity) {
-      publishVelocity(result->velocity, result->vel_cov, result->target_time);
+      publishVelocity(result->velocity, result->vel_cov, rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
     }
 
     if (params_.publish_imu_bias) {
-      publishImuBias(result->imu_bias, result->bias_cov, result->target_time);
+      publishImuBias(result->imu_bias, result->bias_cov, rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
     }
 
     if (params_.publish_graph_metrics) {
-      publishGraphMetrics(result->target_time);
+      publishGraphMetrics(rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
     }
   } catch (const std::exception& e) {
     RCLCPP_FATAL(get_logger(), "%s", e.what());
@@ -611,19 +642,19 @@ void FactorGraphNode::optimizeGraph() {
 void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrapper& stat) {
   stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "All requested sensors online.");
 
-  auto check_queue = [&](const std::string& name, size_t size, const rclcpp::Time& last_time,
+  auto check_queue = [&](const std::string& name, size_t size, double last_time,
                          bool enabled, bool is_critical, double timeout) {
     if (!enabled) {
       return;
     }
 
     double time_since =
-        (last_time.nanoseconds() > 0) ? (this->get_clock()->now() - last_time).seconds() : -1.0;
+        (last_time > 0.0) ? (this->get_clock()->now().seconds() - last_time) : -1.0;
 
     stat.add(name + " Queue Size", size);
     stat.add(name + " Time Since Last (s)", time_since);
 
-    if (time_since > timeout || (last_time.nanoseconds() == 0 && size == 0)) {
+    if (time_since > timeout || (last_time == 0.0 && size == 0)) {
       if (is_critical) {
         stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, name + " is offline.");
       } else {

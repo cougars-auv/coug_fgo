@@ -14,7 +14,7 @@
 
 /**
  * @file factor_graph_core.hpp
- * @brief ROS-independent GTSAM factor graph logic for AUV state estimation.
+ * @brief C++ GTSAM factor graph logic for AUV state estimation.
  * @author Nelson Durrant
  * @date Jan 2026
  */
@@ -31,13 +31,12 @@
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <rclcpp/rclcpp.hpp>
 
 #include "coug_fgo/factor_graph_parameters.hpp"
 #include "coug_fgo/utils/dvl_loose_preintegrator.hpp"
 #include "coug_fgo/utils/dvl_tight_preintegrator.hpp"
 #include "coug_fgo/utils/state_initializer.hpp"
-#include "coug_fgo/utils/types.hpp"
+#include "coug_fgo/utils/data_types.hpp"
 
 namespace coug_fgo {
 
@@ -54,7 +53,7 @@ struct OptimizeResult {
   gtsam::Matrix bias_cov;
 
   gtsam::Values all_estimates;
-  rclcpp::Time target_time{0, 0, RCL_ROS_TIME};
+  double target_time{0.0};
 
   double total_duration = 0.0;
   double smoother_duration = 0.0;
@@ -69,16 +68,16 @@ struct OptimizeResult {
 
 /**
  * @struct UpdateResult
- * @brief Output from a successful update step (unused messages for re-queueing).
+ * @brief Output from a successful update step (unused structs for re-queueing).
  */
 struct UpdateResult {
-  std::deque<sensor_msgs::msg::Imu::SharedPtr> unused_imu;
-  std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> unused_dvl;
+  std::deque<std::shared_ptr<utils::ImuData>> unused_imu;
+  std::deque<std::shared_ptr<utils::TwistData>> unused_dvl;
 };
 
 /**
  * @class FactorGraphCore
- * @brief ROS-independent core for AUV state estimation via factor graph optimization.
+ * @brief C++ core for AUV state estimation via factor graph optimization.
  */
 class FactorGraphCore {
  public:
@@ -98,10 +97,10 @@ class FactorGraphCore {
   /**
    * @brief Builds factors for one keyframe and writes them to the buffer.
    * @param target_time The keyframe timestamp.
-   * @param msgs Drained sensor messages (consumed).
-   * @return UpdateResult with unused messages, or nullopt if timestamp was stale.
+   * @param msgs Drained sensor data structs (consumed).
+   * @return UpdateResult with unused structs, or nullopt if timestamp was stale.
    */
-  std::optional<UpdateResult> update(const rclcpp::Time& target_time, utils::QueueBundle& msgs);
+  std::optional<UpdateResult> update(double target_time, utils::QueueBundle& msgs);
 
   /**
    * @brief Consumes the buffer and runs the GTSAM smoother.
@@ -109,13 +108,8 @@ class FactorGraphCore {
    */
   std::optional<OptimizeResult> optimize();
 
-  /**
-   * @brief Returns the last processed timestamp (for stale check by the node).
-   */
-  rclcpp::Time prev_time() const { return prev_time_; }
-
   std::mutex buffer_mutex;
-  std::map<rclcpp::Time, gtsam::Key> time_to_key;
+  std::map<double, gtsam::Key> time_to_key;
 
  private:
   // --- Configuration ---
@@ -140,115 +134,115 @@ class FactorGraphCore {
   /**
    * @brief Adds a 2D GPS position factor with lever arm compensation.
    * @param graph The target factor graph.
-   * @param gps_msgs Drained GPS odometry messages.
+   * @param gps_msgs Drained GPS odometry structs.
    */
   void addGpsFactor(gtsam::NonlinearFactorGraph& graph,
-                    const std::deque<nav_msgs::msg::Odometry::SharedPtr>& gps_msgs);
+                    const std::deque<std::shared_ptr<utils::OdometryData>>& gps_msgs);
 
   /**
    * @brief Adds a 1D depth factor with lever arm compensation.
    * @param graph The target factor graph.
-   * @param depth_msgs Drained depth odometry messages.
+   * @param depth_msgs Drained depth odometry structs.
    */
   void addDepthFactor(gtsam::NonlinearFactorGraph& graph,
-                      const std::deque<nav_msgs::msg::Odometry::SharedPtr>& depth_msgs);
+                      const std::deque<std::shared_ptr<utils::OdometryData>>& depth_msgs);
 
   /**
    * @brief Adds an AHRS yaw orientation factor with lever arm compensation.
    * @param graph The target factor graph.
-   * @param ahrs_msgs Drained AHRS IMU messages.
+   * @param ahrs_msgs Drained AHRS IMU structs.
    */
   void addAhrsFactor(gtsam::NonlinearFactorGraph& graph,
-                     const std::deque<sensor_msgs::msg::Imu::SharedPtr>& ahrs_msgs);
+                     const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs);
 
   /**
    * @brief Adds a magnetometer heading factor with lever arm compensation.
    * @param graph The target factor graph.
-   * @param mag_msgs Drained magnetometer messages.
+   * @param mag_msgs Drained magnetometer structs.
    */
   void addMagFactor(gtsam::NonlinearFactorGraph& graph,
-                    const std::deque<sensor_msgs::msg::MagneticField::SharedPtr>& mag_msgs);
+                    const std::deque<std::shared_ptr<utils::MagneticFieldData>>& mag_msgs);
 
   /**
    * @brief Adds a DVL body-frame velocity factor with lever arm compensation.
    * @param graph The target factor graph.
-   * @param dvl_msgs Drained DVL twist messages.
+   * @param dvl_msgs Drained DVL twist structs.
    */
   void addDvlFactor(
       gtsam::NonlinearFactorGraph& graph,
-      const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr>& dvl_msgs);
+      const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs);
 
   /**
    * @brief Adds a constant-velocity (zero-acceleration) prior between keyframes.
    * @param graph The target factor graph.
    * @param target_time The current keyframe timestamp.
    */
-  void addConstVelFactor(gtsam::NonlinearFactorGraph& graph, const rclcpp::Time& target_time);
+  void addConstVelFactor(gtsam::NonlinearFactorGraph& graph, double target_time);
 
   /**
    * @brief Adds a simplified Fossen AUV dynamics factor with lever arm compensation.
    * @param graph The target factor graph.
-   * @param wrench_msgs Drained thruster wrench messages (zero-order hold).
+   * @param wrench_msgs Drained thruster wrench structs (zero-order hold).
    * @param target_time The current keyframe timestamp.
    */
   void addAuvDynamicsFactor(
       gtsam::NonlinearFactorGraph& graph,
-      const std::deque<geometry_msgs::msg::WrenchStamped::SharedPtr>& wrench_msgs,
-      const rclcpp::Time& target_time);
+      const std::deque<std::shared_ptr<utils::WrenchData>>& wrench_msgs,
+      double target_time);
 
   /**
    * @brief Integrates IMU measurements and adds a combined IMU factor.
    * @param graph The target factor graph.
-   * @param imu_msgs Drained, time-sorted IMU messages.
+   * @param imu_msgs Drained, time-sorted IMU structs.
    * @param target_time Integration endpoint timestamp.
    * @param[out] unused_imu Messages with timestamps beyond target_time for re-queueing.
    */
   void addImuPreintFactor(gtsam::NonlinearFactorGraph& graph,
-                          const std::deque<sensor_msgs::msg::Imu::SharedPtr>& imu_msgs,
-                          const rclcpp::Time& target_time,
-                          std::deque<sensor_msgs::msg::Imu::SharedPtr>& unused_imu);
+                          const std::deque<std::shared_ptr<utils::ImuData>>& imu_msgs,
+                          double target_time,
+                          std::deque<std::shared_ptr<utils::ImuData>>& unused_imu);
 
   /**
    * @brief Interpolates AHRS-derived orientation at a target timestamp via SLERP.
-   * @param ahrs_msgs Time-sorted AHRS messages bracketing the target time.
+   * @param ahrs_msgs Time-sorted AHRS structs bracketing the target time.
    * @param target_time The desired interpolation timestamp.
    * @return The interpolated rotation as a GTSAM Rot3.
    */
   gtsam::Rot3 getInterpolatedOrientation(
-      const std::deque<sensor_msgs::msg::Imu::SharedPtr>& ahrs_msgs,
-      const rclcpp::Time& target_time);
+      const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs,
+      double target_time);
 
   /**
    * @brief Integrates DVL measurements (rotated via AHRS) and adds a loosely-coupled preintegrated
    * DVL factor.
    * @param graph The target factor graph.
-   * @param dvl_msgs Drained, time-sorted DVL messages.
-   * @param imu_msgs Drained IMU messages for psuedo-measurements.
-   * @param ahrs_msgs Drained AHRS messages for orientation interpolation.
+   * @param dvl_msgs Drained, time-sorted DVL structs.
+   * @param ahrs_msgs Drained AHRS structs for orientation interpolation.
    * @param target_time Integration endpoint timestamp.
    * @param[out] unused_dvl Messages with timestamps beyond target_time for re-queueing.
    */
   void addDvlLoosePreintFactor(
       gtsam::NonlinearFactorGraph& graph,
-      const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr>& dvl_msgs,
-      const std::deque<sensor_msgs::msg::Imu::SharedPtr>& ahrs_msgs,
-      const rclcpp::Time& target_time,
-      std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr>& unused_dvl);
+      const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
+      const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs,
+      double target_time,
+      std::deque<std::shared_ptr<utils::TwistData>>& unused_dvl);
 
   /**
    * @brief Integrates DVL measurements (rotated via relative IMU rotations) and adds a
    * tightly-coupled preintegrated DVL factor.
    * @param graph The target factor graph.
-   * @param dvl_msgs Drained, time-sorted DVL messages.
-   * @param imu_msgs Drained, time-sorted IMU messages for relative rotation calculation.
+   * @param dvl_msgs Drained, time-sorted DVL structs.
+   * @param imu_msgs Drained, time-sorted IMU structs for relative rotation calculation.
    * @param target_time Integration endpoint timestamp.
    * @param[out] unused_dvl Messages with timestamps beyond target_time for re-queueing.
    */
   void addDvlTightPreintFactor(
       gtsam::NonlinearFactorGraph& graph,
-      const std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr>& dvl_msgs,
-      const std::deque<sensor_msgs::msg::Imu::SharedPtr>& imu_msgs, const rclcpp::Time& target_time,
-      std::deque<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr>& unused_dvl);
+      const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
+      const std::deque<std::shared_ptr<utils::ImuData>>& imu_msgs,
+      double target_time,
+      std::deque<std::shared_ptr<utils::TwistData>>& unused_dvl);
 
   // --- Parameters ---
   const factor_graph_node::Params& params_;
@@ -264,7 +258,7 @@ class FactorGraphCore {
   // --- State Estimates ---
   size_t prev_step_ = 0;
   size_t current_step_ = 1;
-  rclcpp::Time prev_time_{0, 0, RCL_ROS_TIME};
+  double prev_time_{0.0};
 
   gtsam::Pose3 prev_pose_;
   gtsam::Vector3 prev_vel_;
@@ -275,13 +269,13 @@ class FactorGraphCore {
   gtsam::Matrix3 last_dvl_covariance_ = gtsam::Matrix3::Zero();
   gtsam::Vector3 last_imu_acc_ = gtsam::Vector3::Zero();
   gtsam::Vector3 last_imu_gyr_ = gtsam::Vector3::Zero();
-  geometry_msgs::msg::WrenchStamped::SharedPtr last_wrench_msg_;
+  std::shared_ptr<utils::WrenchData> last_wrench_msg_;
 
   // --- Buffer ---
   gtsam::NonlinearFactorGraph buffer_graph_;
   gtsam::Values buffer_values_;
   gtsam::IncrementalFixedLagSmoother::KeyTimestampMap buffer_timestamps_;
-  rclcpp::Time buffer_target_time_{0, 0, RCL_ROS_TIME};
+  double buffer_target_time_{0.0};
   size_t buffer_last_step_ = 0;
   bool has_buffer_ = false;
 };

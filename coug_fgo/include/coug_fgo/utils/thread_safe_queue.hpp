@@ -23,14 +23,13 @@
 
 #include <deque>
 #include <mutex>
-#include <rclcpp/rclcpp.hpp>
 #include <utility>
 
 namespace coug_fgo::utils {
 
 /**
  * @class ThreadSafeQueue
- * @brief Utility for thread-safe queue operations.
+ * @brief Utility class for thread-safe queue operations.
  */
 template <typename T>
 class ThreadSafeQueue {
@@ -42,7 +41,7 @@ class ThreadSafeQueue {
   void push(const T& value) {
     std::scoped_lock lock(mutex_);
     queue_.push_back(value);
-    last_msg_time_ = rclcpp::Time(value->header.stamp);
+    last_msg_time_ = value->timestamp;
   }
 
   /**
@@ -77,10 +76,10 @@ class ThreadSafeQueue {
   }
 
   /**
-   * @brief Gets the timestamp of the last message added to the queue.
-   * @return The timestamp as rclcpp::Time.
+   * @brief Gets the timestamp of the last item added to the queue.
+   * @return The timestamp as a double (seconds).
    */
-  rclcpp::Time getLastTime() const {
+  double getLastTime() const {
     std::scoped_lock lock(mutex_);
     return last_msg_time_;
   }
@@ -107,7 +106,7 @@ class ThreadSafeQueue {
  private:
   mutable std::mutex mutex_;
   std::deque<T> queue_;
-  rclcpp::Time last_msg_time_{0, 0, RCL_ROS_TIME};
+  double last_msg_time_{0.0};
 };
 
 }  // namespace coug_fgo::utils

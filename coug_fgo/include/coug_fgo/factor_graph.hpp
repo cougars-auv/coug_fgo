@@ -47,7 +47,7 @@
 
 #include "coug_fgo/factor_graph_core.hpp"
 #include "coug_fgo/factor_graph_parameters.hpp"
-#include "coug_fgo/utils/conversions.hpp"
+#include "coug_fgo/utils/ros_conversions.hpp"
 #include "coug_fgo/utils/state_initializer.hpp"
 #include "coug_fgo/utils/thread_safe_queue.hpp"
 
@@ -191,13 +191,13 @@ class FactorGraphNode : public rclcpp::Node {
   std::atomic<size_t> total_variables_{0};
 
   // --- Message Queues ---
-  utils::ThreadSafeQueue<sensor_msgs::msg::Imu::SharedPtr> imu_queue_;
-  utils::ThreadSafeQueue<nav_msgs::msg::Odometry::SharedPtr> gps_queue_;
-  utils::ThreadSafeQueue<nav_msgs::msg::Odometry::SharedPtr> depth_queue_;
-  utils::ThreadSafeQueue<sensor_msgs::msg::MagneticField::SharedPtr> mag_queue_;
-  utils::ThreadSafeQueue<sensor_msgs::msg::Imu::SharedPtr> ahrs_queue_;
-  utils::ThreadSafeQueue<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> dvl_queue_;
-  utils::ThreadSafeQueue<geometry_msgs::msg::WrenchStamped::SharedPtr> wrench_queue_;
+  utils::ThreadSafeQueue<std::shared_ptr<utils::ImuData>> imu_queue_;
+  utils::ThreadSafeQueue<std::shared_ptr<utils::OdometryData>> gps_queue_;
+  utils::ThreadSafeQueue<std::shared_ptr<utils::OdometryData>> depth_queue_;
+  utils::ThreadSafeQueue<std::shared_ptr<utils::MagneticFieldData>> mag_queue_;
+  utils::ThreadSafeQueue<std::shared_ptr<utils::AhrsData>> ahrs_queue_;
+  utils::ThreadSafeQueue<std::shared_ptr<utils::TwistData>> dvl_queue_;
+  utils::ThreadSafeQueue<std::shared_ptr<utils::WrenchData>> wrench_queue_;
 
   // --- Multithreading ---
   std::thread frontend_thread_;
