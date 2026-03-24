@@ -47,7 +47,9 @@ inline gtsam::Point3 toGtsam(const geometry_msgs::msg::Point& msg) { return {msg
  * @param msg The input Vector3 message.
  * @return The resulting gtsam::Vector3.
  */
-inline gtsam::Vector3 toGtsam(const geometry_msgs::msg::Vector3& msg) { return {msg.x, msg.y, msg.z}; }
+inline gtsam::Vector3 toGtsam(const geometry_msgs::msg::Vector3& msg) {
+  return {msg.x, msg.y, msg.z};
+}
 
 /**
  * @brief Converts a geometry_msgs Quaternion to a GTSAM Rot3.

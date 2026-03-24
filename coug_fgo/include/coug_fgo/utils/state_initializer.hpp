@@ -119,8 +119,10 @@ class StateInitializer {
         initial_imu_ = std::make_shared<ImuData>(*msg);
       } else {
         double n = static_cast<double>(imu_count_ + 1);
-        initial_imu_->linear_acceleration += (msg->linear_acceleration - initial_imu_->linear_acceleration) / n;
-        initial_imu_->angular_velocity += (msg->angular_velocity - initial_imu_->angular_velocity) / n;
+        initial_imu_->linear_acceleration +=
+            (msg->linear_acceleration - initial_imu_->linear_acceleration) / n;
+        initial_imu_->angular_velocity +=
+            (msg->angular_velocity - initial_imu_->angular_velocity) / n;
         initial_imu_->timestamp = msg->timestamp;
       }
       imu_count_++;
@@ -294,8 +296,7 @@ class StateInitializer {
     }
 
     // Account for DVL lever arm
-    gtsam::Vector3 target_v_dvl =
-        tfs.target_T_dvl.rotation() * initial_dvl_->linear_velocity;
+    gtsam::Vector3 target_v_dvl = tfs.target_T_dvl.rotation() * initial_dvl_->linear_velocity;
 
     return map_R_target.rotate(target_v_dvl);
   }

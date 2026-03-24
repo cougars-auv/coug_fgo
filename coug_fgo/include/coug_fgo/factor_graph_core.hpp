@@ -33,10 +33,10 @@
 #include <optional>
 
 #include "coug_fgo/factor_graph_parameters.hpp"
+#include "coug_fgo/utils/data_types.hpp"
 #include "coug_fgo/utils/dvl_loose_preintegrator.hpp"
 #include "coug_fgo/utils/dvl_tight_preintegrator.hpp"
 #include "coug_fgo/utils/state_initializer.hpp"
-#include "coug_fgo/utils/data_types.hpp"
 
 namespace coug_fgo {
 
@@ -168,9 +168,8 @@ class FactorGraphCore {
    * @param graph The target factor graph.
    * @param dvl_msgs Drained DVL twist structs.
    */
-  void addDvlFactor(
-      gtsam::NonlinearFactorGraph& graph,
-      const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs);
+  void addDvlFactor(gtsam::NonlinearFactorGraph& graph,
+                    const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs);
 
   /**
    * @brief Adds a constant-velocity (zero-acceleration) prior between keyframes.
@@ -185,10 +184,9 @@ class FactorGraphCore {
    * @param wrench_msgs Drained thruster wrench structs (zero-order hold).
    * @param target_time The current keyframe timestamp.
    */
-  void addAuvDynamicsFactor(
-      gtsam::NonlinearFactorGraph& graph,
-      const std::deque<std::shared_ptr<utils::WrenchData>>& wrench_msgs,
-      double target_time);
+  void addAuvDynamicsFactor(gtsam::NonlinearFactorGraph& graph,
+                            const std::deque<std::shared_ptr<utils::WrenchData>>& wrench_msgs,
+                            double target_time);
 
   /**
    * @brief Integrates IMU measurements and adds a combined IMU factor.
@@ -209,8 +207,7 @@ class FactorGraphCore {
    * @return The interpolated rotation as a GTSAM Rot3.
    */
   gtsam::Rot3 getInterpolatedOrientation(
-      const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs,
-      double target_time);
+      const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs, double target_time);
 
   /**
    * @brief Integrates DVL measurements (rotated via AHRS) and adds a loosely-coupled preintegrated
@@ -221,12 +218,11 @@ class FactorGraphCore {
    * @param target_time Integration endpoint timestamp.
    * @param[out] unused_dvl Messages with timestamps beyond target_time for re-queueing.
    */
-  void addDvlLoosePreintFactor(
-      gtsam::NonlinearFactorGraph& graph,
-      const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
-      const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs,
-      double target_time,
-      std::deque<std::shared_ptr<utils::TwistData>>& unused_dvl);
+  void addDvlLoosePreintFactor(gtsam::NonlinearFactorGraph& graph,
+                               const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
+                               const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs,
+                               double target_time,
+                               std::deque<std::shared_ptr<utils::TwistData>>& unused_dvl);
 
   /**
    * @brief Integrates DVL measurements (rotated via relative IMU rotations) and adds a
@@ -237,12 +233,11 @@ class FactorGraphCore {
    * @param target_time Integration endpoint timestamp.
    * @param[out] unused_dvl Messages with timestamps beyond target_time for re-queueing.
    */
-  void addDvlTightPreintFactor(
-      gtsam::NonlinearFactorGraph& graph,
-      const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
-      const std::deque<std::shared_ptr<utils::ImuData>>& imu_msgs,
-      double target_time,
-      std::deque<std::shared_ptr<utils::TwistData>>& unused_dvl);
+  void addDvlTightPreintFactor(gtsam::NonlinearFactorGraph& graph,
+                               const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
+                               const std::deque<std::shared_ptr<utils::ImuData>>& imu_msgs,
+                               double target_time,
+                               std::deque<std::shared_ptr<utils::TwistData>>& unused_dvl);
 
   // --- Parameters ---
   const factor_graph_node::Params& params_;

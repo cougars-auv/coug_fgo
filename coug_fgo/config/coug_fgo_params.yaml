@@ -26,6 +26,19 @@
     relinearize_threshold: 0.1 # Lower values are more accurate but slower.
     relinearize_skip: 1 # Number of updates to skip between relinearizations.
 
+    # --- Keyframe Settings ---
+    #
+    # Keyframe Sources:
+    # - "DVL": Trigger keyframes when DVL data arrives. (default)
+    # - "Depth": Trigger keyframes when depth data arrives.
+    # - "Timer": Trigger keyframes periodically at keyframe_timer_hz.
+    # - "None": Disable the keyframe trigger block.
+
+    keyframe_source: "DVL"
+    backup_keyframe_source: "None" # Fallback source if the primary source drops out.
+    keyframe_timeout: 0.25 # [s] Time before determining the primary source has dropped out.
+    keyframe_timer_hz: 10.0 # [Hz] Period of the periodic timer (if "Timer" is used).
+
     # --- ROS Topics and Frames ---
     imu_topic: "imu/data"
     gps_odom_topic: "odometry/gps"
@@ -115,7 +128,6 @@
       use_parameter_covariance: false
       parameter_covariance:
         velocity_noise_sigmas: [0.02, 0.02, 0.02] # [m/s] DVL body-velocity uncertainty sigmas.
-      dropout_timeout_threshold: 0.25 # [s] Time before switching to depth-driven keyframes (DVL dropout).
       diagnostic_timeout: 0.25 # [s]
       robust_kernel: "None"
       robust_k: 1.345

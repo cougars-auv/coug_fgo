@@ -23,8 +23,8 @@
 
 #include <rclcpp_components/register_node_macro.hpp>
 
-#include "coug_fgo/utils/ros_conversions.hpp"
 #include "coug_fgo/utils/gtsam_conversions.hpp"
+#include "coug_fgo/utils/ros_conversions.hpp"
 
 using coug_fgo::utils::toCovariance36Msg;
 using coug_fgo::utils::toGtsam;
@@ -130,26 +130,12 @@ void FactorGraphNode::setupRosInterfaces() {
         data->pose_covariance = toGtsam(msg->pose.covariance);
         depth_queue_.push(data);
 
-        if (params_.comparison.enable_loose_dvl_preintegration ||
-            params_.comparison.enable_tight_dvl_preintegration) {
+        if (params_.keyframe_source == "Depth" || params_.backup_keyframe_source == "Depth") {
           {
             std::scoped_lock lock(frontend_trigger_mutex_);
             frontend_trigger_ = true;
           }
           frontend_cv_.notify_one();
-        } else {
-          double time_since_dvl = get_clock()->now().seconds() - dvl_queue_.getLastTime();
-          if (state_.load() == State::RUNNING &&
-              time_since_dvl > params_.dvl.dropout_timeout_threshold) {
-            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
-                                 "DVL timed out (%.2fs)! Using depth sensor to trigger keyframes.",
-                                 time_since_dvl);
-            {
-              std::scoped_lock lock(frontend_trigger_mutex_);
-              frontend_trigger_ = true;
-            }
-            frontend_cv_.notify_one();
-          }
         }
       },
       sensor_options);
@@ -199,8 +185,7 @@ void FactorGraphNode::setupRosInterfaces() {
         data->twist_covariance = toGtsam(msg->twist.covariance);
         dvl_queue_.push(data);
 
-        if (!params_.comparison.enable_loose_dvl_preintegration &&
-            !params_.comparison.enable_tight_dvl_preintegration) {
+        if (params_.keyframe_source == "DVL" || params_.backup_keyframe_source == "DVL") {
           {
             std::scoped_lock lock(frontend_trigger_mutex_);
             frontend_trigger_ = true;
@@ -225,6 +210,17 @@ void FactorGraphNode::setupRosInterfaces() {
           wrench_queue_.push(data);
         },
         sensor_options);
+  }
+
+  if (params_.keyframe_source == "Timer" || params_.backup_keyframe_source == "Timer") {
+    double period = 1.0 / params_.keyframe_timer_hz;
+    keyframe_timer_ = create_wall_timer(std::chrono::duration<double>(period), [this]() {
+      {
+        std::scoped_lock lock(frontend_trigger_mutex_);
+        frontend_trigger_ = true;
+      }
+      frontend_cv_.notify_one();
+    });
   }
 
   // --- ROS Diagnostics ---
@@ -548,22 +544,34 @@ void FactorGraphNode::initializeGraph() {
 }
 
 void FactorGraphNode::updateGraph() {
+  std::string active_source = params_.keyframe_source;
+  if (active_source != "Timer") {
+    double last_received =
+        (active_source == "DVL") ? dvl_queue_.getLastTime() : depth_queue_.getLastTime();
+
+    if (last_received == 0.0 ||
+        (get_clock()->now().seconds() - last_received) > params_.keyframe_timeout) {
+      if (params_.backup_keyframe_source != "None") {
+        active_source = params_.backup_keyframe_source;
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+                             "Primary keyframe source '%s' timed out! Using backup '%s'.",
+                             params_.keyframe_source.c_str(), active_source.c_str());
+      }
+    }
+  }
+
+  // Extract target time
   double target_time = 0.0;
-  if (params_.comparison.enable_loose_dvl_preintegration ||
-      params_.comparison.enable_tight_dvl_preintegration) {
-    if (!depth_queue_.empty()) {
-      target_time = depth_queue_.back()->timestamp;
-    } else {
-      return;
-    }
-  } else {
-    if (!dvl_queue_.empty()) {
-      target_time = dvl_queue_.back()->timestamp;
-    } else if (!depth_queue_.empty()) {
-      target_time = depth_queue_.back()->timestamp;
-    } else {
-      return;
-    }
+  if (active_source == "DVL" && !dvl_queue_.empty()) {
+    target_time = dvl_queue_.getLastTime();
+  } else if (active_source == "Depth" && !depth_queue_.empty()) {
+    target_time = depth_queue_.getLastTime();
+  } else if (active_source == "Timer") {
+    target_time = imu_queue_.getLastTime();
+  }
+
+  if (target_time == 0.0) {
+    return;
   }
 
   // --- Update Request ---
@@ -612,22 +620,27 @@ void FactorGraphNode::optimizeGraph() {
     }
 
     // --- Publish Results ---
-    publishGlobalOdom(result->pose, result->pose_cov, rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
+    publishGlobalOdom(result->pose, result->pose_cov,
+                      rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
 
     if (params_.publish_global_tf) {
-      broadcastGlobalTf(result->pose, rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
+      broadcastGlobalTf(result->pose,
+                        rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
     }
 
     if (params_.publish_smoothed_path) {
-      publishSmoothedPath(result->all_estimates, rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
+      publishSmoothedPath(result->all_estimates,
+                          rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
     }
 
     if (params_.publish_velocity) {
-      publishVelocity(result->velocity, result->vel_cov, rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
+      publishVelocity(result->velocity, result->vel_cov,
+                      rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
     }
 
     if (params_.publish_imu_bias) {
-      publishImuBias(result->imu_bias, result->bias_cov, rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
+      publishImuBias(result->imu_bias, result->bias_cov,
+                     rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
     }
 
     if (params_.publish_graph_metrics) {
@@ -642,14 +655,13 @@ void FactorGraphNode::optimizeGraph() {
 void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrapper& stat) {
   stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "All requested sensors online.");
 
-  auto check_queue = [&](const std::string& name, size_t size, double last_time,
-                         bool enabled, bool is_critical, double timeout) {
+  auto check_queue = [&](const std::string& name, size_t size, double last_time, bool enabled,
+                         bool is_critical, double timeout) {
     if (!enabled) {
       return;
     }
 
-    double time_since =
-        (last_time > 0.0) ? (this->get_clock()->now().seconds() - last_time) : -1.0;
+    double time_since = (last_time > 0.0) ? (this->get_clock()->now().seconds() - last_time) : -1.0;
 
     stat.add(name + " Queue Size", size);
     stat.add(name + " Time Since Last (s)", time_since);

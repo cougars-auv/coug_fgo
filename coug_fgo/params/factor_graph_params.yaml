@@ -32,6 +32,8 @@ factor_graph_node:
   solver_type:
     type: string
     default_value: "IncrementalFixedLagSmoother"
+    validation:
+      one_of<>: [["IncrementalFixedLagSmoother", "ISAM2"]]
   max_update_rate:
     type: double
     default_value: -1.0
@@ -47,6 +49,24 @@ factor_graph_node:
   relinearize_skip:
     type: int
     default_value: 1
+
+   # --- Keyframe Settings ---
+  keyframe_source:
+    type: string
+    default_value: "DVL"
+    validation:
+      one_of<>: [["DVL", "Depth", "Timer"]]
+  backup_keyframe_source:
+    type: string
+    default_value: "None"
+    validation:
+      one_of<>: [["None", "DVL", "Depth", "Timer"]]
+  keyframe_timeout:
+    type: double
+    default_value: 0.25
+  keyframe_timer_hz:
+    type: double
+    default_value: 10.0
 
   # --- ROS Topics and Frames ---
   imu_topic:
@@ -159,6 +179,8 @@ factor_graph_node:
     robust_kernel:
       type: string
       default_value: "None"
+      validation:
+        one_of<>: [["None", "Huber", "Tukey"]]
     robust_k:
       type: double
       default_value: 1.345
@@ -183,6 +205,8 @@ factor_graph_node:
     robust_kernel:
       type: string
       default_value: "None"
+      validation:
+        one_of<>: [["None", "Huber", "Tukey"]]
     robust_k:
       type: double
       default_value: 1.345
@@ -216,6 +240,8 @@ factor_graph_node:
     robust_kernel:
       type: string
       default_value: "None"
+      validation:
+        one_of<>: [["None", "Huber", "Tukey"]]
     robust_k:
       type: double
       default_value: 1.345
@@ -249,6 +275,8 @@ factor_graph_node:
     robust_kernel:
       type: string
       default_value: "None"
+      validation:
+        one_of<>: [["None", "Huber", "Tukey"]]
     robust_k:
       type: double
       default_value: 1.345
@@ -267,15 +295,14 @@ factor_graph_node:
       velocity_noise_sigmas:
         type: double_array
         default_value: [0.02, 0.02, 0.02]
-    dropout_timeout_threshold:
-      type: double
-      default_value: 0.25
     diagnostic_timeout:
       type: double
       default_value: 0.25
     robust_kernel:
       type: string
       default_value: "None"
+      validation:
+        one_of<>: [["None", "Huber", "Tukey"]]
     robust_k:
       type: double
       default_value: 1.345
@@ -322,6 +349,8 @@ factor_graph_node:
     robust_kernel:
       type: string
       default_value: "None"
+      validation:
+        one_of<>: [["None", "Huber", "Tukey"]]
     robust_k:
       type: double
       default_value: 1.345
