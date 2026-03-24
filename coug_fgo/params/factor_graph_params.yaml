@@ -127,6 +127,16 @@ factor_graph_node:
     parameter_frame:
       type: string
       default_value: "imu_link"
+    use_parameter_tf:
+      type: bool
+      default_value: false
+    parameter_tf:
+      position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0, 1.0]
     use_parameter_covariance:
       type: bool
       default_value: false
@@ -166,6 +176,16 @@ factor_graph_node:
     parameter_frame:
       type: string
       default_value: "gps_link"
+    use_parameter_tf:
+      type: bool
+      default_value: false
+    parameter_tf:
+      position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0, 1.0]
     use_parameter_covariance:
       type: bool
       default_value: false
@@ -198,6 +218,16 @@ factor_graph_node:
     parameter_frame:
       type: string
       default_value: "depth_link"
+    use_parameter_tf:
+      type: bool
+      default_value: false
+    parameter_tf:
+      position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0, 1.0]
     use_parameter_covariance:
       type: bool
       default_value: false
@@ -230,6 +260,16 @@ factor_graph_node:
     parameter_frame:
       type: string
       default_value: "mag_link"
+    use_parameter_tf:
+      type: bool
+      default_value: false
+    parameter_tf:
+      position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0, 1.0]
     use_parameter_covariance:
       type: bool
       default_value: false
@@ -265,6 +305,16 @@ factor_graph_node:
     parameter_frame:
       type: string
       default_value: "ahrs_link"
+    use_parameter_tf:
+      type: bool
+      default_value: false
+    parameter_tf:
+      position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0, 1.0]
     use_parameter_covariance:
       type: bool
       default_value: false
@@ -300,6 +350,16 @@ factor_graph_node:
     parameter_frame:
       type: string
       default_value: "dvl_link"
+    use_parameter_tf:
+      type: bool
+      default_value: false
+    parameter_tf:
+      position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0, 1.0]
     use_parameter_covariance:
       type: bool
       default_value: false
@@ -343,6 +403,16 @@ factor_graph_node:
     parameter_frame:
       type: string
       default_value: "com_link"
+    use_parameter_tf:
+      type: bool
+      default_value: false
+    parameter_tf:
+      position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0, 1.0]
     prediction_noise_sigmas:
       type: double_array
       default_value: [0.1, 0.1, 0.1]

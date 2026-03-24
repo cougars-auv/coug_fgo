@@ -64,6 +64,10 @@
 
     imu:
       use_parameter_frame: false
+      use_parameter_tf: false
+      parameter_tf: # Relative to the target frame.
+        position: [0.0, 0.0, 0.0] # [x, y, z]
+        orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
       parameter_covariance:
         accel_noise_sigmas: [0.0078, 0.0078, 0.0078] # [m/s^2] Accelerometer measurement noise sigmas.
@@ -78,6 +82,10 @@
       enable_gps: false
       enable_gps_init_only: false
       use_parameter_frame: false
+      use_parameter_tf: false
+      parameter_tf: # Relative to the target frame.
+        position: [0.0, 0.0, 0.0] # [x, y, z]
+        orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
       parameter_covariance:
         position_noise_sigmas: [0.015, 0.015] # [m] GPS position uncertainty sigmas.
@@ -89,6 +97,10 @@
       enable_depth: true
       enable_depth_init_only: false
       use_parameter_frame: false
+      use_parameter_tf: false
+      parameter_tf: # Relative to the target frame.
+        position: [0.0, 0.0, 0.0] # [x, y, z]
+        orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
       parameter_covariance:
         position_z_noise_sigma: 0.02 # [m] Depth sensor Z-position uncertainty sigma.
@@ -100,6 +112,10 @@
       enable_mag: false
       enable_mag_init_only: false
       use_parameter_frame: false
+      use_parameter_tf: false
+      parameter_tf: # Relative to the target frame.
+        position: [0.0, 0.0, 0.0] # [x, y, z]
+        orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
       parameter_covariance:
         magnetic_field_noise_sigmas: [0.003, 0.003, 0.003] # [normalized] Magnetic field uncertainty sigmas.
@@ -116,6 +132,10 @@
       enable_ahrs: false
       enable_ahrs_init_only: false
       use_parameter_frame: false
+      use_parameter_tf: false
+      parameter_tf: # Relative to the target frame.
+        position: [0.0, 0.0, 0.0] # [x, y, z]
+        orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
       parameter_covariance:
         yaw_noise_sigma: 0.01745 # [rad] AHRS sensor yaw uncertainty sigma.
@@ -129,6 +149,10 @@
       enable_dvl: true
       enable_dvl_init_only: false
       use_parameter_frame: false
+      use_parameter_tf: false
+      parameter_tf: # Relative to the target frame.
+        position: [0.0, 0.0, 0.0] # [x, y, z]
+        orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
       parameter_covariance:
         velocity_noise_sigmas: [0.02, 0.02, 0.02] # [m/s] DVL body-velocity uncertainty sigmas.
@@ -145,6 +169,10 @@
       enable_dynamics: false
       enable_dynamics_dropout_only: false
       use_parameter_frame: false
+      use_parameter_tf: false
+      parameter_tf: # Relative to the target frame.
+        position: [0.0, 0.0, 0.0] # [x, y, z]
+        orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       prediction_noise_sigmas: [0.1, 0.1, 0.1] # Model prediction uncertainty sigmas.
       mass: [31.87, 60.46, 60.46] # [kg] Mass of the vehicle (diagonal)
       linear_drag: [1.59, 3.02, 3.02] # Linear drag coefficient (diagonal)
