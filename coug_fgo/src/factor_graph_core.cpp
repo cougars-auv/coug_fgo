@@ -721,7 +721,9 @@ std::optional<UpdateResult> FactorGraphCore::update(double target_time, utils::Q
   if (params_.gps.enable_gps) {
     addGpsFactor(new_graph, msgs.gps);
   }
-  addDepthFactor(new_graph, msgs.depth);
+  if (params_.depth.enable_depth) {
+    addDepthFactor(new_graph, msgs.depth);
+  }
   if (params_.mag.enable_mag) {
     addMagFactor(new_graph, msgs.mag);
   }
@@ -743,7 +745,7 @@ std::optional<UpdateResult> FactorGraphCore::update(double target_time, utils::Q
     }
   };
 
-  if (msgs.dvl.empty()) {
+  if (msgs.dvl.empty() || !params_.dvl.enable_dvl) {
     addDropoutFactors(new_graph);
   } else {
     if (params_.comparison.enable_loose_dvl_preintegration) {

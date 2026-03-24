@@ -57,7 +57,9 @@ class StateInitializer {
       if (params_.gps.enable_gps || params_.gps.enable_gps_init_only) {
         initial_gps_ = queues.gps.back();
       }
-      initial_depth_ = queues.depth.back();
+      if (params_.depth.enable_depth || params_.depth.enable_depth_init_only) {
+        initial_depth_ = queues.depth.back();
+      }
       if (params_.mag.enable_mag || params_.mag.enable_mag_init_only) {
         initial_mag_ = queues.mag.back();
       }
@@ -65,7 +67,9 @@ class StateInitializer {
           params_.comparison.enable_loose_dvl_preintegration) {
         initial_ahrs_ = queues.ahrs.back();
       }
-      initial_dvl_ = queues.dvl.back();
+      if (params_.dvl.enable_dvl || params_.dvl.enable_dvl_init_only) {
+        initial_dvl_ = queues.dvl.back();
+      }
       return true;
     }
 
@@ -87,11 +91,12 @@ class StateInitializer {
     pose_ = gtsam::Pose3(map_R_target, computeInitialPosition(map_R_target, tfs));
     velocity_ = computeInitialVelocity(map_R_target, tfs);
     bias_ = computeInitialBias();
-    if (params_.comparison.enable_loose_dvl_preintegration ||
-        params_.comparison.enable_tight_dvl_preintegration) {
+    if (params_.keyframe_source == "DVL") {
+      time_ = initial_dvl_->timestamp;
+    } else if (params_.keyframe_source == "Depth") {
       time_ = initial_depth_->timestamp;
     } else {
-      time_ = initial_dvl_->timestamp;
+      time_ = initial_imu_->timestamp;
     }
   }
 
@@ -146,30 +151,35 @@ class StateInitializer {
     }
 
     // Average Depth
-    for (const auto& msg : queues.depth) {
-      if (depth_count_ == 0) {
-        initial_depth_ = std::make_shared<OdometryData>(*msg);
-      } else {
-        double n = static_cast<double>(depth_count_ + 1);
-        gtsam::Point3 current_p = msg->pose.translation();
-        gtsam::Point3 init_p = initial_depth_->pose.translation();
-        init_p.z() += (current_p.z() - init_p.z()) / n;
-        initial_depth_->pose = gtsam::Pose3(initial_depth_->pose.rotation(), init_p);
-        initial_depth_->timestamp = msg->timestamp;
+    if (params_.depth.enable_depth || params_.depth.enable_depth_init_only) {
+      for (const auto& msg : queues.depth) {
+        if (depth_count_ == 0) {
+          initial_depth_ = std::make_shared<OdometryData>(*msg);
+        } else {
+          double n = static_cast<double>(depth_count_ + 1);
+          gtsam::Point3 current_p = msg->pose.translation();
+          gtsam::Point3 init_p = initial_depth_->pose.translation();
+          init_p.z() += (current_p.z() - init_p.z()) / n;
+          initial_depth_->pose = gtsam::Pose3(initial_depth_->pose.rotation(), init_p);
+          initial_depth_->timestamp = msg->timestamp;
+        }
+        depth_count_++;
       }
-      depth_count_++;
     }
 
     // Average DVL
-    for (const auto& msg : queues.dvl) {
-      if (dvl_count_ == 0) {
-        initial_dvl_ = std::make_shared<TwistData>(*msg);
-      } else {
-        double n = static_cast<double>(dvl_count_ + 1);
-        initial_dvl_->linear_velocity += (msg->linear_velocity - initial_dvl_->linear_velocity) / n;
-        initial_dvl_->timestamp = msg->timestamp;
+    if (params_.dvl.enable_dvl || params_.dvl.enable_dvl_init_only) {
+      for (const auto& msg : queues.dvl) {
+        if (dvl_count_ == 0) {
+          initial_dvl_ = std::make_shared<TwistData>(*msg);
+        } else {
+          double n = static_cast<double>(dvl_count_ + 1);
+          initial_dvl_->linear_velocity +=
+              (msg->linear_velocity - initial_dvl_->linear_velocity) / n;
+          initial_dvl_->timestamp = msg->timestamp;
+        }
+        dvl_count_++;
       }
-      dvl_count_++;
     }
 
     // Average Magnetometer
@@ -275,9 +285,11 @@ class StateInitializer {
       map_p_target = initial_gps_->pose.translation() - map_p_target_gps;
     }
 
-    // Account for depth lever arm
-    gtsam::Point3 map_p_target_depth = map_R_target.rotate(tfs.target_T_depth.translation());
-    map_p_target.z() = initial_depth_->pose.translation().z() - map_p_target_depth.z();
+    if (params_.depth.enable_depth || params_.depth.enable_depth_init_only) {
+      // Account for depth lever arm
+      gtsam::Point3 map_p_target_depth = map_R_target.rotate(tfs.target_T_depth.translation());
+      map_p_target.z() = initial_depth_->pose.translation().z() - map_p_target_depth.z();
+    }
 
     return map_p_target;
   }
@@ -295,10 +307,13 @@ class StateInitializer {
       return map_R_target.rotate(target_v_target);
     }
 
-    // Account for DVL lever arm
-    gtsam::Vector3 target_v_dvl = tfs.target_T_dvl.rotation() * initial_dvl_->linear_velocity;
+    if (params_.dvl.enable_dvl || params_.dvl.enable_dvl_init_only) {
+      // Account for DVL lever arm
+      gtsam::Vector3 target_v_dvl = tfs.target_T_dvl.rotation() * initial_dvl_->linear_velocity;
+      return map_R_target.rotate(target_v_dvl);
+    }
 
-    return map_R_target.rotate(target_v_dvl);
+    return gtsam::Vector3::Zero();
   }
 
   /**

@@ -186,6 +186,12 @@ factor_graph_node:
       default_value: 1.345
 
   depth:
+    enable_depth:
+      type: bool
+      default_value: true
+    enable_depth_init_only:
+      type: bool
+      default_value: false
     use_parameter_frame:
       type: bool
       default_value: false
@@ -282,6 +288,12 @@ factor_graph_node:
       default_value: 1.345
 
   dvl:
+    enable_dvl:
+      type: bool
+      default_value: true
+    enable_dvl_init_only:
+      type: bool
+      default_value: false
     use_parameter_frame:
       type: bool
       default_value: false

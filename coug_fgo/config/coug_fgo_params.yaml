@@ -86,6 +86,8 @@
       robust_k: 1.345
 
     depth:
+      enable_depth: true
+      enable_depth_init_only: false
       use_parameter_frame: false
       use_parameter_covariance: false
       parameter_covariance:
@@ -124,6 +126,8 @@
       robust_k: 1.345
 
     dvl:
+      enable_dvl: true
+      enable_dvl_init_only: false
       use_parameter_frame: false
       use_parameter_covariance: false
       parameter_covariance:

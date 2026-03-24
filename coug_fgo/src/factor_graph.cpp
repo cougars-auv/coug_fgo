@@ -118,27 +118,29 @@ void FactorGraphNode::setupRosInterfaces() {
         sensor_options);
   }
 
-  depth_sub_ = create_subscription<nav_msgs::msg::Odometry>(
-      params_.depth_odom_topic, rclcpp::SensorDataQoS(),
-      [this, try_lookup_tf](const nav_msgs::msg::Odometry::SharedPtr msg) {
-        std::string child =
-            params_.depth.use_parameter_frame ? params_.depth.parameter_frame : msg->child_frame_id;
-        try_lookup_tf(target_T_depth_tf_, child, "depth");
-        auto data = std::make_shared<utils::OdometryData>();
-        data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
-        data->pose = toGtsam(msg->pose.pose);
-        data->pose_covariance = toGtsam(msg->pose.covariance);
-        depth_queue_.push(data);
+  if (params_.depth.enable_depth || params_.depth.enable_depth_init_only) {
+    depth_sub_ = create_subscription<nav_msgs::msg::Odometry>(
+        params_.depth_odom_topic, rclcpp::SensorDataQoS(),
+        [this, try_lookup_tf](const nav_msgs::msg::Odometry::SharedPtr msg) {
+          std::string child = params_.depth.use_parameter_frame ? params_.depth.parameter_frame
+                                                                : msg->child_frame_id;
+          try_lookup_tf(target_T_depth_tf_, child, "depth");
+          auto data = std::make_shared<utils::OdometryData>();
+          data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
+          data->pose = toGtsam(msg->pose.pose);
+          data->pose_covariance = toGtsam(msg->pose.covariance);
+          depth_queue_.push(data);
 
-        if (params_.keyframe_source == "Depth" || params_.backup_keyframe_source == "Depth") {
-          {
-            std::scoped_lock lock(frontend_trigger_mutex_);
-            frontend_trigger_ = true;
+          if (params_.keyframe_source == "Depth" || params_.backup_keyframe_source == "Depth") {
+            {
+              std::scoped_lock lock(frontend_trigger_mutex_);
+              frontend_trigger_ = true;
+            }
+            frontend_cv_.notify_one();
           }
-          frontend_cv_.notify_one();
-        }
-      },
-      sensor_options);
+        },
+        sensor_options);
+  }
 
   if (params_.mag.enable_mag || params_.mag.enable_mag_init_only) {
     mag_sub_ = create_subscription<sensor_msgs::msg::MagneticField>(
@@ -173,27 +175,29 @@ void FactorGraphNode::setupRosInterfaces() {
         sensor_options);
   }
 
-  dvl_sub_ = create_subscription<geometry_msgs::msg::TwistWithCovarianceStamped>(
-      params_.dvl_topic, rclcpp::SensorDataQoS(),
-      [this, try_lookup_tf](const geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr msg) {
-        std::string child =
-            params_.dvl.use_parameter_frame ? params_.dvl.parameter_frame : msg->header.frame_id;
-        try_lookup_tf(target_T_dvl_tf_, child, "DVL");
-        auto data = std::make_shared<utils::TwistData>();
-        data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
-        data->linear_velocity = toGtsam(msg->twist.twist.linear);
-        data->twist_covariance = toGtsam(msg->twist.covariance);
-        dvl_queue_.push(data);
+  if (params_.dvl.enable_dvl || params_.dvl.enable_dvl_init_only) {
+    dvl_sub_ = create_subscription<geometry_msgs::msg::TwistWithCovarianceStamped>(
+        params_.dvl_topic, rclcpp::SensorDataQoS(),
+        [this, try_lookup_tf](const geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr msg) {
+          std::string child =
+              params_.dvl.use_parameter_frame ? params_.dvl.parameter_frame : msg->header.frame_id;
+          try_lookup_tf(target_T_dvl_tf_, child, "DVL");
+          auto data = std::make_shared<utils::TwistData>();
+          data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
+          data->linear_velocity = toGtsam(msg->twist.twist.linear);
+          data->twist_covariance = toGtsam(msg->twist.covariance);
+          dvl_queue_.push(data);
 
-        if (params_.keyframe_source == "DVL" || params_.backup_keyframe_source == "DVL") {
-          {
-            std::scoped_lock lock(frontend_trigger_mutex_);
-            frontend_trigger_ = true;
+          if (params_.keyframe_source == "DVL" || params_.backup_keyframe_source == "DVL") {
+            {
+              std::scoped_lock lock(frontend_trigger_mutex_);
+              frontend_trigger_ = true;
+            }
+            frontend_cv_.notify_one();
           }
-          frontend_cv_.notify_one();
-        }
-      },
-      sensor_options);
+        },
+        sensor_options);
+  }
 
   if (params_.dynamics.enable_dynamics || params_.dynamics.enable_dynamics_dropout_only) {
     wrench_sub_ = create_subscription<geometry_msgs::msg::WrenchStamped>(
@@ -490,13 +494,15 @@ void FactorGraphNode::initializeGraph() {
   bool imu_ok = !target_T_imu_tf_.header.frame_id.empty();
   bool gps_ok = !(params_.gps.enable_gps || params_.gps.enable_gps_init_only) ||
                 !target_T_gps_tf_.header.frame_id.empty();
-  bool depth_ok = !target_T_depth_tf_.header.frame_id.empty();
+  bool depth_ok = !(params_.depth.enable_depth || params_.depth.enable_depth_init_only) ||
+                  !target_T_depth_tf_.header.frame_id.empty();
   bool mag_ok = !(params_.mag.enable_mag || params_.mag.enable_mag_init_only) ||
                 !target_T_mag_tf_.header.frame_id.empty();
   bool ahrs_ok = !(params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only ||
                    params_.comparison.enable_loose_dvl_preintegration) ||
                  !target_T_ahrs_tf_.header.frame_id.empty();
-  bool dvl_ok = !target_T_dvl_tf_.header.frame_id.empty();
+  bool dvl_ok = !(params_.dvl.enable_dvl || params_.dvl.enable_dvl_init_only) ||
+                !target_T_dvl_tf_.header.frame_id.empty();
 
   if (!(imu_ok && gps_ok && depth_ok && mag_ok && ahrs_ok && dvl_ok)) {
     RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "Waiting for sensor TFs: %s%s%s%s%s%s",
@@ -504,7 +510,8 @@ void FactorGraphNode::initializeGraph() {
                          (!gps_ok && params_.gps.enable_gps) ? "[GPS] " : "",
                          (!mag_ok && params_.mag.enable_mag) ? "[Mag] " : "",
                          (!ahrs_ok && params_.ahrs.enable_ahrs) ? "[AHRS] " : "",
-                         !depth_ok ? "[Depth] " : "", !dvl_ok ? "[DVL] " : "");
+                         (!depth_ok && params_.depth.enable_depth) ? "[Depth] " : "",
+                         (!dvl_ok && params_.dvl.enable_dvl) ? "[DVL] " : "");
     return;
   }
 
@@ -679,14 +686,14 @@ void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrap
               params_.imu.diagnostic_timeout);
   check_queue("GPS", gps_queue_.size(), gps_queue_.getLastTime(), params_.gps.enable_gps, false,
               params_.gps.diagnostic_timeout);
-  check_queue("Depth", depth_queue_.size(), depth_queue_.getLastTime(), true, true,
-              params_.depth.diagnostic_timeout);
+  check_queue("Depth", depth_queue_.size(), depth_queue_.getLastTime(), params_.depth.enable_depth,
+              params_.depth.enable_depth, params_.depth.diagnostic_timeout);
   check_queue("Mag", mag_queue_.size(), mag_queue_.getLastTime(), params_.mag.enable_mag, false,
               params_.mag.diagnostic_timeout);
   check_queue("AHRS", ahrs_queue_.size(), ahrs_queue_.getLastTime(), params_.ahrs.enable_ahrs,
               false, params_.ahrs.diagnostic_timeout);
-  check_queue("DVL", dvl_queue_.size(), dvl_queue_.getLastTime(), true, true,
-              params_.dvl.diagnostic_timeout);
+  check_queue("DVL", dvl_queue_.size(), dvl_queue_.getLastTime(), params_.dvl.enable_dvl,
+              params_.dvl.enable_dvl, params_.dvl.diagnostic_timeout);
   check_queue("Wrench", wrench_queue_.size(), wrench_queue_.getLastTime(),
               params_.dynamics.enable_dynamics, false, params_.dynamics.diagnostic_timeout);
 }
