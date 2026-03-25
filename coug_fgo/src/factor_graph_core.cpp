@@ -726,6 +726,10 @@ std::optional<UpdateResult> FactorGraphCore::update(double target_time,
     std::sort(queues.ahrs.begin(), queues.ahrs.end(), by_time);
   }
 
+  if (queues.imu.empty() || queues.imu.front()->timestamp > target_time) {
+    return std::nullopt;
+  }
+
   // --- Build Factor Graph ---
   gtsam::NonlinearFactorGraph new_graph;
   gtsam::Values new_values;
