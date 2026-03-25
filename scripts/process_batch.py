@@ -85,6 +85,7 @@ EXTRACTORS = {
 
 # %%
 def load_config(config_path):
+    print(f"Loading configuration from: {config_path}")
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     params = config.get("/**", {}).get("ros__parameters", config)
@@ -129,6 +130,7 @@ def process_bag(bag_path, config_path, namespace):
     fg = pybind11fgo.FactorGraphPy(config_path)
     raw_results = []
 
+    print(f"Opening bag: {bag_path}")
     with AnyReader(
         [Path(bag_path)], default_typestore=get_typestore(Stores.ROS2_HUMBLE)
     ) as reader:
@@ -148,9 +150,15 @@ def process_bag(bag_path, config_path, namespace):
             if c.topic in topic_to_sensor:
                 matched_conns.append(c)
 
+        print("\nMatched Connections:")
+        for c in matched_conns:
+            print(f"- {c.topic} ({topic_to_sensor[c.topic]})")
+        print()
+
         sensors_seen = set()
         is_running = False
         last_kf_time = None
+        last_print_time = None
 
         for conn, _, rawdata in reader.messages(connections=matched_conns):
             msg = reader.deserialize(rawdata, conn.msgtype)
@@ -164,6 +172,7 @@ def process_bag(bag_path, config_path, namespace):
                 if required_sensors.issubset(sensors_seen) and fg.initialize_graph(t):
                     is_running = True
                     last_kf_time = t
+                    print(f"{t:.3f} s: Initialized with sensors: {sensors_seen}")
                 continue
 
             trigger = False
@@ -182,7 +191,11 @@ def process_bag(bag_path, config_path, namespace):
                 if res := fg.optimize_graph():
                     raw_results.append(res)
 
-    print(f"Processed {len(raw_results)} keyframes.")
+            if last_print_time is None or t - last_print_time >= 30.0:
+                print(f"{t:.3f} s: Processed {len(raw_results)} keyframes...")
+                last_print_time = t
+
+    print(f"Finished processing bag. Total keyframes: {len(raw_results)}")
 
     if raw_results:
         results = {
@@ -235,9 +248,22 @@ def read_ground_truth(bag_path, namespace):
                 conns.append(c)
 
         target_conns = []
+        gt_labels = {}
         for c in conns:
-            if c.topic.endswith(("odometry/truth", "VelocitySensor", "imu_bias")):
+            if c.topic.endswith("odometry/truth"):
                 target_conns.append(c)
+                gt_labels[c.topic] = "pose gt"
+            elif c.topic.endswith("VelocitySensor"):
+                target_conns.append(c)
+                gt_labels[c.topic] = "vel gt"
+            elif c.topic.endswith(f"{namespace}/imu_bias"):
+                target_conns.append(c)
+                gt_labels[c.topic] = "imu bias gt"
+
+        print("\nMatched GT Connections:")
+        for c in target_conns:
+            print(f"- {c.topic} ({gt_labels[c.topic]})")
+        print()
 
         for conn, _, rawdata in reader.messages(connections=target_conns):
             msg = reader.deserialize(rawdata, conn.msgtype)
@@ -261,7 +287,7 @@ def read_ground_truth(bag_path, namespace):
                 vel_dict["vy"].append(v.y)
                 vel_dict["vz"].append(v.z)
 
-            elif conn.topic.endswith("imu_bias"):
+            elif conn.topic.endswith(f"{namespace}/imu_bias"):
                 lin, ang = msg.twist.twist.linear, msg.twist.twist.angular
                 bias_dict["time"].append(t)
                 bias_dict["bias_accel_x"].append(lin.x)
