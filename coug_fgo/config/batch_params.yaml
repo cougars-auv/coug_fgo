@@ -66,7 +66,7 @@
       use_parameter_frame: false
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
-        position: [0.0, 0.0, 0.0] # [x, y, z] (Matches DVL exactly)
+        position: [0.0, 0.0, 0.0] # [x, y, z]
         orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
       parameter_covariance:
@@ -84,7 +84,7 @@
       use_parameter_frame: false
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
-        position: [-0.475, 0.0, -0.035] # [x, y, z] (Assumed at COM)
+        position: [-0.475, 0.0, -0.035] # [x, y, z]
         orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
       parameter_covariance:
@@ -114,7 +114,7 @@
       use_parameter_frame: false
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
-        position: [0.0, 0.0, 0.0] # [x, y, z] (Matches DVL exactly)
+        position: [0.0, 0.0, 0.0] # [x, y, z]
         orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
       parameter_covariance:
@@ -134,7 +134,7 @@
       use_parameter_frame: false
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
-        position: [0.0, 0.0, 0.0] # [x, y, z] (Matches DVL exactly)
+        position: [0.0, 0.0, 0.0] # [x, y, z]
         orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
       parameter_covariance:
@@ -151,7 +151,7 @@
       use_parameter_frame: false
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
-        position: [0.0, 0.0, 0.0] # [x, y, z] (Target frame)
+        position: [0.0, 0.0, 0.0] # [x, y, z]
         orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
       parameter_covariance:
@@ -171,7 +171,7 @@
       use_parameter_frame: false
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
-        position: [-0.475, 0.0, -0.035] # [x, y, z] (COM)
+        position: [-0.475, 0.0, -0.035] # [x, y, z]
         orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
       prediction_noise_sigmas: [0.1, 0.1, 0.1] # Model prediction uncertainty sigmas.
       mass: [31.87, 60.46, 60.46] # [kg] Mass of the vehicle (diagonal)
