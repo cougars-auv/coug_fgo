@@ -64,7 +64,7 @@
 
     base:
       use_parameter_tf: false
-      parameter_tf: # Transform from target frame to base frame.
+      parameter_tf: # Relative to the target frame.
         position: [0.0, 0.0, 0.0] # [x, y, z]
         orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
 

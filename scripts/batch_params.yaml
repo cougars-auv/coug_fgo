@@ -64,14 +64,28 @@
 
     base:
       use_parameter_tf: true
-      parameter_tf: # Transform from target frame to base frame.
-        position: [-0.475, 0.0, 0.035] # [x, y, z]
+      parameter_tf: # Relative to the target frame.
+        # BlueROV2
+        # position: [0.27161, -0.10886, -0.01984] # [x, y, z]
+        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        # BlueROV2 (HoloOcean)
+        # position: [0.0, -0.1, 0.1] # [x, y, z]
+        # orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
+        # CougUV (HoloOcean)
+        position: [-0.475, 0.0, -0.035] # [x, y, z]
         orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
 
     imu:
       use_parameter_frame: false
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
+        # BlueROV2
+        # position: [0.27161, -0.10886, -0.01984] # [x, y, z]
+        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        # BlueROV2 (HoloOcean)
+        # position: [0.11, -0.1, 0.165] # [x, y, z]
+        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        # CougUV (HoloOcean)
         position: [0.0, 0.0, 0.0] # [x, y, z]
         orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
@@ -90,6 +104,13 @@
       use_parameter_frame: false
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
+        # BlueROV2
+        # position: [0.15391, 0.09837, -0.42003] # [x, y, z]
+        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        # BlueROV2 (HoloOcean)
+        # position: [0.0, -0.1, 0.1] # [x, y, z]
+        # orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
+        # CougUV (HoloOcean)
         position: [-0.475, 0.0, -0.035] # [x, y, z]
         orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
@@ -105,6 +126,13 @@
       use_parameter_frame: false
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
+        # BlueROV2
+        # position: [0.27161, -0.10886, -0.01984] # [x, y, z]
+        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        # BlueROV2 (HoloOcean)
+        # position: [-0.17, -0.1, 0.16] # [x, y, z]
+        # orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
+        # CougUV (HoloOcean)
         position: [-0.325, 0.0, -0.053] # [x, y, z]
         orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
@@ -120,6 +148,13 @@
       use_parameter_frame: false
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
+        # BlueROV2
+        # position: [0.27161, -0.10886, -0.01984] # [x, y, z]
+        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        # BlueROV2 (HoloOcean)
+        # position: [0.11, -0.1, 0.165] # [x, y, z]
+        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        # CougUV (HoloOcean)
         position: [0.0, 0.0, 0.0] # [x, y, z]
         orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
@@ -140,6 +175,13 @@
       use_parameter_frame: false
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
+        # BlueROV2
+        # position: [0.27161, -0.10886, -0.01984] # [x, y, z]
+        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        # BlueROV2 (HoloOcean)
+        # position: [0.11, -0.1, 0.165] # [x, y, z]
+        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        # CougUV (HoloOcean)
         position: [0.0, 0.0, 0.0] # [x, y, z]
         orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
@@ -157,6 +199,13 @@
       use_parameter_frame: false
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
+        # BlueROV2
+        # position: [0.0, 0.0, 0.0] # [x, y, z]
+        # orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
+        # BlueROV2 (HoloOcean)
+        # position: [0.0, 0.0, 0.0] # [x, y, z]
+        # orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
+        # CougUV (HoloOcean)
         position: [0.0, 0.0, 0.0] # [x, y, z]
         orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
@@ -177,6 +226,13 @@
       use_parameter_frame: false
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
+        # BlueROV2
+        # position: [0.27161, -0.10886, -0.01984] # [x, y, z]
+        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        # BlueROV2 (HoloOcean)
+        # position: [0.0, -0.1, 0.1] # [x, y, z]
+        # orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
+        # CougUV (HoloOcean)
         position: [-0.475, 0.0, -0.035] # [x, y, z]
         orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
       prediction_noise_sigmas: [0.1, 0.1, 0.1] # Model prediction uncertainty sigmas.
