@@ -30,8 +30,10 @@ FGO_LIB_PATH = str(
 sys.path.insert(0, FGO_LIB_PATH)
 import pybind11fgo  # noqa: E402
 
-NAMESPACE = "coug0sim"
-BAG_PATH = str(Path.home() / "cougars-dev/bags/launch_2026-03-24-11-26-15")
+NAMESPACE = "bluerov2"
+BAG_PATH = str(
+    Path.home() / "cougars-dev/bags/batch_ul_surface_1.0_2026-03-25-14-46-57"
+)
 CONFIG_PATH = str(
     Path.home() / "cougars-dev/ros2_ws/src/coug_fgo/scripts/batch_params.yaml"
 )
@@ -90,15 +92,21 @@ def load_config(config_path):
         config = yaml.safe_load(f)
     params = config.get("/**", {}).get("ros__parameters", config)
 
-    topic_map = {
-        params.get("imu_topic", "imu/data"): "imu",
-        params.get("gps_odom_topic", "odometry/gps"): "gps",
-        params.get("depth_odom_topic", "odometry/depth"): "depth",
-        params.get("mag_topic", "imu/mag"): "mag",
-        params.get("ahrs_topic", "imu/ahrs"): "ahrs",
-        params.get("dvl_topic", "dvl/twist"): "dvl",
-        params.get("wrench_topic", "cmd_wrench"): "wrench",
+    sensor_topics = {
+        "imu": params.get("imu_topic", "imu/data"),
+        "gps": params.get("gps_odom_topic", "odometry/gps"),
+        "depth": params.get("depth_odom_topic", "odometry/depth"),
+        "mag": params.get("mag_topic", "imu/mag"),
+        "ahrs": params.get("ahrs_topic", "imu/ahrs"),
+        "dvl": params.get("dvl_topic", "dvl/twist"),
+        "wrench": params.get("wrench_topic", "cmd_wrench"),
     }
+
+    topic_map = {}
+    for sensor, topic in sensor_topics.items():
+        if topic not in topic_map:
+            topic_map[topic] = []
+        topic_map[topic].append(sensor)
 
     required_sensors = {"imu"}
     for s in ["gps", "depth", "mag", "ahrs", "dvl"]:
@@ -139,20 +147,22 @@ def process_bag(bag_path, config_path, namespace):
             if not namespace or c.topic.startswith(f"/{namespace}/"):
                 conns.append(c)
 
-        topic_to_sensor = {}
+        topic_to_sensors = {}
         for c in conns:
-            for suffix, sensor in topic_map.items():
+            for suffix, sensors in topic_map.items():
                 if c.topic.endswith(suffix):
-                    topic_to_sensor[c.topic] = sensor
+                    if c.topic not in topic_to_sensors:
+                        topic_to_sensors[c.topic] = []
+                    topic_to_sensors[c.topic].extend(sensors)
 
         matched_conns = []
         for c in conns:
-            if c.topic in topic_to_sensor:
+            if c.topic in topic_to_sensors:
                 matched_conns.append(c)
 
         print("\nMatched Connections:")
         for c in matched_conns:
-            print(f"- {c.topic} ({topic_to_sensor[c.topic]})")
+            print(f"- {c.topic} ({topic_to_sensors[c.topic]})")
         print()
 
         sensors_seen = set()
@@ -163,10 +173,12 @@ def process_bag(bag_path, config_path, namespace):
         for conn, _, rawdata in reader.messages(connections=matched_conns):
             msg = reader.deserialize(rawdata, conn.msgtype)
 
-            sensor = topic_to_sensor[conn.topic]
+            sensors = topic_to_sensors[conn.topic]
             t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
-            getattr(fg, f"add_{sensor}")(t, *EXTRACTORS[sensor](msg))
-            sensors_seen.add(sensor)
+
+            for sensor in sensors:
+                getattr(fg, f"add_{sensor}")(t, *EXTRACTORS[sensor](msg))
+                sensors_seen.add(sensor)
 
             if not is_running:
                 if required_sensors.issubset(sensors_seen) and fg.initialize_graph(t):
@@ -178,7 +190,7 @@ def process_bag(bag_path, config_path, namespace):
             trigger = False
             if (
                 kf_source == "Timer"
-                and sensor == "imu"
+                and "imu" in sensors
                 and (t >= last_kf_time + kf_period)
             ):
                 last_kf_time += kf_period
@@ -199,7 +211,11 @@ def process_bag(bag_path, config_path, namespace):
                 print(f"{t:.3f} s: Processed {len(raw_results)} keyframes...")
                 last_print_time = t
 
-    print(f"Finished processing bag. Total keyframes: {len(raw_results)}")
+    if not is_running:
+        missing = required_sensors - sensors_seen
+        print(f"Graph never initialized! Missing sensors: {missing}")
+    else:
+        print(f"Finished processing bag. Total keyframes: {len(raw_results)}")
 
     if raw_results:
         results = {

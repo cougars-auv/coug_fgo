@@ -41,10 +41,10 @@
 
     # --- ROS Topics and Frames ---
     imu_topic: "imu/data"
-    gps_odom_topic: "odometry/gps"
+    gps_odom_topic: "odometry/truth" # "odometry/gps"
     depth_odom_topic: "odometry/depth"
     mag_topic: "imu/mag"
-    ahrs_topic: "imu/ahrs"
+    ahrs_topic: "imu/data" # "imu/ahrs"
     dvl_topic: "dvl/twist"
     wrench_topic: "cmd_wrench"
     global_odom_topic: "odometry/global"
@@ -66,28 +66,28 @@
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
         # BlueROV2
-        # position: [0.27161, -0.10886, -0.01984] # [x, y, z]
-        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        position: [0.27161, -0.10886, -0.01984] # [x, y, z]
+        orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
         # BlueROV2 (HoloOcean)
         # position: [0.0, -0.1, 0.1] # [x, y, z]
         # orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
         # CougUV (HoloOcean)
-        position: [-0.475, 0.0, -0.035] # [x, y, z]
-        orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        # position: [-0.475, 0.0, -0.035] # [x, y, z]
+        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
 
     imu:
       use_parameter_frame: false
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
         # BlueROV2
-        # position: [0.27161, -0.10886, -0.01984] # [x, y, z]
-        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        position: [0.27161, -0.10886, -0.01984] # [x, y, z]
+        orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
         # BlueROV2 (HoloOcean)
         # position: [0.11, -0.1, 0.165] # [x, y, z]
         # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
         # CougUV (HoloOcean)
-        position: [0.0, 0.0, 0.0] # [x, y, z]
-        orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
+        # position: [0.0, 0.0, 0.0] # [x, y, z]
+        # orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
       parameter_covariance:
         accel_noise_sigmas: [0.0078, 0.0078, 0.0078] # [m/s^2] Accelerometer measurement noise sigmas.
@@ -99,20 +99,20 @@
       diagnostic_timeout: 1.0 # [s]
 
     gps:
-      enable_gps: true
-      enable_gps_init_only: false
+      enable_gps: false
+      enable_gps_init_only: true # false
       use_parameter_frame: false
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
         # BlueROV2
-        # position: [0.15391, 0.09837, -0.42003] # [x, y, z]
-        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        position: [0.15391, 0.09837, -0.42003] # [x, y, z]
+        orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
         # BlueROV2 (HoloOcean)
         # position: [0.0, -0.1, 0.1] # [x, y, z]
         # orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
         # CougUV (HoloOcean)
-        position: [-0.475, 0.0, -0.035] # [x, y, z]
-        orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        # position: [-0.475, 0.0, -0.035] # [x, y, z]
+        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
       parameter_covariance:
         position_noise_sigmas: [0.015, 0.015] # [m] GPS position uncertainty sigmas.
@@ -127,14 +127,14 @@
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
         # BlueROV2
-        # position: [0.27161, -0.10886, -0.01984] # [x, y, z]
-        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        position: [0.27161, -0.10886, -0.01984] # [x, y, z]
+        orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
         # BlueROV2 (HoloOcean)
         # position: [-0.17, -0.1, 0.16] # [x, y, z]
         # orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
         # CougUV (HoloOcean)
-        position: [-0.325, 0.0, -0.053] # [x, y, z]
-        orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        # position: [-0.325, 0.0, -0.053] # [x, y, z]
+        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
       parameter_covariance:
         position_z_noise_sigma: 0.02 # [m] Depth sensor Z-position uncertainty sigma.
@@ -143,21 +143,21 @@
       robust_k: 1.345
 
     mag:
-      enable_mag: true
+      enable_mag: false # true
       enable_mag_init_only: false
       use_parameter_frame: false
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
         # BlueROV2
-        # position: [0.27161, -0.10886, -0.01984] # [x, y, z]
-        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        position: [0.27161, -0.10886, -0.01984] # [x, y, z]
+        orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
         # BlueROV2 (HoloOcean)
         # position: [0.11, -0.1, 0.165] # [x, y, z]
         # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
         # CougUV (HoloOcean)
-        position: [0.0, 0.0, 0.0] # [x, y, z]
-        orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
-      use_parameter_covariance: false
+        # position: [0.0, 0.0, 0.0] # [x, y, z]
+        # orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
+      use_parameter_covariance: true # false
       parameter_covariance:
         magnetic_field_noise_sigmas: [0.003, 0.003, 0.003] # [normalized] Magnetic field uncertainty sigmas.
       # https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml#igrfwmm
@@ -170,20 +170,20 @@
       robust_k: 1.345
 
     ahrs:
-      enable_ahrs: false
+      enable_ahrs: true # false
       enable_ahrs_init_only: false
       use_parameter_frame: false
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
         # BlueROV2
-        # position: [0.27161, -0.10886, -0.01984] # [x, y, z]
-        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        position: [0.27161, -0.10886, -0.01984] # [x, y, z]
+        orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
         # BlueROV2 (HoloOcean)
         # position: [0.11, -0.1, 0.165] # [x, y, z]
         # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
         # CougUV (HoloOcean)
-        position: [0.0, 0.0, 0.0] # [x, y, z]
-        orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
+        # position: [0.0, 0.0, 0.0] # [x, y, z]
+        # orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
       parameter_covariance:
         yaw_noise_sigma: 0.01745 # [rad] AHRS sensor yaw uncertainty sigma.
@@ -200,14 +200,14 @@
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
         # BlueROV2
-        # position: [0.0, 0.0, 0.0] # [x, y, z]
-        # orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
+        position: [0.0, 0.0, 0.0] # [x, y, z]
+        orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
         # BlueROV2 (HoloOcean)
         # position: [0.0, 0.0, 0.0] # [x, y, z]
         # orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
         # CougUV (HoloOcean)
-        position: [0.0, 0.0, 0.0] # [x, y, z]
-        orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
+        # position: [0.0, 0.0, 0.0] # [x, y, z]
+        # orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
       use_parameter_covariance: false
       parameter_covariance:
         velocity_noise_sigmas: [0.02, 0.02, 0.02] # [m/s] DVL body-velocity uncertainty sigmas.
@@ -227,14 +227,14 @@
       use_parameter_tf: true
       parameter_tf: # Relative to the target frame.
         # BlueROV2
-        # position: [0.27161, -0.10886, -0.01984] # [x, y, z]
-        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        position: [0.27161, -0.10886, -0.01984] # [x, y, z]
+        orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
         # BlueROV2 (HoloOcean)
         # position: [0.0, -0.1, 0.1] # [x, y, z]
         # orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
         # CougUV (HoloOcean)
-        position: [-0.475, 0.0, -0.035] # [x, y, z]
-        orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+        # position: [-0.475, 0.0, -0.035] # [x, y, z]
+        # orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
       prediction_noise_sigmas: [0.1, 0.1, 0.1] # Model prediction uncertainty sigmas.
       mass: [31.87, 60.46, 60.46] # [kg] Mass of the vehicle (diagonal)
       linear_drag: [1.59, 3.02, 3.02] # Linear drag coefficient (diagonal)
