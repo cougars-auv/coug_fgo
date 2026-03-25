@@ -120,6 +120,18 @@ factor_graph_node:
     default_value: "base_link"
 
   # --- Sensor Settings ---
+  base:
+    use_parameter_tf:
+      type: bool
+      default_value: false
+    parameter_tf:
+      position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0, 1.0]
+
   imu:
     use_parameter_frame:
       type: bool

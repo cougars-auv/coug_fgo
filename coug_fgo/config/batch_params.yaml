@@ -62,6 +62,12 @@
     # - "Huber": Linear penalty for large errors. Good general robustness. (k=1.345 standard)
     # - "Tukey": Ignores large errors completely. Best for sensors with distinct 'bad' readings. (k=4.685 standard)
 
+    base:
+      use_parameter_tf: true
+      parameter_tf: # Transform from target frame to base frame.
+        position: [-0.475, 0.0, 0.035] # [x, y, z]
+        orientation: [1.0, 0.0, 0.0, 0.0] # [qx, qy, qz, qw]
+
     imu:
       use_parameter_frame: false
       use_parameter_tf: true

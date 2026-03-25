@@ -546,13 +546,26 @@ void FactorGraphNode::initializeGraph() {
   }
 
   if (target_T_base_tf_.header.frame_id.empty()) {
-    try {
-      target_T_base_tf_ =
-          tf_buffer_->lookupTransform(params_.target_frame, params_.base_frame, tf2::TimePointZero);
-    } catch (const tf2::TransformException& ex) {
-      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
-                           "Failed to lookup base to target transform: %s", ex.what());
-      return;
+    if (params_.base.use_parameter_tf) {
+      target_T_base_tf_.header.stamp = this->get_clock()->now();
+      target_T_base_tf_.header.frame_id = params_.target_frame;
+      target_T_base_tf_.child_frame_id = params_.base_frame;
+      target_T_base_tf_.transform.translation.x = params_.base.parameter_tf.position[0];
+      target_T_base_tf_.transform.translation.y = params_.base.parameter_tf.position[1];
+      target_T_base_tf_.transform.translation.z = params_.base.parameter_tf.position[2];
+      target_T_base_tf_.transform.rotation.x = params_.base.parameter_tf.orientation[0];
+      target_T_base_tf_.transform.rotation.y = params_.base.parameter_tf.orientation[1];
+      target_T_base_tf_.transform.rotation.z = params_.base.parameter_tf.orientation[2];
+      target_T_base_tf_.transform.rotation.w = params_.base.parameter_tf.orientation[3];
+    } else {
+      try {
+        target_T_base_tf_ = tf_buffer_->lookupTransform(params_.target_frame, params_.base_frame,
+                                                        tf2::TimePointZero);
+      } catch (const tf2::TransformException& ex) {
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+                             "Failed to lookup base to target transform: %s", ex.what());
+        return;
+      }
     }
   }
 

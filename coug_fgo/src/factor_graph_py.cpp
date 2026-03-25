@@ -203,7 +203,7 @@ coug_fgo::utils::TfBundle FactorGraphPy::extract_tfs(const factor_graph_node::Pa
   tfs.target_T_ahrs = make_tf(p.ahrs.parameter_tf.position, p.ahrs.parameter_tf.orientation);
   tfs.target_T_mag = make_tf(p.mag.parameter_tf.position, p.mag.parameter_tf.orientation);
   tfs.target_T_com = make_tf(p.dynamics.parameter_tf.position, p.dynamics.parameter_tf.orientation);
-  tfs.target_T_base = gtsam::Pose3::Identity();
+  tfs.target_T_base = make_tf(p.base.parameter_tf.position, p.base.parameter_tf.orientation);
 
   return tfs;
 }
