@@ -14,7 +14,7 @@
 
 /**
  * @file dvl_a50_twist.hpp
- * @brief ROS 2 node that converts raw DVL velocity data to a twist message.
+ * @brief ROS 2 node that converts DVL A50 velocity data to a twist message.
  * @author Nelson Durrant
  * @date Jan 2026
  */
@@ -35,7 +35,7 @@ namespace coug_fgo {
 
 /**
  * @class DvlA50TwistNode
- * @brief ROS 2 node that converts raw DVL velocity data to a twist message.
+ * @brief ROS 2 node that converts DVL A50 velocity data to a twist message.
  */
 class DvlA50TwistNode : public rclcpp::Node {
  public:

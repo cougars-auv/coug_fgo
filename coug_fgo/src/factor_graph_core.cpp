@@ -713,16 +713,17 @@ void FactorGraphCore::addDvlTightPreintFactor(
       gtsam::noiseModel::Gaussian::Covariance(dvl_tight_preintegrator_->covariance()));
 }
 
-std::optional<UpdateResult> FactorGraphCore::update(double target_time, utils::QueueBundle& msgs) {
+std::optional<UpdateResult> FactorGraphCore::update(double target_time,
+                                                    utils::QueueBundle& queues) {
   if (target_time <= prev_time_ + 1e-6) {
     return std::nullopt;
   }
 
   // Sort IMU/AHRS messages
   auto by_time = [](const auto& a, const auto& b) { return a->timestamp < b->timestamp; };
-  std::sort(msgs.imu.begin(), msgs.imu.end(), by_time);
+  std::sort(queues.imu.begin(), queues.imu.end(), by_time);
   if (params_.comparison.enable_loose_dvl_preintegration) {
-    std::sort(msgs.ahrs.begin(), msgs.ahrs.end(), by_time);
+    std::sort(queues.ahrs.begin(), queues.ahrs.end(), by_time);
   }
 
   // --- Build Factor Graph ---
@@ -732,18 +733,18 @@ std::optional<UpdateResult> FactorGraphCore::update(double target_time, utils::Q
 
   UpdateResult result;
 
-  addImuPreintFactor(new_graph, msgs.imu, target_time, result.unused_imu);
+  addImuPreintFactor(new_graph, queues.imu, target_time, result.unused_imu);
   if (params_.gps.enable_gps) {
-    addGpsFactor(new_graph, msgs.gps);
+    addGpsFactor(new_graph, queues.gps);
   }
   if (params_.depth.enable_depth) {
-    addDepthFactor(new_graph, msgs.depth);
+    addDepthFactor(new_graph, queues.depth);
   }
   if (params_.mag.enable_mag) {
-    addMagFactor(new_graph, msgs.mag);
+    addMagFactor(new_graph, queues.mag);
   }
   if (params_.ahrs.enable_ahrs) {
-    addAhrsFactor(new_graph, msgs.ahrs);
+    addAhrsFactor(new_graph, queues.ahrs);
   }
 
   // DVL dropout handling
@@ -754,24 +755,24 @@ std::optional<UpdateResult> FactorGraphCore::update(double target_time, utils::Q
         params_.const_vel.enable_const_vel || params_.const_vel.enable_const_vel_dropout_only;
 
     if (use_dynamics) {
-      addAuvDynamicsFactor(g, msgs.wrench, target_time);
+      addAuvDynamicsFactor(g, queues.wrench, target_time);
     } else if (use_const_vel) {
       addConstVelFactor(g, target_time);
     }
   };
 
-  if (msgs.dvl.empty() || !params_.dvl.enable_dvl) {
+  if (queues.dvl.empty() || !params_.dvl.enable_dvl) {
     addDropoutFactors(new_graph);
   } else {
     if (params_.comparison.enable_loose_dvl_preintegration) {
-      addDvlLoosePreintFactor(new_graph, msgs.dvl, msgs.ahrs, target_time, result.unused_dvl);
+      addDvlLoosePreintFactor(new_graph, queues.dvl, queues.ahrs, target_time, result.unused_dvl);
     } else if (params_.comparison.enable_tight_dvl_preintegration) {
-      addDvlTightPreintFactor(new_graph, msgs.dvl, msgs.imu, target_time, result.unused_dvl);
+      addDvlTightPreintFactor(new_graph, queues.dvl, queues.imu, target_time, result.unused_dvl);
     } else {
-      addDvlFactor(new_graph, msgs.dvl);
+      addDvlFactor(new_graph, queues.dvl);
 
       if (params_.dynamics.enable_dynamics) {
-        addAuvDynamicsFactor(new_graph, msgs.wrench, target_time);
+        addAuvDynamicsFactor(new_graph, queues.wrench, target_time);
       } else if (params_.const_vel.enable_const_vel) {
         addConstVelFactor(new_graph, target_time);
       }

@@ -14,7 +14,7 @@
 
 /**
  * @file dvl_a50_odom.hpp
- * @brief ROS 2 node that converts raw DVL dead-reckoning data to an odometry message.
+ * @brief ROS 2 node that converts DVL A50 dead-reckoning data to an odometry message.
  * @author Nelson Durrant
  * @date Jan 2026
  */
@@ -39,7 +39,7 @@ namespace coug_fgo {
 
 /**
  * @class DvlA50OdomNode
- * @brief ROS 2 node that converts raw DVL dead-reckoning data to an odometry message.
+ * @brief ROS 2 node that converts DVL A50 dead-reckoning data to an odometry message.
  */
 class DvlA50OdomNode : public rclcpp::Node {
  public:

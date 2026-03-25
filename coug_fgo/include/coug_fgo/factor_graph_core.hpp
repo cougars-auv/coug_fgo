@@ -96,10 +96,10 @@ class FactorGraphCore {
   /**
    * @brief Builds factors for one keyframe and writes the graph to the buffer.
    * @param target_time The keyframe timestamp.
-   * @param msgs Drained sensor data structs (consumed).
+   * @param queues Drained sensor data structs (consumed).
    * @return UpdateResult with unused structs, or nullopt if timestamp was stale.
    */
-  std::optional<UpdateResult> update(double target_time, utils::QueueBundle& msgs);
+  std::optional<UpdateResult> update(double target_time, utils::QueueBundle& queues);
 
   /**
    * @brief Consumes the buffer and runs the GTSAM smoother.
