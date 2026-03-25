@@ -187,9 +187,13 @@ def process_bag(bag_path, config_path, namespace):
                 trigger = True
 
             if trigger:
-                fg.update_graph(t)
-                if res := fg.optimize_graph():
-                    raw_results.append(res)
+                try:
+                    fg.update_graph(t)
+                    if res := fg.optimize_graph():
+                        raw_results.append(res)
+                except Exception as e:
+                    print(f"{e}\n")
+                    break
 
             if last_print_time is None or t - last_print_time >= 30.0:
                 print(f"{t:.3f} s: Processed {len(raw_results)} keyframes...")
