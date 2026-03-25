@@ -644,6 +644,14 @@ void FactorGraphNode::updateGraph() {
     if (!result->unused_dvl.empty()) {
       dvl_queue_.restore(result->unused_dvl);
     }
+  } else {
+    imu_queue_.restore(queues.imu);
+    gps_queue_.restore(queues.gps);
+    depth_queue_.restore(queues.depth);
+    mag_queue_.restore(queues.mag);
+    ahrs_queue_.restore(queues.ahrs);
+    dvl_queue_.restore(queues.dvl);
+    wrench_queue_.restore(queues.wrench);
   }
 }
 

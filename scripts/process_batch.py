@@ -127,12 +127,17 @@ def load_config(config_path):
 
     kf_period = 1.0 / max(params.get("keyframe_timer_hz", 10.0), 0.1)
 
-    return topic_map, required_sensors, kf_source, kf_topic, kf_period
+    base_tf = params.get("base", {}).get("parameter_tf", {})
+    base_pos = np.array(base_tf.get("position", [0.0, 0.0, 0.0]))  # [x, y, z]
+    base_quat = base_tf.get("orientation", [0.0, 0.0, 0.0, 1.0])  # [qx, qy, qz, qw]
+    target_T_base = (base_pos, R.from_quat(base_quat))
+
+    return topic_map, required_sensors, kf_source, kf_topic, kf_period, target_T_base
 
 
 def process_bag(bag_path, config_path, namespace):
-    topic_map, required_sensors, kf_source, kf_topic, kf_period = load_config(
-        config_path
+    topic_map, required_sensors, kf_source, kf_topic, kf_period, target_T_base = (
+        load_config(config_path)
     )
 
     fg = pybind11fgo.FactorGraphPy(config_path)
@@ -222,11 +227,28 @@ def process_bag(bag_path, config_path, namespace):
             k: np.array([r[k] for r in raw_results]) for k in raw_results[0].keys()
         }
 
+        base_pos, base_rot = target_T_base
         rolls, pitches, yaws = [], [], []
         for i in range(len(raw_results)):
-            r, p, y = R.from_quat(
+            map_R_target = R.from_quat(
                 [results["qx"][i], results["qy"][i], results["qz"][i], results["qw"][i]]
-            ).as_euler("xyz")
+            )
+            map_R_base = map_R_target * base_rot
+            map_t_base = map_R_target.apply(base_pos) + np.array(
+                [results["x"][i], results["y"][i], results["z"][i]]
+            )
+
+            results["x"][i] = map_t_base[0]
+            results["y"][i] = map_t_base[1]
+            results["z"][i] = map_t_base[2]
+
+            q = map_R_base.as_quat()
+            results["qx"][i] = q[0]
+            results["qy"][i] = q[1]
+            results["qz"][i] = q[2]
+            results["qw"][i] = q[3]
+
+            r, p, y = map_R_base.as_euler("xyz")
             rolls.append(r)
             pitches.append(p)
             yaws.append(y)

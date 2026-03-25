@@ -203,8 +203,8 @@
         initial_position_sigmas: [0.001, 0.001, 0.001] # [m] Initial position uncertainty.
         initial_orientation_sigmas: [0.001, 0.001, 0.001] # [rad] Initial yaw uncertainty.
         initial_velocity_sigmas: [0.001, 0.001, 0.001] # [m/s] Initial velocity uncertainty.
-      initial_accel_bias_sigmas: [0.01, 0.01, 0.01] # [m/s^2] Initial accelerometer bias uncertainty.
-      initial_gyro_bias_sigmas: [0.001, 0.001, 0.001] # [rad/s] Initial gyroscope bias uncertainty.
+      initial_accel_bias_sigmas: [0.1, 0.1, 0.1] # [m/s^2] Initial accelerometer bias uncertainty.
+      initial_gyro_bias_sigmas: [0.005, 0.005, 0.005] # [rad/s] Initial gyroscope bias uncertainty.
 
     # --- Comparison Methods ---
     comparison:
