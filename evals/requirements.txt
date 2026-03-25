@@ -1,5 +1,4 @@
 evo
-daft-pgm
 matplotlib
 pandas
 seaborn
