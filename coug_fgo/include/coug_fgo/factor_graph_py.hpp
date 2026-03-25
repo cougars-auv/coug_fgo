@@ -37,7 +37,7 @@
 
 /**
  * @class FactorGraphPy
- * @brief Standalone wrapper around FactorGraphCore for use from Python via pybind11.
+ * @brief Python bindings wrapper for the FactorGraphCore.
  */
 class FactorGraphPy {
  public:
@@ -126,8 +126,7 @@ class FactorGraphPy {
 
   /**
    * @brief Delegates optimization to the core and returns the result.
-   * @return Dict with pose (x, y, z, qx, qy, qz, qw), velocity, biases, and time.
-   *         Empty dict if the graph is not yet initialized.
+   * @return Optimization results or empty dict if the graph is not yet initialized.
    */
   pybind11::dict optimize_graph();
 

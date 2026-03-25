@@ -45,15 +45,14 @@ namespace coug_fgo {
  * @brief Output from a successful optimization step.
  */
 struct OptimizeResult {
+  double target_time{0.0};
   gtsam::Pose3 pose;
   gtsam::Vector3 velocity;
   gtsam::imuBias::ConstantBias imu_bias;
   gtsam::Matrix pose_cov;
   gtsam::Matrix vel_cov;
   gtsam::Matrix bias_cov;
-
   gtsam::Values all_estimates;
-  double target_time{0.0};
 
   double total_duration = 0.0;
   double smoother_duration = 0.0;
@@ -77,7 +76,7 @@ struct UpdateResult {
 
 /**
  * @class FactorGraphCore
- * @brief C++ core for AUV state estimation via factor graph optimization.
+ * @brief C++ GTSAM factor graph logic for AUV state estimation.
  */
 class FactorGraphCore {
  public:
@@ -95,7 +94,7 @@ class FactorGraphCore {
   void initialize(const utils::StateInitializer& state_init, const utils::TfBundle& tfs);
 
   /**
-   * @brief Builds factors for one keyframe and writes them to the buffer.
+   * @brief Builds factors for one keyframe and writes the graph to the buffer.
    * @param target_time The keyframe timestamp.
    * @param msgs Drained sensor data structs (consumed).
    * @return UpdateResult with unused structs, or nullopt if timestamp was stale.
@@ -115,7 +114,7 @@ class FactorGraphCore {
   // --- Configuration ---
   /**
    * @brief Configures the GTSAM combined IMU preintegration parameters.
-   * @param state_init Provides initial sensor data for covariance estimation.
+   * @param state_init Provides computed initial IMU values.
    * @return Shared pointer to the configured preintegration parameters.
    */
   std::shared_ptr<gtsam::PreintegratedCombinedMeasurements::Params> configureImuPreintegration(
@@ -172,7 +171,7 @@ class FactorGraphCore {
                     const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs);
 
   /**
-   * @brief Adds a constant-velocity (zero-acceleration) prior between keyframes.
+   * @brief Adds a constant-velocity (zero-acceleration) factor between keyframes.
    * @param graph The target factor graph.
    * @param target_time The current keyframe timestamp.
    */

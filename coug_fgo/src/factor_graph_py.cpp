@@ -47,10 +47,10 @@ bool FactorGraphPy::initialize_graph(double current_time) {
     return true;
   }
 
-  coug_fgo::utils::QueueBundle init_msgs = std::move(queues_);
+  coug_fgo::utils::QueueBundle init_queues = std::move(queues_);
   queues_ = coug_fgo::utils::QueueBundle();
 
-  if (state_init_->update(current_time, init_msgs)) {
+  if (state_init_->update(current_time, init_queues)) {
     state_init_->compute(tfs_);
     core_->initialize(*state_init_, tfs_);
     is_initialized_ = true;
@@ -129,10 +129,10 @@ bool FactorGraphPy::update_graph(double target_time) {
     return false;
   }
 
-  coug_fgo::utils::QueueBundle msgs = std::move(queues_);
+  coug_fgo::utils::QueueBundle update_queues = std::move(queues_);
   queues_ = coug_fgo::utils::QueueBundle();
 
-  auto update_result = core_->update(target_time, msgs);
+  auto update_result = core_->update(target_time, update_queues);
 
   if (update_result) {
     queues_.imu.insert(queues_.imu.end(), update_result->unused_imu.begin(),
@@ -157,6 +157,8 @@ pybind11::dict FactorGraphPy::optimize_graph() {
     gtsam::Vector3 b_g = opt_result->imu_bias.gyroscope();
     gtsam::Quaternion q = p.rotation().toQuaternion();
 
+    result["time"] = opt_result->target_time;
+
     result["x"] = p.translation().x();
     result["y"] = p.translation().y();
     result["z"] = p.translation().z();
@@ -164,9 +166,11 @@ pybind11::dict FactorGraphPy::optimize_graph() {
     result["qy"] = q.y();
     result["qz"] = q.z();
     result["qw"] = q.w();
+
     result["vx"] = v.x();
     result["vy"] = v.y();
     result["vz"] = v.z();
+
     result["bias_accel_x"] = b_a.x();
     result["bias_accel_y"] = b_a.y();
     result["bias_accel_z"] = b_a.z();
@@ -177,8 +181,6 @@ pybind11::dict FactorGraphPy::optimize_graph() {
     if (params_.publish_pose_cov) result["pose_cov"] = opt_result->pose_cov;
     if (params_.publish_velocity_cov) result["vel_cov"] = opt_result->vel_cov;
     if (params_.publish_imu_bias_cov) result["bias_cov"] = opt_result->bias_cov;
-
-    result["time"] = opt_result->target_time;
   }
   return result;
 }
@@ -188,12 +190,10 @@ coug_fgo::utils::TfBundle FactorGraphPy::extract_tfs(const factor_graph_node::Pa
 
   auto make_tf = [](const std::vector<double>& pos,
                     const std::vector<double>& quat) -> gtsam::Pose3 {
-    if (pos.size() >= 3 && quat.size() >= 4) {
-      gtsam::Rot3 r = gtsam::Rot3::Quaternion(quat[3], quat[0], quat[1], quat[2]);
-      gtsam::Point3 t(pos[0], pos[1], pos[2]);
-      return gtsam::Pose3(r, t);
-    }
-    return gtsam::Pose3::Identity();
+    // Convert ROS (x, y, z, w) to GTSAM (w, x, y, z) quaternion conventions
+    gtsam::Rot3 r = gtsam::Rot3::Quaternion(quat[3], quat[0], quat[1], quat[2]);
+    gtsam::Point3 t(pos[0], pos[1], pos[2]);
+    return gtsam::Pose3(r, t);
   };
 
   tfs.target_T_imu = make_tf(p.imu.parameter_tf.position, p.imu.parameter_tf.orientation);

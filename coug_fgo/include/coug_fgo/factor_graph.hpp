@@ -14,7 +14,7 @@
 
 /**
  * @file factor_graph.hpp
- * @brief ROS 2 node for multi-sensor AUV state estimation via factor graph optimization.
+ * @brief ROS 2 node for AUV state estimation via factor graph optimization.
  * @author Nelson Durrant
  * @date Jan 2026
  */
@@ -55,7 +55,7 @@ namespace coug_fgo {
 
 /**
  * @class FactorGraphNode
- * @brief ROS 2 node for multi-sensor AUV state estimation via factor graph optimization.
+ * @brief ROS 2 node for AUV state estimation via factor graph optimization.
  */
 class FactorGraphNode : public rclcpp::Node {
  public:
@@ -124,10 +124,10 @@ class FactorGraphNode : public rclcpp::Node {
 
   /**
    * @brief Publishes the full optimized trajectory path.
-   * @param results The final optimized values.
+   * @param values The final optimized values.
    * @param timestamp The path timestamp.
    */
-  void publishSmoothedPath(const gtsam::Values& results, const rclcpp::Time& timestamp);
+  void publishSmoothedPath(const gtsam::Values& values, const rclcpp::Time& timestamp);
 
   /**
    * @brief Publishes the optimized velocity (at the target frame in the map frame).

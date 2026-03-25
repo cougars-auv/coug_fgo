@@ -378,7 +378,7 @@ void FactorGraphNode::broadcastGlobalTf(const gtsam::Pose3& current_pose,
   }
 }
 
-void FactorGraphNode::publishSmoothedPath(const gtsam::Values& results,
+void FactorGraphNode::publishSmoothedPath(const gtsam::Values& values,
                                           const rclcpp::Time& timestamp) {
   nav_msgs::msg::Path path_msg;
   path_msg.header.stamp = timestamp;
@@ -393,11 +393,11 @@ void FactorGraphNode::publishSmoothedPath(const gtsam::Values& results,
   }
 
   for (const auto& pair : keys_snapshot) {
-    if (results.exists(pair.second)) {
+    if (values.exists(pair.second)) {
       geometry_msgs::msg::PoseStamped ps;
       ps.header.frame_id = params_.map_frame;
       ps.header.stamp = rclcpp::Time(static_cast<int64_t>(pair.first * 1e9));
-      ps.pose = toPoseMsg(results.at<gtsam::Pose3>(pair.second) * target_T_base);
+      ps.pose = toPoseMsg(values.at<gtsam::Pose3>(pair.second) * target_T_base);
       path_msg.poses.push_back(ps);
     }
   }
@@ -557,15 +557,15 @@ void FactorGraphNode::initializeGraph() {
   }
 
   // --- Compute Initial State ---
-  utils::QueueBundle queues;
-  queues.imu = imu_queue_.drain();
-  queues.gps = gps_queue_.drain();
-  queues.depth = depth_queue_.drain();
-  queues.mag = mag_queue_.drain();
-  queues.ahrs = ahrs_queue_.drain();
-  queues.dvl = dvl_queue_.drain();
-  queues.wrench = wrench_queue_.drain();
-  if (!state_init_->update(get_clock()->now().seconds(), queues)) {
+  utils::QueueBundle init_queues;
+  init_queues.imu = imu_queue_.drain();
+  init_queues.gps = gps_queue_.drain();
+  init_queues.depth = depth_queue_.drain();
+  init_queues.mag = mag_queue_.drain();
+  init_queues.ahrs = ahrs_queue_.drain();
+  init_queues.dvl = dvl_queue_.drain();
+  init_queues.wrench = wrench_queue_.drain();
+  if (!state_init_->update(get_clock()->now().seconds(), init_queues)) {
     return;
   }
 
@@ -612,16 +612,16 @@ void FactorGraphNode::updateGraph() {
   }
 
   // --- Update Request ---
-  utils::QueueBundle msgs;
-  msgs.imu = imu_queue_.drain();
-  msgs.gps = gps_queue_.drain();
-  msgs.depth = depth_queue_.drain();
-  msgs.mag = mag_queue_.drain();
-  msgs.ahrs = ahrs_queue_.drain();
-  msgs.dvl = dvl_queue_.drain();
-  msgs.wrench = wrench_queue_.drain();
+  utils::QueueBundle queues;
+  queues.imu = imu_queue_.drain();
+  queues.gps = gps_queue_.drain();
+  queues.depth = depth_queue_.drain();
+  queues.mag = mag_queue_.drain();
+  queues.ahrs = ahrs_queue_.drain();
+  queues.dvl = dvl_queue_.drain();
+  queues.wrench = wrench_queue_.drain();
 
-  auto result = core_->update(target_time, msgs);
+  auto result = core_->update(target_time, queues);
 
   // Re-queue unused messages
   if (result) {
