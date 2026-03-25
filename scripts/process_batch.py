@@ -33,7 +33,7 @@ import pybind11fgo  # noqa: E402
 NAMESPACE = "coug0sim"
 BAG_PATH = str(Path.home() / "cougars-dev/bags/launch_2026-03-24-11-26-15")
 CONFIG_PATH = str(
-    Path.home() / "cougars-dev/ros2_ws/src/coug_fgo/coug_fgo/config/batch_params.yaml"
+    Path.home() / "cougars-dev/ros2_ws/src/coug_fgo/scripts/batch_params.yaml"
 )
 EXTRACTORS = {
     "imu": lambda m: (
