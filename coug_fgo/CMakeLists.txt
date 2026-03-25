@@ -6,13 +6,15 @@ if(NOT CMAKE_CXX_STANDARD)
 endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+  add_compile_options(-Wall -Wextra -Wpedantic -fno-lto)
 endif()
 
 # --- Dependencies ---
 find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 find_package(GTSAM REQUIRED)
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+find_package(pybind11 REQUIRED)
 
 # --- GTSAM & Eigen Setup ---
 get_target_property(GTSAM_TARGET_INC gtsam INTERFACE_INCLUDE_DIRECTORIES)
@@ -85,6 +87,19 @@ target_link_libraries(dvl_a50_twist factor_graph_component)
 
 ament_auto_add_executable(dvl_a50_odom src/dvl_a50_odom_node.cpp)
 target_link_libraries(dvl_a50_odom factor_graph_component)
+
+# --- Python Bindings ---
+pybind11_add_module(pybind11fgo src/factor_graph_py.cpp)
+target_include_directories(pybind11fgo PRIVATE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  ${GTSAM_EIGEN_INCLUDE_DIR}
+)
+target_link_libraries(pybind11fgo PRIVATE
+  factor_graph_component
+)
+install(FILES $<TARGET_FILE:pybind11fgo>
+  DESTINATION "lib/python${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}/site-packages"
+)
 
 # --- Testing ---
 if(BUILD_TESTING)
