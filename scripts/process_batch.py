@@ -358,4 +358,5 @@ if results:
                 ax.set_xlabel("Time (s)")
 
     plt.tight_layout()
+    print("Displaying results...")
     plt.show()
