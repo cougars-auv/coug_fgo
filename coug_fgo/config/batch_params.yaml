@@ -193,7 +193,7 @@
 
       # If true, forces the initial state to be set by the values below.
       # The parameter priors should be set at the base frame with respect to the map frame.
-      use_parameter_priors: true
+      use_parameter_priors: false
       parameter_priors:
         initial_position: [0.0, 0.0, 0.0] # [m]
         initial_orientation: [0.0, 0.0, 0.0] # [rad]

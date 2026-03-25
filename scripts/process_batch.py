@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Copyright (c) 2026 BYU FROST Lab
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,8 +16,11 @@
 # %%
 import sys
 from pathlib import Path
-import yaml
+
 import numpy as np
+import yaml
+import matplotlib.pyplot as plt
+from scipy.spatial.transform import Rotation as R
 from rosbags.highlevel import AnyReader
 from rosbags.typesys import Stores, get_typestore
 
@@ -26,43 +30,11 @@ FGO_LIB_PATH = str(
 sys.path.insert(0, FGO_LIB_PATH)
 import pybind11fgo  # noqa: E402
 
-# %%
+NAMESPACE = "coug0sim"
 BAG_PATH = str(Path.home() / "cougars-dev/bags/launch_2026-03-24-11-26-15")
 CONFIG_PATH = str(
     Path.home() / "cougars-dev/ros2_ws/src/coug_fgo/coug_fgo/config/batch_params.yaml"
 )
-NAMESPACE = "coug0sim"
-
-with open(CONFIG_PATH, "r") as file:
-    config_yaml = yaml.safe_load(file)
-
-params = config_yaml.get("/**", {}).get("ros__parameters", config_yaml)
-
-kf_source = params.get("keyframe_source", "DVL")
-KEYFRAME_TOPIC = {
-    "DVL": params.get("dvl_topic", "dvl/twist"),
-    "Depth": params.get("depth_odom_topic", "odometry/depth"),
-}.get(kf_source, "dvl/twist")
-
-TOPIC_MAP = {
-    params.get("imu_topic", "imu/data"): ("sensor_msgs/msg/Imu", "imu"),
-    params.get("gps_odom_topic", "odometry/gps"): ("nav_msgs/msg/Odometry", "gps"),
-    params.get("depth_odom_topic", "odometry/depth"): (
-        "nav_msgs/msg/Odometry",
-        "depth",
-    ),
-    params.get("mag_topic", "imu/mag"): ("sensor_msgs/msg/MagneticField", "mag"),
-    params.get("ahrs_topic", "imu/ahrs"): ("sensor_msgs/msg/Imu", "ahrs"),
-    params.get("dvl_topic", "dvl/twist"): (
-        "geometry_msgs/msg/TwistWithCovarianceStamped",
-        "dvl",
-    ),
-    params.get("wrench_topic", "cmd_wrench"): (
-        "geometry_msgs/msg/WrenchStamped",
-        "wrench",
-    ),
-}
-
 EXTRACTORS = {
     "imu": lambda m: (
         np.array(
@@ -110,49 +82,254 @@ EXTRACTORS = {
     ),
 }
 
-# %%
-typestore = get_typestore(Stores.ROS2_HUMBLE)
-fg = pybind11fgo.FactorGraphPy(CONFIG_PATH)
-
-topic_sensor_map = {}
-results = []
-
-reader = AnyReader([Path(BAG_PATH)], default_typestore=typestore)
-reader.open()
-
-for conn in reader.connections:
-    if NAMESPACE and not conn.topic.startswith(f"/{NAMESPACE}/"):
-        continue
-    for suffix, (msg_type, sensor) in TOPIC_MAP.items():
-        if conn.topic.endswith(suffix) and conn.msgtype == msg_type:
-            topic_sensor_map[conn.topic] = sensor
-            break
-
-print(f"Mapped topics: {topic_sensor_map}")
-
-keyframe_full_topic = next(
-    (t for t in topic_sensor_map if t.endswith(KEYFRAME_TOPIC)), None
-)
-if not keyframe_full_topic:
-    print(f"Warning: keyframe topic '{KEYFRAME_TOPIC}' not found in bag.")
 
 # %%
-matched_conns = [c for c in reader.connections if c.topic in topic_sensor_map]
-for conn, _, rawdata in reader.messages(connections=matched_conns):
-    msg = reader.deserialize(rawdata, conn.msgtype)
-    sensor = topic_sensor_map[conn.topic]
-    timestamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+def load_config(config_path):
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+    params = config.get("/**", {}).get("ros__parameters", config)
 
-    args = EXTRACTORS[sensor](msg)
-    getattr(fg, f"add_{sensor}")(timestamp, *args)
+    topic_map = {
+        params.get("imu_topic", "imu/data"): "imu",
+        params.get("gps_odom_topic", "odometry/gps"): "gps",
+        params.get("depth_odom_topic", "odometry/depth"): "depth",
+        params.get("mag_topic", "imu/mag"): "mag",
+        params.get("ahrs_topic", "imu/ahrs"): "ahrs",
+        params.get("dvl_topic", "dvl/twist"): "dvl",
+        params.get("wrench_topic", "cmd_wrench"): "wrench",
+    }
 
-    if not fg.initialize_graph(timestamp):
-        continue
+    required_sensors = {"imu"}
+    for s in ["gps", "depth", "mag", "ahrs", "dvl"]:
+        sensor_params = params.get(s, {})
+        if sensor_params.get(f"enable_{s}") or sensor_params.get(
+            f"enable_{s}_init_only"
+        ):
+            required_sensors.add(s)
 
-    if conn.topic == keyframe_full_topic:
-        fg.update_graph(timestamp)
-        if result := fg.optimize_graph():
-            results.append(result)
+    kf_source = params.get("keyframe_source", "DVL")
+    if kf_source == "Timer":
+        kf_topic = None
+    else:
+        topic_key = {"DVL": "dvl_topic", "Depth": "depth_odom_topic"}.get(
+            kf_source, "dvl_topic"
+        )
+        kf_topic = params.get(topic_key, "dvl/twist")
 
-reader.close()
-print(f"Processed {len(results)} keyframes.")
+    kf_period = 1.0 / max(params.get("keyframe_timer_hz", 10.0), 0.1)
+
+    return topic_map, required_sensors, kf_source, kf_topic, kf_period
+
+
+def process_bag(bag_path, config_path, namespace):
+    topic_map, required_sensors, kf_source, kf_topic, kf_period = load_config(
+        config_path
+    )
+
+    fg = pybind11fgo.FactorGraphPy(config_path)
+    raw_results = []
+
+    with AnyReader(
+        [Path(bag_path)], default_typestore=get_typestore(Stores.ROS2_HUMBLE)
+    ) as reader:
+        conns = []
+        for c in reader.connections:
+            if not namespace or c.topic.startswith(f"/{namespace}/"):
+                conns.append(c)
+
+        topic_to_sensor = {}
+        for c in conns:
+            for suffix, sensor in topic_map.items():
+                if c.topic.endswith(suffix):
+                    topic_to_sensor[c.topic] = sensor
+
+        matched_conns = []
+        for c in conns:
+            if c.topic in topic_to_sensor:
+                matched_conns.append(c)
+
+        sensors_seen = set()
+        is_running = False
+        last_kf_time = None
+
+        for conn, _, rawdata in reader.messages(connections=matched_conns):
+            msg = reader.deserialize(rawdata, conn.msgtype)
+
+            sensor = topic_to_sensor[conn.topic]
+            t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+            getattr(fg, f"add_{sensor}")(t, *EXTRACTORS[sensor](msg))
+            sensors_seen.add(sensor)
+
+            if not is_running:
+                if required_sensors.issubset(sensors_seen) and fg.initialize_graph(t):
+                    is_running = True
+                    last_kf_time = t
+                continue
+
+            trigger = False
+            if (
+                kf_source == "Timer"
+                and sensor == "imu"
+                and (t >= last_kf_time + kf_period)
+            ):
+                last_kf_time += kf_period
+                trigger = True
+            elif kf_topic and conn.topic.endswith(kf_topic):
+                trigger = True
+
+            if trigger:
+                fg.update_graph(t)
+                if res := fg.optimize_graph():
+                    raw_results.append(res)
+
+    print(f"Processed {len(raw_results)} keyframes.")
+
+    if raw_results:
+        results = {
+            k: np.array([r[k] for r in raw_results]) for k in raw_results[0].keys()
+        }
+
+        rolls, pitches, yaws = [], [], []
+        for i in range(len(raw_results)):
+            r, p, y = R.from_quat(
+                [results["qx"][i], results["qy"][i], results["qz"][i], results["qw"][i]]
+            ).as_euler("xyz")
+            rolls.append(r)
+            pitches.append(p)
+            yaws.append(y)
+
+        results["roll"] = np.array(rolls)
+        results["pitch"] = np.array(pitches)
+        results["yaw"] = np.array(yaws)
+
+        return results
+
+
+def read_ground_truth(bag_path, namespace):
+    pose_dict = {
+        "time": [],
+        "x": [],
+        "y": [],
+        "z": [],
+        "roll": [],
+        "pitch": [],
+        "yaw": [],
+    }
+    vel_dict = {"time": [], "vx": [], "vy": [], "vz": []}
+    bias_dict = {
+        "time": [],
+        "bias_accel_x": [],
+        "bias_accel_y": [],
+        "bias_accel_z": [],
+        "bias_gyro_x": [],
+        "bias_gyro_y": [],
+        "bias_gyro_z": [],
+    }
+
+    with AnyReader(
+        [Path(bag_path)], default_typestore=get_typestore(Stores.ROS2_HUMBLE)
+    ) as reader:
+        conns = []
+        for c in reader.connections:
+            if not namespace or c.topic.startswith(f"/{namespace}/"):
+                conns.append(c)
+
+        target_conns = []
+        for c in conns:
+            if c.topic.endswith(("odometry/truth", "VelocitySensor", "imu_bias")):
+                target_conns.append(c)
+
+        for conn, _, rawdata in reader.messages(connections=target_conns):
+            msg = reader.deserialize(rawdata, conn.msgtype)
+            t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+
+            if conn.topic.endswith("odometry/truth"):
+                q, pos = msg.pose.pose.orientation, msg.pose.pose.position
+                roll, pitch, yaw = R.from_quat([q.x, q.y, q.z, q.w]).as_euler("xyz")
+                pose_dict["time"].append(t)
+                pose_dict["x"].append(pos.x)
+                pose_dict["y"].append(pos.y)
+                pose_dict["z"].append(pos.z)
+                pose_dict["roll"].append(roll)
+                pose_dict["pitch"].append(pitch)
+                pose_dict["yaw"].append(yaw)
+
+            elif conn.topic.endswith("VelocitySensor"):
+                v = msg.twist.twist.linear
+                vel_dict["time"].append(t)
+                vel_dict["vx"].append(v.x)
+                vel_dict["vy"].append(v.y)
+                vel_dict["vz"].append(v.z)
+
+            elif conn.topic.endswith("imu_bias"):
+                lin, ang = msg.twist.twist.linear, msg.twist.twist.angular
+                bias_dict["time"].append(t)
+                bias_dict["bias_accel_x"].append(lin.x)
+                bias_dict["bias_accel_y"].append(lin.y)
+                bias_dict["bias_accel_z"].append(lin.z)
+                bias_dict["bias_gyro_x"].append(ang.x)
+                bias_dict["bias_gyro_y"].append(ang.y)
+                bias_dict["bias_gyro_z"].append(ang.z)
+
+    pose = {k: np.array(v) for k, v in pose_dict.items()} if pose_dict["time"] else {}
+    vel = {k: np.array(v) for k, v in vel_dict.items()} if vel_dict["time"] else {}
+    bias = {k: np.array(v) for k, v in bias_dict.items()} if bias_dict["time"] else {}
+
+    return pose, vel, bias
+
+
+# %%
+results = process_bag(BAG_PATH, CONFIG_PATH, NAMESPACE)
+pose_gt, vel_gt, bias_gt = read_ground_truth(BAG_PATH, NAMESPACE)
+
+# %%
+if results:
+    t0 = results["time"][0]
+    t_fgo = results["time"] - t0
+
+    def t_gt(data):
+        return data["time"] - t0 if data else []
+
+    layout = [
+        (["x", "y", "z"], ["X (m)", "Y (m)", "Z (m)"], pose_gt),
+        (["roll", "pitch", "yaw"], ["Roll (rad)", "Pitch (rad)", "Yaw (rad)"], pose_gt),
+        (["vx", "vy", "vz"], ["Vx (m/s)", "Vy (m/s)", "Vz (m/s)"], vel_gt),
+        (
+            ["bias_accel_x", "bias_accel_y", "bias_accel_z"],
+            ["Accel Bias X", "Accel Bias Y", "Accel Bias Z"],
+            bias_gt,
+        ),
+        (
+            ["bias_gyro_x", "bias_gyro_y", "bias_gyro_z"],
+            ["Gyro Bias X", "Gyro Bias Y", "Gyro Bias Z"],
+            bias_gt,
+        ),
+    ]
+
+    fig, axes = plt.subplots(5, 3, figsize=(12, 10))
+
+    for row, (keys, labels, gt_data) in enumerate(layout):
+        for col, (key, label) in enumerate(zip(keys, labels)):
+            ax = axes[row, col]
+
+            if gt_data:
+                ax.plot(
+                    t_gt(gt_data),
+                    gt_data[key],
+                    "-k",
+                    label="GT",
+                )
+
+            ax.plot(
+                t_fgo,
+                results[key],
+                "-r",
+                label="FGO",
+            )
+
+            ax.set_ylabel(label)
+            if row == 4:
+                ax.set_xlabel("Time (s)")
+
+    plt.tight_layout()
+    plt.show()

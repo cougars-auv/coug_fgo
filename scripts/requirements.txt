@@ -1,3 +1,4 @@
 daft-pgm
 matplotlib
 rosbags
+scipy

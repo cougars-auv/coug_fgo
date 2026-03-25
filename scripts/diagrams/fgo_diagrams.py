@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Copyright (c) 2026 BYU FROST Lab
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,7 +24,6 @@ OUTPUT_DIR = Path(__file__).parent
 plt.rcParams["text.usetex"] = True
 plt.rcParams["font.family"] = "serif"
 
-# %%
 COLOR_VAR = "#B5CBE6"
 COLOR_PRIOR = "#4C72B0"
 COLOR_FACTOR_DEPTH = "#DD8452"
