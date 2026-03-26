@@ -35,9 +35,8 @@ NAMESPACE = "bluerov2"
 BAG_PATH = str(
     Path.home() / "cougars-dev/bags/batch_ul_surface_1.0_2026-03-25-14-46-57"
 )
-CONFIG_PATH = str(
-    Path.home() / "cougars-dev/ros2_ws/src/coug_fgo/scripts/batch_params.yaml"
-)
+FLEET_CONFIG_PATH = str(Path.home() / "cougars-dev/config/fleet/coug_fgo_params.yaml")
+AUV_CONFIG_PATH = str(Path.home() / "cougars-dev/config/bluerov2_params.yaml")
 EXTRACTORS = {
     "imu": lambda m: (
         np.array(
@@ -87,11 +86,23 @@ EXTRACTORS = {
 
 
 # %%
-def load_config(config_path):
-    print(f"Loading configuration from: {config_path}")
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-    params = config.get("/**", {}).get("ros__parameters", config)
+def load_config(config_paths, namespace):
+    params = {}
+    for path in config_paths:
+        print(f"Loading config: {path}")
+        with open(path, "r") as f:
+            config = yaml.safe_load(f)
+        for key in ["/**", f"/{namespace}/**"]:
+            layer = config.get(key, {}).get("ros__parameters", {})
+
+            def merge(base, override):
+                for k, v in override.items():
+                    if isinstance(v, dict) and isinstance(base.get(k), dict):
+                        merge(base[k], v)
+                    else:
+                        base[k] = v
+
+            merge(params, layer)
 
     sensor_topics = {
         "imu": params.get("imu_topic", "imu/data"),
@@ -136,12 +147,12 @@ def load_config(config_path):
     return topic_map, required_sensors, kf_source, kf_topic, kf_period, target_T_base
 
 
-def process_bag(bag_path, config_path, namespace):
+def process_bag(bag_path, config_paths, namespace):
     topic_map, required_sensors, kf_source, kf_topic, kf_period, target_T_base = (
-        load_config(config_path)
+        load_config(config_paths, namespace)
     )
 
-    fg = pybind11fgo.FactorGraphPy(config_path)
+    fg = pybind11fgo.FactorGraphPy(config_paths, namespace)
     raw_results = []
 
     print(f"Opening bag: {bag_path}")
@@ -354,7 +365,7 @@ def read_ground_truth(bag_path, namespace):
 
 
 # %%
-results = process_bag(BAG_PATH, CONFIG_PATH, NAMESPACE)
+results = process_bag(BAG_PATH, [FLEET_CONFIG_PATH, AUV_CONFIG_PATH], NAMESPACE)
 pose_gt, vel_gt, bias_gt = read_ground_truth(BAG_PATH, NAMESPACE)
 
 # %%

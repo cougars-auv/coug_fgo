@@ -23,14 +23,23 @@
 
 #include <rclcpp/rclcpp.hpp>
 
-FactorGraphPy::FactorGraphPy(const std::string& config_path) {
+FactorGraphPy::FactorGraphPy(const std::vector<std::string>& config_paths)
+    : FactorGraphPy(config_paths, "") {}
+
+FactorGraphPy::FactorGraphPy(const std::vector<std::string>& config_paths, const std::string& ns) {
   if (!rclcpp::ok()) {
     rclcpp::init(0, nullptr);
   }
 
+  std::vector<std::string> args = {"--ros-args"};
+  for (const auto& path : config_paths) {
+    args.push_back("--params-file");
+    args.push_back(path);
+  }
+
   rclcpp::NodeOptions options;
-  options.arguments({"--ros-args", "--params-file", config_path});
-  auto dummy_node = std::make_shared<rclcpp::Node>("factor_graph_node", options);
+  options.arguments(args);
+  auto dummy_node = std::make_shared<rclcpp::Node>("factor_graph_node", ns, options);
 
   auto param_listener = std::make_shared<factor_graph_node::ParamListener>(
       dummy_node->get_node_parameters_interface());
@@ -223,7 +232,9 @@ PYBIND11_MODULE(pybind11fgo, m) {
   m.doc() = "Python bindings for the FactorGraphCore.";
 
   pybind11::class_<FactorGraphPy>(m, "FactorGraphPy")
-      .def(pybind11::init<const std::string&>(), pybind11::arg("config_path"))
+      .def(pybind11::init<const std::vector<std::string>&>(), pybind11::arg("config_paths"))
+      .def(pybind11::init<const std::vector<std::string>&, const std::string&>(),
+           pybind11::arg("config_paths"), pybind11::arg("namespace"))
       .def("add_imu", &FactorGraphPy::add_imu, pybind11::arg("timestamp"), pybind11::arg("accel"),
            pybind11::arg("gyro"), pybind11::arg("accel_cov"), pybind11::arg("gyro_cov"))
       .def("add_dvl", &FactorGraphPy::add_dvl, pybind11::arg("timestamp"),

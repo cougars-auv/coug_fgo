@@ -30,6 +30,7 @@
 #include <Eigen/Dense>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "coug_fgo/factor_graph_core.hpp"
 #include "coug_fgo/factor_graph_parameters.hpp"
@@ -42,10 +43,12 @@
 class FactorGraphPy {
  public:
   /**
-   * @brief Constructs the wrapper, loading parameters from a ROS 2 YAML config file.
-   * @param config_path Path to the ROS 2 parameter YAML file.
+   * @brief Constructs the wrapper, loading parameters from ROS 2 YAML config files.
+   * @param config_paths Paths to ROS 2 parameter YAML files.
+   * @param ns Optional ROS namespace for parameter resolution.
    */
-  explicit FactorGraphPy(const std::string& config_path);
+  explicit FactorGraphPy(const std::vector<std::string>& config_paths);
+  FactorGraphPy(const std::vector<std::string>& config_paths, const std::string& ns);
 
   // --- Sensor Input ---
   /**

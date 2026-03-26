@@ -184,9 +184,9 @@
         # CougUV (HoloOcean)
         # position: [0.0, 0.0, 0.0] # [x, y, z]
         # orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
-      use_parameter_covariance: false
+      use_parameter_covariance: false # true
       parameter_covariance:
-        yaw_noise_sigma: 0.01745 # [rad] AHRS sensor yaw uncertainty sigma.
+        yaw_noise_sigma: 0.005 # 0.01745 # [rad] AHRS sensor yaw uncertainty sigma.
       # https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml#declination
       mag_declination_radians: 0.0
       diagnostic_timeout: 1.0 # [s]
@@ -259,8 +259,8 @@
         initial_position_sigmas: [0.001, 0.001, 0.001] # [m] Initial position uncertainty.
         initial_orientation_sigmas: [0.001, 0.001, 0.001] # [rad] Initial yaw uncertainty.
         initial_velocity_sigmas: [0.001, 0.001, 0.001] # [m/s] Initial velocity uncertainty.
-      initial_accel_bias_sigmas: [0.1, 0.1, 0.1] # [m/s^2] Initial accelerometer bias uncertainty.
-      initial_gyro_bias_sigmas: [0.005, 0.005, 0.005] # [rad/s] Initial gyroscope bias uncertainty.
+      initial_accel_bias_sigmas: [0.01, 0.01, 0.01] # [m/s^2] Initial accelerometer bias uncertainty.
+      initial_gyro_bias_sigmas: [0.001, 0.001, 0.001] # [rad/s] Initial gyroscope bias uncertainty.
 
     # --- Comparison Methods ---
     comparison:
