@@ -36,7 +36,7 @@ options=$(gum choose --no-limit --header "Select evo options:" -- \
   "--align_origin" \
   "--project_to_plane xy ")
 
-evo_args=()
+evo_args=("--t_max_diff" "0.05")
 [[ "${options}" == *"--align (Umeyama)"* ]] && evo_args+=("--align")
 [[ "${options}" == *"--align_origin"* ]] && evo_args+=("--align_origin")
 [[ "${options}" == *"--project_to_plane"* ]] && evo_args+=("--project_to_plane" "xy")
