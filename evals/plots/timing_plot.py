@@ -24,10 +24,10 @@ from rosbags.highlevel import AnyReader
 
 plt.style.use(["science", "ieee"])
 
-ALGORITHMS = ["FL-B", "iSAM2-B", "FL-LPI", "FL-TPI", "IEKF", "UKF", "EKF", "DVL"]
+ALGORITHMS = ["FL-B", "iS2-B", "FL-LPI", "FL-TPI", "IEKF", "UKF", "EKF", "DVL"]
 COLORS = {
     "FL-B": "#55A868",
-    "iSAM2-B": "#DD8452",
+    "iS2-B": "#DD8452",
     "FL-LPI": "#4C72B0",
     "FL-TPI": "#C44E52",
     "IEKF": "#8172B2",
@@ -37,7 +37,7 @@ COLORS = {
 }
 NAME_MAPPING = {
     "factor_graph_node": "FL-B",
-    "factor_graph_node_isam2": "iSAM2-B",
+    "factor_graph_node_isam2": "iS2-B",
     "factor_graph_node_lpi": "FL-LPI",
     "factor_graph_node_tpi": "FL-TPI",
 }
