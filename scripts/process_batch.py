@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
 from rosbags.highlevel import AnyReader
 from rosbags.typesys import Stores, get_typestore
+from tqdm import tqdm
 
 FGO_LIB_PATH = str(
     Path.home() / "cougars-dev/ros2_ws/install/coug_fgo/lib/python3.10/site-packages"
@@ -173,9 +174,15 @@ def process_bag(bag_path, config_path, namespace):
         sensors_seen = set()
         is_running = False
         last_kf_time = None
-        last_print_time = None
 
-        for conn, _, rawdata in reader.messages(connections=matched_conns):
+        total_msgs = sum(c.msgcount for c in matched_conns)
+        pbar = tqdm(
+            reader.messages(connections=matched_conns),
+            total=total_msgs,
+            desc="Processing FGO",
+        )
+
+        for conn, _, rawdata in pbar:
             msg = reader.deserialize(rawdata, conn.msgtype)
 
             sensors = topic_to_sensors[conn.topic]
@@ -189,7 +196,6 @@ def process_bag(bag_path, config_path, namespace):
                 if required_sensors.issubset(sensors_seen) and fg.initialize_graph(t):
                     is_running = True
                     last_kf_time = t
-                    print(f"{t:.3f} s: Initialized with sensors: {sensors_seen}")
                 continue
 
             trigger = False
@@ -209,18 +215,12 @@ def process_bag(bag_path, config_path, namespace):
                     if res := fg.optimize_graph():
                         raw_results.append(res)
                 except Exception as e:
-                    print(f"{e}\n")
+                    tqdm.write(f"{e}\n")
                     break
-
-            if last_print_time is None or t - last_print_time >= 30.0:
-                print(f"{t:.3f} s: Processed {len(raw_results)} keyframes...")
-                last_print_time = t
 
     if not is_running:
         missing = required_sensors - sensors_seen
-        print(f"Graph never initialized! Missing sensors: {missing}")
-    else:
-        print(f"Finished processing bag. Total keyframes: {len(raw_results)}")
+        print(f"\nGraph never initialized! Missing sensors: {missing}")
 
     if raw_results:
         results = {
@@ -307,7 +307,14 @@ def read_ground_truth(bag_path, namespace):
             print(f"- {c.topic} ({gt_labels[c.topic]})")
         print()
 
-        for conn, _, rawdata in reader.messages(connections=target_conns):
+        total_msgs = sum(c.msgcount for c in target_conns)
+        pbar = tqdm(
+            reader.messages(connections=target_conns),
+            total=total_msgs,
+            desc="Processing GT",
+        )
+
+        for conn, _, rawdata in pbar:
             msg = reader.deserialize(rawdata, conn.msgtype)
             t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
 
@@ -400,5 +407,4 @@ if results:
                 ax.set_xlabel("Time (s)")
 
     plt.tight_layout()
-    print("Displaying results...")
     plt.show()

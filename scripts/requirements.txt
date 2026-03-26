@@ -2,3 +2,4 @@ daft-pgm
 matplotlib
 rosbags
 scipy
+tqdm
