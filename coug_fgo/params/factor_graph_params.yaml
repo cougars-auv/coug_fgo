@@ -63,7 +63,7 @@ factor_graph_node:
       one_of<>: [["None", "DVL", "Depth", "Timer"]]
   keyframe_timeout:
     type: double
-    default_value: 0.25
+    default_value: 0.5
   keyframe_timer_hz:
     type: double
     default_value: 10.0

@@ -105,13 +105,13 @@ def load_config(config_paths, namespace):
             merge(params, layer)
 
     sensor_topics = {
-        "imu": params.get("imu_topic", "imu/data"),
-        "gps": params.get("gps_odom_topic", "odometry/gps"),
-        "depth": params.get("depth_odom_topic", "odometry/depth"),
-        "mag": params.get("mag_topic", "imu/mag"),
-        "ahrs": params.get("ahrs_topic", "imu/ahrs"),
-        "dvl": params.get("dvl_topic", "dvl/twist"),
-        "wrench": params.get("wrench_topic", "cmd_wrench"),
+        "imu": params["imu_topic"],
+        "gps": params["gps_odom_topic"],
+        "depth": params["depth_odom_topic"],
+        "mag": params["mag_topic"],
+        "ahrs": params["ahrs_topic"],
+        "dvl": params["dvl_topic"],
+        "wrench": params["wrench_topic"],
     }
 
     topic_map = {}
@@ -122,34 +122,47 @@ def load_config(config_paths, namespace):
 
     required_sensors = {"imu"}
     for s in ["gps", "depth", "mag", "ahrs", "dvl"]:
-        sensor_params = params.get(s, {})
+        sensor_params = params[s]
         if sensor_params.get(f"enable_{s}") or sensor_params.get(
             f"enable_{s}_init_only"
         ):
             required_sensors.add(s)
 
-    kf_source = params.get("keyframe_source", "DVL")
-    if kf_source == "Timer":
-        kf_topic = None
-    else:
-        topic_key = {"DVL": "dvl_topic", "Depth": "depth_odom_topic"}.get(
-            kf_source, "dvl_topic"
-        )
-        kf_topic = params.get(topic_key, "dvl/twist")
+    source_to_topic_key = {"DVL": "dvl_topic", "Depth": "depth_odom_topic"}
 
-    kf_period = 1.0 / max(params.get("keyframe_timer_hz", 10.0), 0.1)
+    kf_source = params["keyframe_source"]
+    kf_topic = None if kf_source == "Timer" else params[source_to_topic_key[kf_source]]
 
-    base_tf = params.get("base", {}).get("parameter_tf", {})
-    base_pos = np.array(base_tf.get("position", [0.0, 0.0, 0.0]))  # [x, y, z]
-    base_quat = base_tf.get("orientation", [0.0, 0.0, 0.0, 1.0])  # [qx, qy, qz, qw]
+    backup_source = params["backup_keyframe_source"]
+    backup_topic = (
+        None
+        if backup_source in ("None", "Timer")
+        else params[source_to_topic_key[backup_source]]
+    )
+
+    kf_timeout = params["keyframe_timeout"]
+    kf_period = 1.0 / max(params["keyframe_timer_hz"], 0.1)
+
+    base_tf = params["base"]["parameter_tf"]
+    base_pos = np.array(base_tf["position"])  # [x, y, z]
+    base_quat = base_tf["orientation"]  # [qx, qy, qz, qw]
     target_T_base = (base_pos, R.from_quat(base_quat))
 
-    return topic_map, required_sensors, kf_source, kf_topic, kf_period, target_T_base
+    kf_config = {
+        "source": kf_source,
+        "topic": kf_topic,
+        "backup_source": backup_source,
+        "backup_topic": backup_topic,
+        "timeout": kf_timeout,
+        "period": kf_period,
+    }
+
+    return topic_map, required_sensors, kf_config, target_T_base
 
 
 def process_bag(bag_path, config_paths, namespace):
-    topic_map, required_sensors, kf_source, kf_topic, kf_period, target_T_base = (
-        load_config(config_paths, namespace)
+    topic_map, required_sensors, kf_config, target_T_base = load_config(
+        config_paths, namespace
     )
 
     fg = pybind11fgo.FactorGraphPy(config_paths, namespace)
@@ -185,6 +198,8 @@ def process_bag(bag_path, config_paths, namespace):
         sensors_seen = set()
         is_running = False
         last_kf_time = None
+        current_time = 0.0
+        last_received = 0.0
 
         total_msgs = sum(c.msgcount for c in matched_conns)
         pbar = tqdm(
@@ -209,15 +224,37 @@ def process_bag(bag_path, config_paths, namespace):
                     last_kf_time = t
                 continue
 
+            current_time = max(t, current_time)
+
+            kf_topic = kf_config["topic"]
+            if kf_topic and conn.topic.endswith(kf_topic):
+                last_received = max(t, last_received)
+
+            active_topic = kf_topic
+            if kf_config["source"] != "Timer" and kf_config["backup_source"] != "None":
+                if (
+                    last_received == 0.0
+                    or (current_time - last_received) > kf_config["timeout"]
+                ):
+                    active_topic = kf_config["backup_topic"]
+
             trigger = False
             if (
-                kf_source == "Timer"
+                kf_config["source"] == "Timer"
                 and "imu" in sensors
-                and (t >= last_kf_time + kf_period)
+                and (t >= last_kf_time + kf_config["period"])
             ):
-                last_kf_time += kf_period
+                last_kf_time += kf_config["period"]
                 trigger = True
-            elif kf_topic and conn.topic.endswith(kf_topic):
+            elif active_topic and conn.topic.endswith(active_topic):
+                trigger = True
+            elif (
+                kf_config["backup_source"] == "Timer"
+                and active_topic != kf_topic
+                and "imu" in sensors
+                and (t >= last_kf_time + kf_config["period"])
+            ):
+                last_kf_time += kf_config["period"]
                 trigger = True
 
             if trigger:
