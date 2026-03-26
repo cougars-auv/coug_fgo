@@ -180,6 +180,7 @@ class FactorGraphNode : public rclcpp::Node {
   std::atomic<State> state_{State::WAITING_FOR_SENSORS};
   rclcpp::Time last_update_time_{0, 0, RCL_ROS_TIME};
   rclcpp::Time last_opt_time_{0, 0, RCL_ROS_TIME};
+  double last_target_time_{0.0};
 
   // --- Diagnostics State ---
   std::atomic<double> last_total_duration_{0.0};

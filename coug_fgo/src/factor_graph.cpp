@@ -620,9 +620,10 @@ void FactorGraphNode::updateGraph() {
     target_time = imu_queue_.getLastTime();
   }
 
-  if (target_time == 0.0) {
+  if (target_time == 0.0 || target_time <= last_target_time_) {
     return;
   }
+  last_target_time_ = target_time;
 
   // --- Update Request ---
   utils::QueueBundle queues;
