@@ -36,10 +36,13 @@ options=$(gum choose --no-limit --header "Select evo options:" -- \
   "--align_origin" \
   "--project_to_plane xy ")
 
-evo_args=("--t_max_diff" "0.05")
-[[ "${options}" == *"--align (Umeyama)"* ]] && evo_args+=("--align")
-[[ "${options}" == *"--align_origin"* ]] && evo_args+=("--align_origin")
-[[ "${options}" == *"--project_to_plane"* ]] && evo_args+=("--project_to_plane" "xy")
+evo_base_args=("--t_max_diff" "0.05")
+[[ "${options}" == *"--align (Umeyama)"* ]] && evo_base_args+=("--align")
+[[ "${options}" == *"--align_origin"* ]] && evo_base_args+=("--align_origin")
+
+evo_trans_args=("${evo_base_args[@]}")
+evo_rot_args=("${evo_base_args[@]}")
+[[ "${options}" == *"--project_to_plane"* ]] && evo_trans_args+=("--project_to_plane" "xy")
 
 # --- Evaluation ---
 evo_config set save_traj_in_zip true &>/dev/null
@@ -66,17 +69,17 @@ for bag_path in ${bags_to_eval}; do
 
       # APE (Global Accuracy)
       gum spin --spinner dot --title "Calculating APE (Translation)..." --show-output -- \
-        evo_ape bag2 "${bag_path}" "${truth}" "${topic}" -r trans_part "${evo_args[@]}" --save_results "${out_dir}/ape_trans.zip"
+        evo_ape bag2 "${bag_path}" "${truth}" "${topic}" -r trans_part "${evo_trans_args[@]}" --save_results "${out_dir}/ape_trans.zip"
 
       gum spin --spinner dot --title "Calculating APE (Rotation)..." --show-output -- \
-        evo_ape bag2 "${bag_path}" "${truth}" "${topic}" -r angle_deg "${evo_args[@]}" --save_results "${out_dir}/ape_rot.zip"
+        evo_ape bag2 "${bag_path}" "${truth}" "${topic}" -r angle_deg "${evo_rot_args[@]}" --save_results "${out_dir}/ape_rot.zip"
 
       # RPE (Drift)
       gum spin --spinner dot --title "Calculating RPE (Translation)..." --show-output -- \
-        evo_rpe bag2 "${bag_path}" "${truth}" "${topic}" -r trans_part "${evo_args[@]}" --delta 1 --delta_unit m --all_pairs --save_results "${out_dir}/rpe_trans.zip"
+        evo_rpe bag2 "${bag_path}" "${truth}" "${topic}" -r trans_part "${evo_trans_args[@]}" --delta 1 --delta_unit m --all_pairs --save_results "${out_dir}/rpe_trans.zip"
 
       gum spin --spinner dot --title "Calculating RPE (Rotation)..." --show-output -- \
-        evo_rpe bag2 "${bag_path}" "${truth}" "${topic}" -r angle_deg "${evo_args[@]}" --delta 1 --delta_unit m --all_pairs --save_results "${out_dir}/rpe_rot.zip"
+        evo_rpe bag2 "${bag_path}" "${truth}" "${topic}" -r angle_deg "${evo_rot_args[@]}" --delta 1 --delta_unit m --all_pairs --save_results "${out_dir}/rpe_rot.zip"
     done
 
     if ls "${bag_path}/evo/${agent}"/*/*/*.zip 1> /dev/null 2>&1; then
