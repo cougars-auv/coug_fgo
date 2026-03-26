@@ -25,6 +25,8 @@
 #include <gtsam/navigation/CombinedImuFactor.h>
 #include <gtsam/nonlinear/ISAM2.h>
 #include <gtsam/nonlinear/IncrementalFixedLagSmoother.h>
+#include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
+#include <gtsam/nonlinear/NonlinearFactorGraph.h>
 
 #include <deque>
 #include <map>
@@ -245,6 +247,8 @@ class FactorGraphCore {
   // --- GTSAM Solver ---
   std::unique_ptr<gtsam::IncrementalFixedLagSmoother> inc_smoother_;
   std::unique_ptr<gtsam::ISAM2> isam_;
+  gtsam::NonlinearFactorGraph lm_graph_;
+  gtsam::Values lm_values_;
   std::unique_ptr<gtsam::PreintegratedCombinedMeasurements> imu_preintegrator_;
   std::unique_ptr<utils::DvlLoosePreintegrator> dvl_loose_preintegrator_;
   std::unique_ptr<utils::DvlTightPreintegrator> dvl_tight_preintegrator_;

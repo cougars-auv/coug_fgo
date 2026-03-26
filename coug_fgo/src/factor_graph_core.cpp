@@ -143,6 +143,9 @@ void FactorGraphCore::initialize(const utils::StateInitializer& state_init,
   if (params_.solver_type == "ISAM2") {
     isam_ = std::make_unique<gtsam::ISAM2>(isam2_params);
     isam_->update(initial_graph, initial_values);
+  } else if (params_.solver_type == "LevenbergMarquardt") {
+    lm_graph_ = initial_graph;
+    lm_values_ = initial_values;
   } else {
     inc_smoother_ =
         std::make_unique<gtsam::IncrementalFixedLagSmoother>(params_.smoother_lag, isam2_params);
@@ -795,12 +798,17 @@ std::optional<UpdateResult> FactorGraphCore::update(double target_time,
     new_timestamps[V(current_step_)] = target_time;
     new_timestamps[B(current_step_)] = target_time;
 
+    if (!inc_smoother_ && !isam_) {
+      prev_pose_ = pred.pose();
+      prev_vel_ = pred.velocity();
+    }
+
     // --- Reset Preintegrators ---
     imu_preintegrator_->resetIntegrationAndSetBias(prev_imu_bias_);
 
     if (params_.publish_smoothed_path) {
       time_to_key[target_time] = X(current_step_);
-      if (!isam_) {
+      if (inc_smoother_) {
         time_to_key.erase(time_to_key.begin(),
                           time_to_key.lower_bound(target_time - params_.smoother_lag));
       }
@@ -897,6 +905,29 @@ std::optional<OptimizeResult> FactorGraphCore::optimize() {
       result.total_factors = isam_->getFactorsUnsafe().nrFactors();
       result.total_variables = isam_->getLinearizationPoint().size();
     }
+  } else {
+    lm_graph_.push_back(batch_graph.begin(), batch_graph.end());
+    lm_values_.insert(batch_values);
+
+    auto smoother_start = std::chrono::high_resolution_clock::now();
+    gtsam::LevenbergMarquardtParams lm_params;
+    gtsam::LevenbergMarquardtOptimizer optimizer(lm_graph_, lm_values_, lm_params);
+    gtsam::Values lm_result = optimizer.optimize();
+    lm_values_ = lm_result;
+    auto smoother_end = std::chrono::high_resolution_clock::now();
+    result.smoother_duration = std::chrono::duration<double>(smoother_end - smoother_start).count();
+
+    {
+      std::scoped_lock update_lock(buffer_mutex);
+      prev_pose_ = lm_result.at<gtsam::Pose3>(X(batch_last_step));
+      prev_vel_ = lm_result.at<gtsam::Vector3>(V(batch_last_step));
+      prev_imu_bias_ = lm_result.at<gtsam::imuBias::ConstantBias>(B(batch_last_step));
+    }
+
+    if (params_.publish_diagnostics || params_.publish_graph_metrics) {
+      result.total_factors = lm_graph_.nrFactors();
+      result.total_variables = lm_values_.size();
+    }
   }
 
   result.pose = prev_pose_;
@@ -941,6 +972,8 @@ std::optional<OptimizeResult> FactorGraphCore::optimize() {
       result.all_estimates = inc_smoother_->calculateEstimate();
     } else if (isam_) {
       result.all_estimates = isam_->calculateEstimate();
+    } else {
+      result.all_estimates = lm_values_;
     }
   }
 

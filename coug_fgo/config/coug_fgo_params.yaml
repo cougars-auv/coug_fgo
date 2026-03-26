@@ -16,8 +16,9 @@
     # --- GTSAM Smoother Settings ---
     #
     # Solver Types:
-    # - "IncrementalFixedLagSmoother": Fixed-lag smoothing. (default)
-    # - "ISAM2": Full history smoothing.
+    # - "IncrementalFixedLagSmoother": Incremental fixed-lag smoothing. (default)
+    # - "ISAM2": Incremental full trajectory smoothing.
+    # - "LevenbergMarquardt": Batch full trajectory smoothing.
 
     solver_type: "IncrementalFixedLagSmoother"
     max_update_rate: -1.0 # Maximum keyframe rate (in Hz). -1.0 for no limit.

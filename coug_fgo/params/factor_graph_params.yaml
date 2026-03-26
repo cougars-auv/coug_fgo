@@ -33,7 +33,7 @@ factor_graph_node:
     type: string
     default_value: "IncrementalFixedLagSmoother"
     validation:
-      one_of<>: [["IncrementalFixedLagSmoother", "ISAM2"]]
+      one_of<>: [["IncrementalFixedLagSmoother", "ISAM2", "LevenbergMarquardt"]]
   max_update_rate:
     type: double
     default_value: -1.0

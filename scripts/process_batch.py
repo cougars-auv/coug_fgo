@@ -157,13 +157,16 @@ def load_config(config_paths, namespace):
         "period": kf_period,
     }
 
-    return topic_map, required_sensors, kf_config, target_T_base
+    solver_type = params["solver_type"]
+
+    return topic_map, required_sensors, kf_config, target_T_base, solver_type
 
 
 def process_bag(bag_path, config_paths, namespace):
-    topic_map, required_sensors, kf_config, target_T_base = load_config(
+    topic_map, required_sensors, kf_config, target_T_base, solver_type = load_config(
         config_paths, namespace
     )
+    is_lm = solver_type == "LevenbergMarquardt"
 
     fg = pybind11fgo.FactorGraphPy(config_paths, namespace)
     raw_results = []
@@ -260,11 +263,16 @@ def process_bag(bag_path, config_paths, namespace):
             if trigger:
                 try:
                     fg.update_graph(t)
-                    if res := fg.optimize_graph():
-                        raw_results.append(res)
+                    if not is_lm:
+                        if res := fg.optimize_graph():
+                            raw_results.append(res)
                 except Exception as e:
                     tqdm.write(f"{e}\n")
                     break
+
+        if is_lm and is_running:
+            if res := fg.optimize_graph():
+                raw_results = list(res.get("smoothed_path", []))
 
     if not is_running:
         missing = required_sensors - sensors_seen
@@ -272,7 +280,9 @@ def process_bag(bag_path, config_paths, namespace):
 
     if raw_results:
         results = {
-            k: np.array([r[k] for r in raw_results]) for k in raw_results[0].keys()
+            k: np.array([r[k] for r in raw_results])
+            for k in raw_results[0].keys()
+            if k != "smoothed_path"
         }
 
         base_pos, base_rot = target_T_base

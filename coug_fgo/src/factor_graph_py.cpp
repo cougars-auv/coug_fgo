@@ -23,6 +23,10 @@
 
 #include <rclcpp/rclcpp.hpp>
 
+using gtsam::symbol_shorthand::B;  // Bias (ax,ay,az,gx,gy,gz)
+using gtsam::symbol_shorthand::V;  // Velocity (x,y,z)
+using gtsam::symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
+
 FactorGraphPy::FactorGraphPy(const std::vector<std::string>& config_paths)
     : FactorGraphPy(config_paths, "") {}
 
@@ -201,6 +205,47 @@ pybind11::dict FactorGraphPy::optimize_graph() {
     if (params_.publish_pose_cov) result["pose_cov"] = opt_result->pose_cov;
     if (params_.publish_velocity_cov) result["vel_cov"] = opt_result->vel_cov;
     if (params_.publish_imu_bias_cov) result["bias_cov"] = opt_result->bias_cov;
+
+    if (params_.publish_smoothed_path && !opt_result->all_estimates.empty()) {
+      pybind11::list smoothed;
+      for (const auto& [time, x_key] : core_->time_to_key) {
+        if (!opt_result->all_estimates.exists(x_key)) continue;
+        gtsam::Symbol sym(x_key);
+        auto step = sym.index();
+        auto v_key = V(step);
+        auto b_key = B(step);
+
+        gtsam::Pose3 sp = opt_result->all_estimates.at<gtsam::Pose3>(x_key);
+        gtsam::Quaternion sq = sp.rotation().toQuaternion();
+        pybind11::dict entry;
+        entry["time"] = time;
+        entry["x"] = sp.translation().x();
+        entry["y"] = sp.translation().y();
+        entry["z"] = sp.translation().z();
+        entry["qx"] = sq.x();
+        entry["qy"] = sq.y();
+        entry["qz"] = sq.z();
+        entry["qw"] = sq.w();
+
+        if (opt_result->all_estimates.exists(v_key)) {
+          gtsam::Vector3 sv = opt_result->all_estimates.at<gtsam::Vector3>(v_key);
+          entry["vx"] = sv.x();
+          entry["vy"] = sv.y();
+          entry["vz"] = sv.z();
+        }
+        if (opt_result->all_estimates.exists(b_key)) {
+          auto sb = opt_result->all_estimates.at<gtsam::imuBias::ConstantBias>(b_key);
+          entry["bias_accel_x"] = sb.accelerometer().x();
+          entry["bias_accel_y"] = sb.accelerometer().y();
+          entry["bias_accel_z"] = sb.accelerometer().z();
+          entry["bias_gyro_x"] = sb.gyroscope().x();
+          entry["bias_gyro_y"] = sb.gyroscope().y();
+          entry["bias_gyro_z"] = sb.gyroscope().z();
+        }
+        smoothed.append(entry);
+      }
+      result["smoothed_path"] = smoothed;
+    }
   }
   return result;
 }
