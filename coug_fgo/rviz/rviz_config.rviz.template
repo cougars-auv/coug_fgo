@@ -334,7 +334,7 @@ Visualization Manager:
         Value: false
       Enabled: false
       Keep: 1
-      Name: iSAM2-B
+      Name: iS2-B
       Position Tolerance: 0.10000000149011612
       Shape:
         Alpha: 1

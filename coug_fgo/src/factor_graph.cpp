@@ -271,7 +271,7 @@ void FactorGraphNode::setupRosInterfaces() {
     } else if (params_.comparison.enable_tight_dvl_preintegration) {
       suffix = " (FL-TPI)";
     } else if (params_.solver_type == "ISAM2") {
-      suffix = " (iSAM2-B)";
+      suffix = " (iS2-B)";
     } else {
       suffix = "";
     }
