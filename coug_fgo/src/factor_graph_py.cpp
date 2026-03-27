@@ -21,6 +21,8 @@
 
 #include "coug_fgo/factor_graph_py.hpp"
 
+#include <gtsam/inference/Symbol.h>
+
 #include <rclcpp/rclcpp.hpp>
 
 using gtsam::symbol_shorthand::B;  // Bias (ax,ay,az,gx,gy,gz)
