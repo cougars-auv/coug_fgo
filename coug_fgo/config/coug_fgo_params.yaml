@@ -190,7 +190,7 @@
 
     # --- Initial State Priors ---
     prior:
-      initialization_duration: 10.0 # [s] Time duration to collect and average data before initializing.
+      initialization_duration: 5.0 # [s] Time duration to collect and average data before initializing.
 
       # If true, forces the initial state to be set by the values below.
       # The parameter priors should be set at the base frame with respect to the map frame.
