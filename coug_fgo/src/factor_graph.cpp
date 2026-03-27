@@ -462,7 +462,7 @@ void FactorGraphNode::processFrontend() {
 
     lock.unlock();
 
-    if (state_.load() != State::RUNNING) {
+    if (!is_initialized_.load()) {
       initializeGraph();
     } else {
       bool should_update = true;
@@ -498,7 +498,7 @@ void FactorGraphNode::processBackend() {
       break;
     }
 
-    if (state_.load() == State::RUNNING) {
+    if (is_initialized_.load()) {
       lock.unlock();
 
       bool should_optimize = true;
@@ -589,7 +589,7 @@ void FactorGraphNode::initializeGraph() {
   state_init_->compute(tfs);
   core_->initialize(*state_init_, tfs);
 
-  state_.store(State::RUNNING);
+  is_initialized_.store(true);
   RCLCPP_INFO(get_logger(), "Graph initialized successfully!");
 }
 
@@ -751,13 +751,10 @@ void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrap
 }
 
 void FactorGraphNode::checkGraphState(diagnostic_updater::DiagnosticStatusWrapper& stat) {
-  switch (state_.load()) {
-    case State::RUNNING:
-      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Optimizing factor graph.");
-      break;
-    case State::WAITING_FOR_SENSORS:
-      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "Waiting for sensor data.");
-      break;
+  if (is_initialized_.load()) {
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Optimizing factor graph.");
+  } else {
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "Waiting for sensor data.");
   }
 }
 

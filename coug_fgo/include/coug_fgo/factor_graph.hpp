@@ -70,8 +70,6 @@ class FactorGraphNode : public rclcpp::Node {
    */
   ~FactorGraphNode() override;
 
-  enum class State { WAITING_FOR_SENSORS, RUNNING };
-
  protected:
   // --- Main Logic ---
   /**
@@ -177,7 +175,7 @@ class FactorGraphNode : public rclcpp::Node {
   std::unique_ptr<utils::StateInitializer> state_init_;
 
   // --- Node State ---
-  std::atomic<State> state_{State::WAITING_FOR_SENSORS};
+  std::atomic<bool> is_initialized_{false};
   rclcpp::Time last_update_time_{0, 0, RCL_ROS_TIME};
   rclcpp::Time last_opt_time_{0, 0, RCL_ROS_TIME};
   double last_target_time_{0.0};
