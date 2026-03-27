@@ -15,6 +15,7 @@
 
 import glob
 import os
+import sys
 from pathlib import Path
 
 from evo.tools import file_interface, plot
@@ -131,21 +132,22 @@ def plot_auv(evo_agent_dir, output_dir, auv_name):
 
 
 def main():
-    bags_root = (
-        Path(os.environ.get("HOME", os.path.expanduser("~"))) / "cougars-dev" / "bags"
-    )
-
-    if not bags_root.exists():
-        print(f"Error: {bags_root} does not exist.")
+    if len(sys.argv) < 2:
+        print("Usage: trajectory_plot.py <target_dir>")
         return
 
-    for evo_dir in bags_root.rglob("evo"):
+    target_dir = Path(sys.argv[1])
+    if not target_dir.exists():
+        print(f"Error: {target_dir} does not exist.")
+        return
+
+    for evo_dir in target_dir.rglob("evo"):
         bag_dir = evo_dir.parent
         for agent_dir in evo_dir.iterdir():
             if agent_dir.is_dir():
                 plot_auv(str(agent_dir), str(bag_dir), agent_dir.name)
 
-    print(f"Plots saved to bag directories in {bags_root}")
+    print(f"Plots saved to bag directories in {target_dir}")
 
 
 if __name__ == "__main__":

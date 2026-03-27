@@ -36,7 +36,7 @@ BAG_PATH = str(
     Path.home() / "cougars-dev/bags/batch_ul_surface_1.0_2026-03-25-14-46-57"
 )
 FLEET_CONFIG_PATH = str(Path.home() / "cougars-dev/config/fleet/coug_fgo_params.yaml")
-AUV_CONFIG_PATH = str(Path.home() / "cougars-dev/config/bluerov2_params.yaml")
+AUV_CONFIG_PATH = str(Path.home() / f"cougars-dev/config/{NAMESPACE}_params.yaml")
 EVO_FLAGS = ["--align", "--project_to_plane", "xy"]
 EXTRACTORS = {
     "imu": lambda m: (

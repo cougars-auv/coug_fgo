@@ -15,6 +15,7 @@
 
 import glob
 import os
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -118,15 +119,17 @@ def generate_plots(data_map, output_dir):
 
 
 def main():
-    home_dir = os.environ.get("HOME", os.path.expanduser("~"))
-    bags_dir = Path(home_dir) / "cougars-dev" / "bags"
-
-    if not bags_dir.exists():
-        print(f"Error: {bags_dir} does not exist.")
+    if len(sys.argv) < 2:
+        print("Usage: benchmark_plot.py <target_dir>")
         return
 
-    generate_plots(load_data(bags_dir), bags_dir)
-    print(f"Plots saved to {bags_dir}")
+    target_dir = Path(sys.argv[1])
+    if not target_dir.exists():
+        print(f"Error: {target_dir} does not exist.")
+        return
+
+    generate_plots(load_data(target_dir), target_dir)
+    print(f"Plots saved to {target_dir}")
 
 
 if __name__ == "__main__":
