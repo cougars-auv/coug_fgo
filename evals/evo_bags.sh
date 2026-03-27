@@ -36,7 +36,7 @@ options=$(gum choose --no-limit --header "Select evo options:" -- \
   "--align_origin" \
   "--project_to_plane xy ")
 
-evo_base_args=("--t_max_diff" "0.05")
+evo_base_args=("--t_max_diff" "0.05" "--no_warnings")
 [[ "${options}" == *"--align (Umeyama)"* ]] && evo_base_args+=("--align")
 [[ "${options}" == *"--align_origin"* ]] && evo_base_args+=("--align_origin")
 
@@ -64,7 +64,6 @@ for bag_path in ${bags_to_eval}; do
 
       out_dir="${bag_path}/evo/${agent}/${suffix}"
       mkdir -p "${out_dir}"
-      rm -f "${out_dir}"/*.zip
       echo "" && gum style --foreground 75 --bold "Evaluating ${topic}..."
 
       # APE (Global Accuracy)

@@ -37,6 +37,7 @@ BAG_PATH = str(
 )
 FLEET_CONFIG_PATH = str(Path.home() / "cougars-dev/config/fleet/coug_fgo_params.yaml")
 AUV_CONFIG_PATH = str(Path.home() / "cougars-dev/config/bluerov2_params.yaml")
+EVO_FLAGS = ["--align", "--project_to_plane", "xy"]
 EXTRACTORS = {
     "imu": lambda m: (
         np.array(
@@ -324,6 +325,10 @@ def read_ground_truth(bag_path, namespace):
         "x": [],
         "y": [],
         "z": [],
+        "qx": [],
+        "qy": [],
+        "qz": [],
+        "qw": [],
         "roll": [],
         "pitch": [],
         "yaw": [],
@@ -378,11 +383,16 @@ def read_ground_truth(bag_path, namespace):
 
             if conn.topic.endswith("odometry/truth"):
                 q, pos = msg.pose.pose.orientation, msg.pose.pose.position
-                roll, pitch, yaw = R.from_quat([q.x, q.y, q.z, q.w]).as_euler("xyz")
+                rot = R.from_quat([q.x, q.y, q.z, q.w])
+                roll, pitch, yaw = rot.as_euler("xyz")
                 pose_dict["time"].append(t)
                 pose_dict["x"].append(pos.x)
                 pose_dict["y"].append(pos.y)
                 pose_dict["z"].append(pos.z)
+                pose_dict["qx"].append(q.x)
+                pose_dict["qy"].append(q.y)
+                pose_dict["qz"].append(q.z)
+                pose_dict["qw"].append(q.w)
                 pose_dict["roll"].append(roll)
                 pose_dict["pitch"].append(pitch)
                 pose_dict["yaw"].append(yaw)
@@ -411,11 +421,62 @@ def read_ground_truth(bag_path, namespace):
     return pose, vel, bias
 
 
+def save_tum(filepath, data):
+    with open(filepath, "w") as f:
+        for i in range(len(data["time"])):
+            f.write(
+                f"{data['time'][i]:.9f} "
+                f"{data['x'][i]:.9f} {data['y'][i]:.9f} {data['z'][i]:.9f} "
+                f"{data['qx'][i]:.9f} {data['qy'][i]:.9f} {data['qz'][i]:.9f} {data['qw'][i]:.9f}\n"
+            )
+    print(f"Saved: {filepath}")
+
+
 # %%
+print("\n--- Factor Graph Optimization ---\n")
 results = process_bag(BAG_PATH, [FLEET_CONFIG_PATH, AUV_CONFIG_PATH], NAMESPACE)
+
+print("\n--- Ground Truth ---")
 pose_gt, vel_gt, bias_gt = read_ground_truth(BAG_PATH, NAMESPACE)
 
 # %%
+print("\n--- Saving TUM Files ---\n")
+evo_dir = Path(BAG_PATH) / "evo" / NAMESPACE / "odometry" / "batch"
+evo_dir.mkdir(parents=True, exist_ok=True)
+if results:
+    save_tum(evo_dir / "batch.tum", results)
+if pose_gt:
+    save_tum(evo_dir / "ground_truth.tum", pose_gt)
+
+# %%
+print("\n--- Evo Evaluation ---")
+if results and pose_gt:
+    import subprocess
+
+    gt_file = str(evo_dir / "ground_truth.tum")
+    est_file = str(evo_dir / "batch.tum")
+    evo_base = ["--t_max_diff", "0.05", "--no_warnings"]
+    plane_flags = [
+        f for f in EVO_FLAGS if f.startswith("--project") or f in ("xy", "xz", "yz")
+    ]
+    non_plane_flags = [f for f in EVO_FLAGS if f not in plane_flags]
+
+    for metric, cmd in [("APE", "evo_ape"), ("RPE", "evo_rpe")]:
+        for mode, flag, suffix in [
+            ("Translation", "trans_part", "trans"),
+            ("Rotation", "angle_deg", "rot"),
+        ]:
+            out_file = str(evo_dir / f"{metric.lower()}_{suffix}.zip")
+            flags = EVO_FLAGS if flag == "trans_part" else non_plane_flags
+            args = [cmd, "tum", gt_file, est_file, "-r", flag] + evo_base + flags
+            args += ["--save_results", out_file]
+            if metric == "RPE":
+                args += ["--delta", "1", "--delta_unit", "m", "--all_pairs"]
+            print(f"\n{metric} ({mode}):")
+            subprocess.run(args)
+
+# %%
+print("\n--- Plotting ---\n")
 if results:
     t0 = results["time"][0]
     t_fgo = results["time"] - t0
@@ -465,4 +526,5 @@ if results:
                 ax.set_xlabel("Time (s)")
 
     plt.tight_layout()
+    print("Displaying plots...")
     plt.show()
