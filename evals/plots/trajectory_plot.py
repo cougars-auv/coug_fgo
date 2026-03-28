@@ -50,7 +50,14 @@ NAME_MAPPING = {
 }
 
 
-def add_start_end_markers(ax, traj, color, start_symbol="o", end_symbol="x", size=15):
+def add_start_end_markers(
+    ax: plt.Axes,
+    traj: object,
+    color: str,
+    start_symbol: str = "o",
+    end_symbol: str = "x",
+    size: int = 15,
+) -> None:
     if traj.num_poses == 0:
         return
     start, end = traj.positions_xyz[0], traj.positions_xyz[-1]
@@ -58,7 +65,7 @@ def add_start_end_markers(ax, traj, color, start_symbol="o", end_symbol="x", siz
     ax.scatter(end[0], end[1], marker=end_symbol, color=color, zorder=10, s=size)
 
 
-def load_trajectories(evo_agent_dir):
+def load_trajectories(evo_agent_dir: str) -> tuple[dict, object | None]:
     est_trajs, gt_traj = {}, None
     zips = glob.glob(
         os.path.join(evo_agent_dir, "**", "*ape_trans*.zip"), recursive=True
@@ -95,7 +102,7 @@ def load_trajectories(evo_agent_dir):
     return est_trajs, gt_traj
 
 
-def plot_auv(evo_agent_dir, output_dir, auv_name):
+def plot_auv(evo_agent_dir: str, output_dir: str, auv_name: str) -> None:
     est_trajs, gt_traj = load_trajectories(evo_agent_dir)
 
     if not est_trajs and gt_traj is None:
@@ -131,7 +138,7 @@ def plot_auv(evo_agent_dir, output_dir, auv_name):
     plt.close(fig)
 
 
-def main():
+def main() -> None:
     if len(sys.argv) < 2:
         print("Usage: trajectory_plot.py <target_dir>")
         return

@@ -43,7 +43,7 @@ NAME_MAPPING = {
 }
 
 
-def load_timing_data(bag_dir, agent_name):
+def load_timing_data(bag_dir: str, agent_name: str) -> pd.DataFrame:
     timing_data = []
     bag_path = Path(bag_dir)
 
@@ -82,7 +82,7 @@ def load_timing_data(bag_dir, agent_name):
     return pd.DataFrame(timing_data)
 
 
-def plot_timing(bag_dir, output_dir, agent_name):
+def plot_timing(bag_dir: str, output_dir: str, agent_name: str) -> None:
     df = load_timing_data(bag_dir, agent_name)
 
     if df.empty:
@@ -129,7 +129,7 @@ def plot_timing(bag_dir, output_dir, agent_name):
         plt.close(fig)
 
 
-def main():
+def main() -> None:
     if len(sys.argv) < 2:
         print("Usage: timing_plot.py <target_dir>")
         return

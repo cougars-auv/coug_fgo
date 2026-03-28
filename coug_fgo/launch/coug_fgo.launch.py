@@ -24,7 +24,7 @@ from launch.substitutions import (
 )
 
 
-def generate_launch_description():
+def generate_launch_description() -> LaunchDescription:
 
     use_sim_time = LaunchConfiguration("use_sim_time")
     auv_ns = LaunchConfiguration("auv_ns")

@@ -21,7 +21,7 @@ from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 
 
-def visualization_setup(context, *args, **kwargs):
+def visualization_setup(context, *args, **kwargs) -> list:
 
     use_sim_time = LaunchConfiguration("use_sim_time")
     auv_ns_str = LaunchConfiguration("auv_ns").perform(context)
@@ -88,7 +88,7 @@ def visualization_setup(context, *args, **kwargs):
     return nodes_to_launch
 
 
-def generate_launch_description():
+def generate_launch_description() -> LaunchDescription:
     return LaunchDescription(
         [
             DeclareLaunchArgument(

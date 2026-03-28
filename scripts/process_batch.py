@@ -87,7 +87,9 @@ EXTRACTORS = {
 
 
 # %%
-def load_config(config_paths, namespace):
+def load_config(
+    config_paths: list[str], namespace: str
+) -> tuple[dict, set[str], dict, tuple, str]:
     params = {}
     for path in config_paths:
         print(f"Loading config: {path}")
@@ -96,7 +98,7 @@ def load_config(config_paths, namespace):
         for key in ["/**", f"/{namespace}/**"]:
             layer = config.get(key, {}).get("ros__parameters", {})
 
-            def merge(base, override):
+            def merge(base: dict, override: dict) -> None:
                 for k, v in override.items():
                     if isinstance(v, dict) and isinstance(base.get(k), dict):
                         merge(base[k], v)
@@ -163,7 +165,7 @@ def load_config(config_paths, namespace):
     return topic_map, required_sensors, kf_config, target_T_base, solver_type
 
 
-def process_bag(bag_path, config_paths, namespace):
+def process_bag(bag_path: str, config_paths: list[str], namespace: str) -> dict | None:
     topic_map, required_sensors, kf_config, target_T_base, solver_type = load_config(
         config_paths, namespace
     )
@@ -319,7 +321,7 @@ def process_bag(bag_path, config_paths, namespace):
         return results
 
 
-def read_ground_truth(bag_path, namespace):
+def read_ground_truth(bag_path: str, namespace: str) -> tuple[dict, dict, dict]:
     pose_dict = {
         "time": [],
         "x": [],
@@ -421,7 +423,7 @@ def read_ground_truth(bag_path, namespace):
     return pose, vel, bias
 
 
-def save_tum(filepath, data):
+def save_tum(filepath: str | Path, data: dict) -> None:
     with open(filepath, "w") as f:
         for i in range(len(data["time"])):
             f.write(
@@ -481,9 +483,6 @@ if results:
     t0 = results["time"][0]
     t_fgo = results["time"] - t0
 
-    def t_gt(data):
-        return data["time"] - t0 if data else []
-
     layout = [
         (["x", "y", "z"], ["X (m)", "Y (m)", "Z (m)"], pose_gt),
         (["roll", "pitch", "yaw"], ["Roll (rad)", "Pitch (rad)", "Yaw (rad)"], pose_gt),
@@ -508,7 +507,7 @@ if results:
 
             if gt_data:
                 ax.plot(
-                    t_gt(gt_data),
+                    gt_data["time"] - t0,
                     gt_data[key],
                     "-k",
                     label="GT",

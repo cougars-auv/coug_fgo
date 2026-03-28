@@ -55,7 +55,7 @@ METRICS_CONFIG = [
 ]
 
 
-def load_data(bags_dir):
+def load_data(bags_dir: Path) -> dict[str, pd.DataFrame]:
     data_store = {cfg[0]: [] for cfg in METRICS_CONFIG}
     files = glob.glob(os.path.join(bags_dir, "**", "benchmark_*.csv"), recursive=True)
 
@@ -76,7 +76,7 @@ def load_data(bags_dir):
     return {k: pd.DataFrame(v) for k, v in data_store.items() if v}
 
 
-def generate_plots(data_map, output_dir):
+def generate_plots(data_map: dict[str, pd.DataFrame], output_dir: Path) -> None:
     for filename, label, prefix in METRICS_CONFIG:
         if filename not in data_map or data_map[filename].empty:
             continue
@@ -118,7 +118,7 @@ def generate_plots(data_map, output_dir):
             plt.close(fig)
 
 
-def main():
+def main() -> None:
     if len(sys.argv) < 2:
         print("Usage: benchmark_plot.py <target_dir>")
         return
