@@ -148,6 +148,7 @@ pgm.add_edge("x2", "gps")
 pgm_preint_loose = copy.deepcopy(pgm)
 pgm_preint_tight = copy.deepcopy(pgm)
 pgm_dynamics = copy.deepcopy(pgm)
+pgm_const_vel = copy.deepcopy(pgm)
 
 # %%
 # Binary DVL Factors
@@ -268,4 +269,45 @@ pgm_dynamics.render()
 pgm_dynamics.figure.savefig(OUTPUT_DIR / "fgo_dynamics.pdf", bbox_inches="tight")
 pgm_dynamics.figure.savefig(
     OUTPUT_DIR / "fgo_dynamics.png", bbox_inches="tight", dpi=300
+)
+
+# %%
+# Constant Velocity Factors
+for i in range(2):
+    x_pos = start_x + (i * col_spacing)
+
+    pgm_const_vel.add_node(
+        f"dvl{i}",
+        f"$f^{{v}}_{{{i}}}$",
+        x_pos,
+        2.5,
+        fixed=True,
+        offset=[-10, -8],
+        plot_params=style_factor_dvl,
+    )
+    pgm_const_vel.add_edge(f"x{i}", f"dvl{i}")
+    pgm_const_vel.add_edge(f"v{i}", f"dvl{i}")
+
+for i in range(4):
+    x_pos = start_x + (i * col_spacing)
+
+    if i < 3 and i >= 1:
+        mid_x = x_pos + (col_spacing / 2)
+
+        pgm_const_vel.add_node(
+            f"const_vel{i}",
+            f"$f^{{\\dot{{v}}}}_{{{i}{i + 1}}}$",
+            mid_x,
+            2.5,
+            fixed=True,
+            plot_params=style_factor_dynamics,
+            offset=[0, 5],
+        )
+        pgm_const_vel.add_edge(f"v{i}", f"const_vel{i}")
+        pgm_const_vel.add_edge(f"v{i + 1}", f"const_vel{i}")
+
+pgm_const_vel.render()
+pgm_const_vel.figure.savefig(OUTPUT_DIR / "fgo_const_vel.pdf", bbox_inches="tight")
+pgm_const_vel.figure.savefig(
+    OUTPUT_DIR / "fgo_const_vel.png", bbox_inches="tight", dpi=300
 )
