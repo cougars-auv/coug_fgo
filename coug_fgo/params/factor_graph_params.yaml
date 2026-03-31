@@ -400,7 +400,7 @@ factor_graph_node:
       default_value: false
     velocity_sigma:
       type: double_array
-      default_value: [0.1, 0.1, 0.1]
+      default_value: [0.001, 0.001, 0.001]
 
   dynamics:
     enable_dynamics:

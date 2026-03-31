@@ -170,7 +170,7 @@
     const_vel:
       enable_const_vel: false
       enable_const_vel_dropout_only: false
-      velocity_sigma: [0.1, 0.1, 0.1] # [m/s/sqrt(s)] Velocity uncertainty growth rate during dropouts.
+      velocity_sigma: [0.001, 0.001, 0.001] # [m/s/sqrt(s)] Velocity uncertainty growth rate during dropouts.
 
     dynamics:
       enable_dynamics: false
