@@ -70,6 +70,7 @@ void FactorGraphNode::setupRosInterfaces() {
                                   const std::string& child, const std::string& sensor_name,
                                   bool use_parameter_tf, const std::vector<double>& pos,
                                   const std::vector<double>& quat) {
+    std::scoped_lock lock(tf_mutex_);
     if (!tf_out.header.frame_id.empty()) {
       return;
     }
@@ -105,10 +106,13 @@ void FactorGraphNode::setupRosInterfaces() {
             params_.imu.use_parameter_frame ? params_.imu.parameter_frame : msg->header.frame_id;
         load_or_lookup_tf(target_T_imu_tf_, child, "IMU", params_.imu.use_parameter_tf,
                           params_.imu.parameter_tf.position, params_.imu.parameter_tf.orientation);
-        if (target_T_imu_tf_.header.frame_id.empty()) {
-          return;
+        {
+          std::scoped_lock lock(tf_mutex_);
+          if (target_T_imu_tf_.header.frame_id.empty()) {
+            return;
+          }
+          imu_frame_ = child;
         }
-        imu_frame_ = child;
         auto data = std::make_shared<utils::ImuData>();
         data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
         data->linear_acceleration = toGtsam(msg->linear_acceleration);
@@ -327,7 +331,11 @@ FactorGraphNode::~FactorGraphNode() {
 void FactorGraphNode::publishGlobalOdom(const gtsam::Pose3& current_pose,
                                         const gtsam::Matrix& pose_covariance,
                                         const rclcpp::Time& timestamp) {
-  gtsam::Pose3 target_T_base = toGtsam(target_T_base_tf_.transform);
+  gtsam::Pose3 target_T_base;
+  {
+    std::scoped_lock lock(tf_mutex_);
+    target_T_base = toGtsam(target_T_base_tf_.transform);
+  }
   gtsam::Pose3 map_T_base = current_pose * target_T_base;
 
   nav_msgs::msg::Odometry odom_msg;
@@ -357,7 +365,11 @@ void FactorGraphNode::publishGlobalOdom(const gtsam::Pose3& current_pose,
 void FactorGraphNode::broadcastGlobalTf(const gtsam::Pose3& current_pose,
                                         const rclcpp::Time& timestamp) {
   try {
-    gtsam::Pose3 target_T_base = toGtsam(target_T_base_tf_.transform);
+    gtsam::Pose3 target_T_base;
+    {
+      std::scoped_lock lock(tf_mutex_);
+      target_T_base = toGtsam(target_T_base_tf_.transform);
+    }
     gtsam::Pose3 map_T_base = current_pose * target_T_base;
 
     gtsam::Pose3 odom_T_base = toGtsam(
@@ -384,7 +396,11 @@ void FactorGraphNode::publishSmoothedPath(const gtsam::Values& values,
   path_msg.header.stamp = timestamp;
   path_msg.header.frame_id = params_.map_frame;
 
-  gtsam::Pose3 target_T_base = toGtsam(target_T_base_tf_.transform);
+  gtsam::Pose3 target_T_base;
+  {
+    std::scoped_lock lock(tf_mutex_);
+    target_T_base = toGtsam(target_T_base_tf_.transform);
+  }
 
   std::map<double, gtsam::Key> keys_snapshot;
   {
@@ -426,7 +442,10 @@ void FactorGraphNode::publishImuBias(const gtsam::imuBias::ConstantBias& current
                                      const rclcpp::Time& timestamp) {
   geometry_msgs::msg::TwistWithCovarianceStamped imu_bias_msg;
   imu_bias_msg.header.stamp = timestamp;
-  imu_bias_msg.header.frame_id = imu_frame_;
+  {
+    std::scoped_lock lock(tf_mutex_);
+    imu_bias_msg.header.frame_id = imu_frame_;
+  }
 
   // IMPORTANT! We use 'linear' for accelerometer bias and 'angular' for gyroscope bias.
   imu_bias_msg.twist.twist.linear = toVectorMsg(current_imu_bias.accelerometer());
@@ -521,18 +540,22 @@ void FactorGraphNode::processBackend() {
 
 void FactorGraphNode::initializeGraph() {
   // --- Wait for Sensor TFs ---
-  bool imu_ok = !target_T_imu_tf_.header.frame_id.empty();
-  bool gps_ok = !(params_.gps.enable_gps || params_.gps.enable_gps_init_only) ||
-                !target_T_gps_tf_.header.frame_id.empty();
-  bool depth_ok = !(params_.depth.enable_depth || params_.depth.enable_depth_init_only) ||
-                  !target_T_depth_tf_.header.frame_id.empty();
-  bool mag_ok = !(params_.mag.enable_mag || params_.mag.enable_mag_init_only) ||
-                !target_T_mag_tf_.header.frame_id.empty();
-  bool ahrs_ok = !(params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only ||
-                   params_.comparison.enable_loose_dvl_preintegration) ||
-                 !target_T_ahrs_tf_.header.frame_id.empty();
-  bool dvl_ok = !(params_.dvl.enable_dvl || params_.dvl.enable_dvl_init_only) ||
-                !target_T_dvl_tf_.header.frame_id.empty();
+  bool imu_ok, gps_ok, depth_ok, mag_ok, ahrs_ok, dvl_ok;
+  {
+    std::scoped_lock lock(tf_mutex_);
+    imu_ok = !target_T_imu_tf_.header.frame_id.empty();
+    gps_ok = !(params_.gps.enable_gps || params_.gps.enable_gps_init_only) ||
+             !target_T_gps_tf_.header.frame_id.empty();
+    depth_ok = !(params_.depth.enable_depth || params_.depth.enable_depth_init_only) ||
+               !target_T_depth_tf_.header.frame_id.empty();
+    mag_ok = !(params_.mag.enable_mag || params_.mag.enable_mag_init_only) ||
+             !target_T_mag_tf_.header.frame_id.empty();
+    ahrs_ok = !(params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only ||
+                params_.comparison.enable_loose_dvl_preintegration) ||
+              !target_T_ahrs_tf_.header.frame_id.empty();
+    dvl_ok = !(params_.dvl.enable_dvl || params_.dvl.enable_dvl_init_only) ||
+             !target_T_dvl_tf_.header.frame_id.empty();
+  }
 
   if (!(imu_ok && gps_ok && depth_ok && mag_ok && ahrs_ok && dvl_ok)) {
     RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "Waiting for sensor TFs: %s%s%s%s%s%s",
@@ -545,26 +568,29 @@ void FactorGraphNode::initializeGraph() {
     return;
   }
 
-  if (target_T_base_tf_.header.frame_id.empty()) {
-    if (params_.base.use_parameter_tf) {
-      target_T_base_tf_.header.stamp = this->get_clock()->now();
-      target_T_base_tf_.header.frame_id = params_.target_frame;
-      target_T_base_tf_.child_frame_id = params_.base_frame;
-      target_T_base_tf_.transform.translation.x = params_.base.parameter_tf.position[0];
-      target_T_base_tf_.transform.translation.y = params_.base.parameter_tf.position[1];
-      target_T_base_tf_.transform.translation.z = params_.base.parameter_tf.position[2];
-      target_T_base_tf_.transform.rotation.x = params_.base.parameter_tf.orientation[0];
-      target_T_base_tf_.transform.rotation.y = params_.base.parameter_tf.orientation[1];
-      target_T_base_tf_.transform.rotation.z = params_.base.parameter_tf.orientation[2];
-      target_T_base_tf_.transform.rotation.w = params_.base.parameter_tf.orientation[3];
-    } else {
-      try {
-        target_T_base_tf_ = tf_buffer_->lookupTransform(params_.target_frame, params_.base_frame,
-                                                        tf2::TimePointZero);
-      } catch (const tf2::TransformException& ex) {
-        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
-                             "Failed to lookup base to target transform: %s", ex.what());
-        return;
+  {
+    std::scoped_lock lock(tf_mutex_);
+    if (target_T_base_tf_.header.frame_id.empty()) {
+      if (params_.base.use_parameter_tf) {
+        target_T_base_tf_.header.stamp = this->get_clock()->now();
+        target_T_base_tf_.header.frame_id = params_.target_frame;
+        target_T_base_tf_.child_frame_id = params_.base_frame;
+        target_T_base_tf_.transform.translation.x = params_.base.parameter_tf.position[0];
+        target_T_base_tf_.transform.translation.y = params_.base.parameter_tf.position[1];
+        target_T_base_tf_.transform.translation.z = params_.base.parameter_tf.position[2];
+        target_T_base_tf_.transform.rotation.x = params_.base.parameter_tf.orientation[0];
+        target_T_base_tf_.transform.rotation.y = params_.base.parameter_tf.orientation[1];
+        target_T_base_tf_.transform.rotation.z = params_.base.parameter_tf.orientation[2];
+        target_T_base_tf_.transform.rotation.w = params_.base.parameter_tf.orientation[3];
+      } else {
+        try {
+          target_T_base_tf_ = tf_buffer_->lookupTransform(params_.target_frame, params_.base_frame,
+                                                          tf2::TimePointZero);
+        } catch (const tf2::TransformException& ex) {
+          RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+                               "Failed to lookup base to target transform: %s", ex.what());
+          return;
+        }
       }
     }
   }
@@ -582,10 +608,14 @@ void FactorGraphNode::initializeGraph() {
     return;
   }
 
-  utils::TfBundle tfs{toGtsam(target_T_imu_tf_.transform),   toGtsam(target_T_gps_tf_.transform),
-                      toGtsam(target_T_depth_tf_.transform), toGtsam(target_T_mag_tf_.transform),
-                      toGtsam(target_T_ahrs_tf_.transform),  toGtsam(target_T_dvl_tf_.transform),
-                      toGtsam(target_T_base_tf_.transform),  toGtsam(target_T_com_tf_.transform)};
+  utils::TfBundle tfs;
+  {
+    std::scoped_lock lock(tf_mutex_);
+    tfs = {toGtsam(target_T_imu_tf_.transform),   toGtsam(target_T_gps_tf_.transform),
+           toGtsam(target_T_depth_tf_.transform), toGtsam(target_T_mag_tf_.transform),
+           toGtsam(target_T_ahrs_tf_.transform),  toGtsam(target_T_dvl_tf_.transform),
+           toGtsam(target_T_base_tf_.transform),  toGtsam(target_T_com_tf_.transform)};
+  }
   state_init_->compute(tfs);
   core_->initialize(*state_init_, tfs);
 

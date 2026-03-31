@@ -212,6 +212,7 @@ class FactorGraphNode : public rclcpp::Node {
   rclcpp::CallbackGroup::SharedPtr sensor_cb_group_;
 
   // --- Transformations ---
+  mutable std::mutex tf_mutex_;
   geometry_msgs::msg::TransformStamped target_T_base_tf_;
   geometry_msgs::msg::TransformStamped target_T_dvl_tf_;
   geometry_msgs::msg::TransformStamped target_T_imu_tf_;
