@@ -15,6 +15,7 @@
 
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import fgo_utils
 
 NAMESPACE = "bluerov2"
@@ -28,7 +29,7 @@ AUV_CONFIG_PATH = str(Path.home() / f"cougars-dev/config/{NAMESPACE}_params.yaml
 EVO_FLAGS = ["--align", "--project_to_plane", "xy"]
 
 
-def process_bag(bag_path: str) -> None:
+def process_bag(bag_path: str) -> tuple:
     print(f"\nProcessing bag: {bag_path}")
 
     print("\n--- Ground Truth ---")
@@ -56,18 +57,25 @@ def process_bag(bag_path: str) -> None:
             EVO_FLAGS,
         )
 
-    print("\n--- Plotting ---\n")
-    if results:
-        fgo_utils.plot_results(results, pose_gt, vel_gt, bias_gt)
+    return results, pose_gt, vel_gt, bias_gt
 
 
 def main() -> None:
+    plot_args = []
     for bag in BAG_PATHS:
         if not Path(bag).exists():
             print(f"\nBag not found: {bag}")
             continue
 
-        process_bag(bag)
+        results, pose_gt, vel_gt, bias_gt = process_bag(bag)
+        if results:
+            plot_args.append((results, pose_gt, vel_gt, bias_gt, Path(bag).name))
+
+    print("\n--- Plotting ---\n")
+    for results, pose_gt, vel_gt, bias_gt, label in plot_args:
+        fgo_utils.plot_results(results, pose_gt, vel_gt, bias_gt, label)
+    print("Displaying plots...")
+    plt.show()
 
 
 if __name__ == "__main__":

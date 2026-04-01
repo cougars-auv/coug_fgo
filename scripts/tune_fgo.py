@@ -14,16 +14,23 @@
 # limitations under the License.
 
 import atexit
+import math
 import subprocess
 from datetime import datetime
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import optuna
 
 import fgo_utils
 
 NAMESPACE = "bluerov2"
-BAG_PATH = str(Path.home() / "cougars-dev/bags/bluerov2_dropout_2026-03-31-11-05-33")
+BAG_PATHS = [
+    str(Path.home() / "cougars-dev/bags/dropout_1.0_2026-04-01-15-47-59"),
+    str(Path.home() / "cougars-dev/bags/fake"),
+    str(Path.home() / "cougars-dev/bags/dropout_5.0_2026-04-01-15-42-34"),
+    str(Path.home() / "cougars-dev/bags/dropout_7.0_2026-04-01-15-36-25"),
+]
 FLEET_CONFIG_PATH = str(Path.home() / "cougars-dev/config/fleet/coug_fgo_params.yaml")
 AUV_CONFIG_PATH = str(Path.home() / f"cougars-dev/config/{NAMESPACE}_params.yaml")
 SCRIPTS_PATH = str(Path.home() / "cougars-dev/ros2_ws/src/coug_fgo/scripts")
@@ -32,32 +39,45 @@ EVO_FLAGS = ["--align", "--project_to_plane", "xy"]
 DB_URL = f"sqlite:///{SCRIPTS_PATH}/optuna_fgo.db"
 timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 STUDY_NAME = f"{NAMESPACE}_scalar_sweep_{timestamp}"
-SCALARS_TO_TUNE = ["dvl", "const_vel"]
-N_OPTUNA_TRIALS = 50
+SCALARS_TO_TUNE = ["dvl"]
+N_OPTUNA_TRIALS = 200
 MIN_SCALAR = 0.5
 MAX_SCALAR = 100
 
 
 def main() -> None:
     print("\n--- Ground Truth ---")
-    pose_gt, vel_gt, bias_gt = fgo_utils.load_ground_truth(BAG_PATH, NAMESPACE)
-
-    if not pose_gt:
-        raise RuntimeError("No ground truth found in bag. Aborting.")
+    ground_truths = []
+    for bag_path in BAG_PATHS:
+        if not Path(bag_path).exists():
+            print(f"\nBag not found: {bag_path}")
+            ground_truths.append((None, None, None))
+            continue
+        pose_gt, vel_gt, bias_gt = fgo_utils.load_ground_truth(bag_path, NAMESPACE)
+        if not pose_gt:
+            raise RuntimeError(f"No ground truth found in {bag_path}. Aborting.")
+        ground_truths.append((pose_gt, vel_gt, bias_gt))
 
     def objective(trial: optuna.Trial) -> float:
         scalars = {
             s: trial.suggest_float(s, MIN_SCALAR, MAX_SCALAR, log=True)
             for s in SCALARS_TO_TUNE
         }
+        rmses = []
         with fgo_utils.param_override_file(scalars) as override_path:
-            results, crashed = fgo_utils.run_factor_graph(
-                BAG_PATH,
-                [FLEET_CONFIG_PATH, AUV_CONFIG_PATH, override_path],
-                NAMESPACE,
-                verbose=False,
-            )
-        return fgo_utils.compute_ape_rmse(pose_gt, results, crashed)
+            for bag_path, (pose_gt, _, _) in zip(BAG_PATHS, ground_truths):
+                if pose_gt is None:
+                    continue
+                results, crashed = fgo_utils.run_factor_graph(
+                    bag_path,
+                    [FLEET_CONFIG_PATH, AUV_CONFIG_PATH, override_path],
+                    NAMESPACE,
+                    verbose=False,
+                )
+                rmses.append(fgo_utils.compute_ape_rmse(pose_gt, results, crashed))
+        if not rmses:
+            return float("inf")
+        return math.sqrt(sum(r**2 for r in rmses) / len(rmses))
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(
@@ -78,34 +98,46 @@ def main() -> None:
     study.optimize(objective, n_trials=N_OPTUNA_TRIALS, show_progress_bar=True)
     print(f"\nResults: {study.best_params}")
 
-    print("\n--- Factor Graph Optimization ---\n")
+    plot_args = []
+    print("\n--- Factor Graph Optimization ---")
     with fgo_utils.param_override_file(study.best_params) as best_override_path:
-        results, _ = fgo_utils.run_factor_graph(
-            BAG_PATH,
-            [FLEET_CONFIG_PATH, AUV_CONFIG_PATH, best_override_path],
-            NAMESPACE,
-        )
+        for bag_path, (pose_gt, vel_gt, bias_gt) in zip(BAG_PATHS, ground_truths):
+            if pose_gt is None:
+                continue
+            print(f"\nProcessing bag: {bag_path}\n")
+            results, _ = fgo_utils.run_factor_graph(
+                bag_path,
+                [FLEET_CONFIG_PATH, AUV_CONFIG_PATH, best_override_path],
+                NAMESPACE,
+            )
 
-    print("\n--- Saving TUM Files ---\n")
-    evo_dir = Path(BAG_PATH) / "evo" / NAMESPACE / "odometry" / "tuned"
-    evo_dir.mkdir(parents=True, exist_ok=True)
-    if results:
-        fgo_utils.write_tum(evo_dir / "tuned.tum", results)
-    if pose_gt:
-        fgo_utils.write_tum(evo_dir / "ground_truth.tum", pose_gt)
+            print("\n--- Saving TUM Files ---\n")
+            evo_dir = Path(bag_path) / "evo" / NAMESPACE / "odometry" / "tuned"
+            evo_dir.mkdir(parents=True, exist_ok=True)
+            if results:
+                fgo_utils.write_tum(evo_dir / "tuned.tum", results)
+            if pose_gt:
+                fgo_utils.write_tum(evo_dir / "ground_truth.tum", pose_gt)
 
-    print("\n--- Evo Evaluation ---")
-    if results and pose_gt:
-        fgo_utils.run_evo_evaluations(
-            str(evo_dir / "ground_truth.tum"),
-            str(evo_dir / "tuned.tum"),
-            evo_dir,
-            EVO_FLAGS,
-        )
+            print("\n--- Evo Evaluation ---")
+            if results and pose_gt:
+                fgo_utils.run_evo_evaluations(
+                    str(evo_dir / "ground_truth.tum"),
+                    str(evo_dir / "tuned.tum"),
+                    evo_dir,
+                    EVO_FLAGS,
+                )
+
+            if results:
+                plot_args.append(
+                    (results, pose_gt, vel_gt, bias_gt, Path(bag_path).name)
+                )
 
     print("\n--- Plotting ---\n")
-    if results:
-        fgo_utils.plot_results(results, pose_gt, vel_gt, bias_gt)
+    for results, pose_gt, vel_gt, bias_gt, label in plot_args:
+        fgo_utils.plot_results(results, pose_gt, vel_gt, bias_gt, label)
+    print("Displaying plots...")
+    plt.show()
 
 
 if __name__ == "__main__":

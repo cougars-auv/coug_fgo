@@ -501,7 +501,9 @@ def run_evo_evaluations(
             subprocess.run(args)
 
 
-def plot_results(results: dict, pose_gt: dict, vel_gt: dict, bias_gt: dict) -> None:
+def plot_results(
+    results: dict, pose_gt: dict, vel_gt: dict, bias_gt: dict, label: str = ""
+) -> None:
     t0 = results["time"][0]
     t_fgo = results["time"] - t0
 
@@ -521,7 +523,7 @@ def plot_results(results: dict, pose_gt: dict, vel_gt: dict, bias_gt: dict) -> N
         ),
     ]
 
-    _, axes = plt.subplots(5, 3, figsize=(12, 10))
+    _, axes = plt.subplots(5, 3, figsize=(12, 10), num=label or None)
     for row, (keys, labels, gt_data) in enumerate(layout):
         for col, (key, label) in enumerate(zip(keys, labels)):
             ax = axes[row, col]
@@ -533,5 +535,3 @@ def plot_results(results: dict, pose_gt: dict, vel_gt: dict, bias_gt: dict) -> N
                 ax.set_xlabel("Time (s)")
 
     plt.tight_layout()
-    print("Displaying plots...")
-    plt.show()
