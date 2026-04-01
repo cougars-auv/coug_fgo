@@ -22,7 +22,6 @@ import optuna
 
 import fgo_utils
 
-# --- CONFIGURATION ---
 NAMESPACE = "bluerov2"
 BAG_PATH = str(Path.home() / "cougars-dev/bags/bluerov2_dropout_2026-03-31-11-05-33")
 FLEET_CONFIG_PATH = str(Path.home() / "cougars-dev/config/fleet/coug_fgo_params.yaml")

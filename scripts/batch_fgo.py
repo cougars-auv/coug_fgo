@@ -17,7 +17,6 @@ from pathlib import Path
 
 import fgo_utils
 
-# --- CONFIGURATION ---
 NAMESPACE = "bluerov2"
 BAG_PATHS = [
     str(Path.home() / "cougars-dev/bags/bluerov2_dropout_2026-03-31-12-00-00"),
