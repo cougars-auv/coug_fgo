@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import atexit
+import subprocess
+from datetime import datetime
 from pathlib import Path
 
 import optuna
@@ -24,10 +27,14 @@ NAMESPACE = "bluerov2"
 BAG_PATH = str(Path.home() / "cougars-dev/bags/bluerov2_dropout_2026-03-31-11-05-33")
 FLEET_CONFIG_PATH = str(Path.home() / "cougars-dev/config/fleet/coug_fgo_params.yaml")
 AUV_CONFIG_PATH = str(Path.home() / f"cougars-dev/config/{NAMESPACE}_params.yaml")
+SCRIPTS_PATH = str(Path.home() / "cougars-dev/ros2_ws/src/coug_fgo/scripts")
 EVO_FLAGS = ["--align", "--project_to_plane", "xy"]
 
-SCALARS_TO_TUNE = ["dvl"]
-N_OPTUNA_TRIALS = 2
+DB_URL = f"sqlite:///{SCRIPTS_PATH}/fgo_tuning.db"
+timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+STUDY_NAME = f"{NAMESPACE}_scalar_sweep_{timestamp}"
+SCALARS_TO_TUNE = ["dvl", "const_vel"]
+N_OPTUNA_TRIALS = 50
 MIN_SCALAR = 0.5
 MAX_SCALAR = 100
 
@@ -54,9 +61,21 @@ def main() -> None:
         return fgo_utils.compute_ape_rmse(pose_gt, results, crashed)
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
-    study = optuna.create_study(direction="minimize")
+    study = optuna.create_study(
+        study_name=STUDY_NAME, storage=DB_URL, direction="minimize"
+    )
 
-    print("\n--- Optuna Hyperparameter Trials ---\n")
+    print("\n--- Starting Optuna Dashboard ---\n")
+    subprocess.run(["pkill", "-9", "-f", "optuna-dashboard"], capture_output=True)
+    dashboard_process = subprocess.Popen(
+        ["optuna-dashboard", DB_URL, "--host", "0.0.0.0", "--port", "9000"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    atexit.register(dashboard_process.terminate)
+    print("Dashboard running at http://localhost:9000.")
+
+    print("\n--- Running Optuna Trials ---\n")
     study.optimize(objective, n_trials=N_OPTUNA_TRIALS, show_progress_bar=True)
     print(f"\nResults: {study.best_params}")
 
