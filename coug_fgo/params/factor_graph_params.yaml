@@ -416,7 +416,10 @@ factor_graph_node:
     enable_const_vel_dropout_only:
       type: bool
       default_value: false
-    velocity_sigma:
+    covariance_scalar:
+      type: double
+      default_value: 1.0
+    prediction_noise_sigmas:
       type: double_array
       default_value: [0.001, 0.001, 0.001]
 
@@ -443,6 +446,9 @@ factor_graph_node:
       orientation:
         type: double_array
         default_value: [0.0, 0.0, 0.0, 1.0]
+    covariance_scalar:
+      type: double
+      default_value: 1.0
     prediction_noise_sigmas:
       type: double_array
       default_value: [0.1, 0.1, 0.1]

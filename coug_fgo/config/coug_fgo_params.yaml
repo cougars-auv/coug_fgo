@@ -75,7 +75,7 @@
       parameter_tf: # Relative to the target frame.
         position: [0.0, 0.0, 0.0] # [x, y, z]
         orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
-      covariance_scalar: 1.0
+      covariance_scalar: 1.0 # Applies to both sensor-reported and parameter_covariance values.
       use_parameter_covariance: false
       parameter_covariance:
         accel_noise_sigmas: [0.0078, 0.0078, 0.0078] # [m/s^2] Accelerometer measurement noise sigmas.
@@ -94,7 +94,7 @@
       parameter_tf: # Relative to the target frame.
         position: [0.0, 0.0, 0.0] # [x, y, z]
         orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
-      covariance_scalar: 1.0
+      covariance_scalar: 1.0 # Applies to both sensor-reported and parameter_covariance values.
       use_parameter_covariance: false
       parameter_covariance:
         position_noise_sigmas: [0.015, 0.015] # [m] GPS position uncertainty sigmas.
@@ -110,7 +110,7 @@
       parameter_tf: # Relative to the target frame.
         position: [0.0, 0.0, 0.0] # [x, y, z]
         orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
-      covariance_scalar: 1.0
+      covariance_scalar: 1.0 # Applies to both sensor-reported and parameter_covariance values.
       use_parameter_covariance: false
       parameter_covariance:
         position_z_noise_sigma: 0.02 # [m] Depth sensor Z-position uncertainty sigma.
@@ -126,7 +126,7 @@
       parameter_tf: # Relative to the target frame.
         position: [0.0, 0.0, 0.0] # [x, y, z]
         orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
-      covariance_scalar: 1.0
+      covariance_scalar: 1.0 # Applies to both sensor-reported and parameter_covariance values.
       use_parameter_covariance: false
       parameter_covariance:
         magnetic_field_noise_sigmas: [0.003, 0.003, 0.003] # [normalized] Magnetic field uncertainty sigmas.
@@ -147,7 +147,7 @@
       parameter_tf: # Relative to the target frame.
         position: [0.0, 0.0, 0.0] # [x, y, z]
         orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
-      covariance_scalar: 1.0
+      covariance_scalar: 1.0 # Applies to both sensor-reported and parameter_covariance values.
       use_parameter_covariance: false
       parameter_covariance:
         yaw_noise_sigma: 0.01745 # [rad] AHRS sensor yaw uncertainty sigma.
@@ -165,7 +165,7 @@
       parameter_tf: # Relative to the target frame.
         position: [0.0, 0.0, 0.0] # [x, y, z]
         orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
-      covariance_scalar: 1.0
+      covariance_scalar: 1.0 # Applies to both sensor-reported and parameter_covariance values.
       use_parameter_covariance: false
       parameter_covariance:
         velocity_noise_sigmas: [0.02, 0.02, 0.02] # [m/s] DVL body-velocity uncertainty sigmas.
@@ -176,7 +176,8 @@
     const_vel:
       enable_const_vel: false
       enable_const_vel_dropout_only: false
-      velocity_sigma: [0.001, 0.001, 0.001] # [m/s/sqrt(s)] Velocity uncertainty growth rate during dropouts.
+      covariance_scalar: 1.0 # Scales the prediction noise sigmas.
+      prediction_noise_sigmas: [0.001, 0.001, 0.001] # [m/s/sqrt(s)] Velocity uncertainty growth rate during dropouts.
 
     dynamics:
       enable_dynamics: false
@@ -186,6 +187,7 @@
       parameter_tf: # Relative to the target frame.
         position: [0.0, 0.0, 0.0] # [x, y, z]
         orientation: [0.0, 0.0, 0.0, 1.0] # [qx, qy, qz, qw]
+      covariance_scalar: 1.0 # Scales the prediction noise sigmas.
       prediction_noise_sigmas: [0.1, 0.1, 0.1] # Model prediction uncertainty sigmas.
       mass: [31.87, 60.46, 60.46] # [kg] Mass of the vehicle (diagonal)
       linear_drag: [1.59, 3.02, 3.02] # Linear drag coefficient (diagonal)

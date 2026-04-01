@@ -111,7 +111,8 @@ void FactorGraphCore::initialize(const utils::StateInitializer& state_init,
     if (params_.dvl.use_parameter_covariance || !params_.dvl.enable_dvl) {
       last_dvl_covariance_ =
           toGtsamSquaredDiagonal(params_.dvl.parameter_covariance.velocity_noise_sigmas)
-              .block<3, 3>(0, 0);
+              .block<3, 3>(0, 0) *
+          params_.dvl.covariance_scalar;
     } else {
       last_dvl_covariance_ = state_init.initial_dvl_->twist_covariance.block<3, 3>(0, 0) *
                              params_.dvl.covariance_scalar;
@@ -125,7 +126,8 @@ void FactorGraphCore::initialize(const utils::StateInitializer& state_init,
     if (params_.dvl.use_parameter_covariance || !params_.dvl.enable_dvl) {
       last_dvl_covariance_ =
           toGtsamSquaredDiagonal(params_.dvl.parameter_covariance.velocity_noise_sigmas)
-              .block<3, 3>(0, 0);
+              .block<3, 3>(0, 0) *
+          params_.dvl.covariance_scalar;
     } else {
       last_dvl_covariance_ = state_init.initial_dvl_->twist_covariance.block<3, 3>(0, 0) *
                              params_.dvl.covariance_scalar;
@@ -165,7 +167,8 @@ FactorGraphCore::configureImuPreintegration(const utils::StateInitializer& state
   if (params_.imu.use_parameter_covariance) {
     imu_params->accelerometerCovariance =
         toGtsamSquaredDiagonal(params_.imu.parameter_covariance.accel_noise_sigmas)
-            .block<3, 3>(0, 0);
+            .block<3, 3>(0, 0) *
+        params_.imu.covariance_scalar;
   } else {
     imu_params->accelerometerCovariance =
         state_init.initial_imu_->linear_acceleration_covariance * params_.imu.covariance_scalar;
@@ -174,7 +177,8 @@ FactorGraphCore::configureImuPreintegration(const utils::StateInitializer& state
   if (params_.imu.use_parameter_covariance) {
     imu_params->gyroscopeCovariance =
         toGtsamSquaredDiagonal(params_.imu.parameter_covariance.gyro_noise_sigmas)
-            .block<3, 3>(0, 0);
+            .block<3, 3>(0, 0) *
+        params_.imu.covariance_scalar;
   } else {
     imu_params->gyroscopeCovariance =
         state_init.initial_imu_->angular_velocity_covariance * params_.imu.covariance_scalar;
@@ -203,11 +207,13 @@ void FactorGraphCore::addPriorFactors(const utils::StateInitializer& state_init,
     // Add initial position prior
     if (params_.gps.enable_gps) {
       prior_pose_sigmas(3) = params_.gps.use_parameter_covariance
-                                 ? params_.gps.parameter_covariance.position_noise_sigmas[0]
+                                 ? params_.gps.parameter_covariance.position_noise_sigmas[0] *
+                                       std::sqrt(params_.gps.covariance_scalar)
                                  : std::sqrt(state_init.initial_gps_->pose_covariance(0, 0) *
                                              params_.gps.covariance_scalar);
       prior_pose_sigmas(4) = params_.gps.use_parameter_covariance
-                                 ? params_.gps.parameter_covariance.position_noise_sigmas[1]
+                                 ? params_.gps.parameter_covariance.position_noise_sigmas[1] *
+                                       std::sqrt(params_.gps.covariance_scalar)
                                  : std::sqrt(state_init.initial_gps_->pose_covariance(1, 1) *
                                              params_.gps.covariance_scalar);
     } else {
@@ -217,7 +223,8 @@ void FactorGraphCore::addPriorFactors(const utils::StateInitializer& state_init,
 
     if (params_.depth.enable_depth) {
       prior_pose_sigmas(5) = params_.depth.use_parameter_covariance
-                                 ? params_.depth.parameter_covariance.position_z_noise_sigma
+                                 ? params_.depth.parameter_covariance.position_z_noise_sigma *
+                                       std::sqrt(params_.depth.covariance_scalar)
                                  : std::sqrt(state_init.initial_depth_->pose_covariance(2, 2) *
                                              params_.depth.covariance_scalar);
     } else {
@@ -228,7 +235,8 @@ void FactorGraphCore::addPriorFactors(const utils::StateInitializer& state_init,
     if (params_.ahrs.enable_ahrs) {
       prior_pose_sigmas(2) =
           params_.ahrs.use_parameter_covariance
-              ? params_.ahrs.parameter_covariance.yaw_noise_sigma
+              ? params_.ahrs.parameter_covariance.yaw_noise_sigma *
+                    std::sqrt(params_.ahrs.covariance_scalar)
               : std::sqrt(state_init.initial_ahrs_->orientation_covariance(2, 2) *
                           params_.ahrs.covariance_scalar);
     } else if (params_.mag.enable_mag) {
@@ -236,19 +244,22 @@ void FactorGraphCore::addPriorFactors(const utils::StateInitializer& state_init,
                                params_.mag.reference_field[1] * params_.mag.reference_field[1]);
       double mag_sigma_norm =
           params_.mag.use_parameter_covariance
-              ? params_.mag.parameter_covariance.magnetic_field_noise_sigmas[0]
+              ? params_.mag.parameter_covariance.magnetic_field_noise_sigmas[0] *
+                    std::sqrt(params_.mag.covariance_scalar)
               : std::sqrt(state_init.initial_mag_->magnetic_field_covariance(0, 0) *
                           params_.mag.covariance_scalar);
       prior_pose_sigmas(2) = mag_sigma_norm / h_mag;
     }
     prior_pose_sigmas(0) =
         params_.imu.use_parameter_covariance
-            ? params_.imu.parameter_covariance.gyro_noise_sigmas[0]
+            ? params_.imu.parameter_covariance.gyro_noise_sigmas[0] *
+                  std::sqrt(params_.imu.covariance_scalar)
             : std::sqrt(state_init.initial_imu_->angular_velocity_covariance(0, 0) *
                         params_.imu.covariance_scalar);
     prior_pose_sigmas(1) =
         params_.imu.use_parameter_covariance
-            ? params_.imu.parameter_covariance.gyro_noise_sigmas[1]
+            ? params_.imu.parameter_covariance.gyro_noise_sigmas[1] *
+                  std::sqrt(params_.imu.covariance_scalar)
             : std::sqrt(state_init.initial_imu_->angular_velocity_covariance(1, 1) *
                         params_.imu.covariance_scalar);
   }
@@ -266,7 +277,8 @@ void FactorGraphCore::addPriorFactors(const utils::StateInitializer& state_init,
     if (params_.dvl.enable_dvl) {
       if (params_.dvl.use_parameter_covariance) {
         auto& sigmas = params_.dvl.parameter_covariance.velocity_noise_sigmas;
-        prior_vel_noise = gtsam::noiseModel::Diagonal::Sigmas(toGtsam(sigmas));
+        prior_vel_noise = gtsam::noiseModel::Diagonal::Sigmas(
+            toGtsam(sigmas) * std::sqrt(params_.dvl.covariance_scalar));
       } else {
         gtsam::Matrix33 dvl_cov = state_init.initial_dvl_->twist_covariance.block<3, 3>(0, 0) *
                                   params_.dvl.covariance_scalar;
@@ -307,7 +319,8 @@ void FactorGraphCore::addGpsFactor(
   gtsam::SharedNoiseModel gps_noise;
   if (params_.gps.use_parameter_covariance) {
     gps_noise = gtsam::noiseModel::Diagonal::Sigmas(
-        toGtsam(params_.gps.parameter_covariance.position_noise_sigmas));
+        toGtsam(params_.gps.parameter_covariance.position_noise_sigmas) *
+        std::sqrt(params_.gps.covariance_scalar));
   } else {
     gtsam::Matrix22 gps_cov =
         gps_msg->pose_covariance.block<2, 2>(0, 0) * params_.gps.covariance_scalar;
@@ -331,7 +344,8 @@ void FactorGraphCore::addDepthFactor(
 
   gtsam::SharedNoiseModel depth_noise;
   if (params_.depth.use_parameter_covariance) {
-    double depth_sigma = params_.depth.parameter_covariance.position_z_noise_sigma;
+    double depth_sigma = params_.depth.parameter_covariance.position_z_noise_sigma *
+                         std::sqrt(params_.depth.covariance_scalar);
     depth_noise = gtsam::noiseModel::Isotropic::Sigma(1, depth_sigma);
   } else {
     gtsam::Matrix11 depth_cov = gtsam::Matrix11::Zero();
@@ -356,7 +370,8 @@ void FactorGraphCore::addAhrsFactor(gtsam::NonlinearFactorGraph& graph,
   gtsam::SharedNoiseModel ahrs_noise;
   if (params_.ahrs.use_parameter_covariance) {
     gtsam::Vector1 ahrs_sigmas;
-    ahrs_sigmas << params_.ahrs.parameter_covariance.yaw_noise_sigma;
+    ahrs_sigmas << params_.ahrs.parameter_covariance.yaw_noise_sigma *
+                       std::sqrt(params_.ahrs.covariance_scalar);
     ahrs_noise = gtsam::noiseModel::Diagonal::Sigmas(ahrs_sigmas);
   } else {
     gtsam::Matrix11 ahrs_cov = gtsam::Matrix11::Zero();
@@ -388,7 +403,8 @@ void FactorGraphCore::addMagFactor(
   gtsam::SharedNoiseModel mag_noise;
   if (params_.mag.use_parameter_covariance) {
     mag_noise = gtsam::noiseModel::Diagonal::Sigmas(
-        toGtsam(params_.mag.parameter_covariance.magnetic_field_noise_sigmas));
+        toGtsam(params_.mag.parameter_covariance.magnetic_field_noise_sigmas) *
+        std::sqrt(params_.mag.covariance_scalar));
   } else {
     gtsam::Matrix33 mag_cov = mag_msg->magnetic_field_covariance * params_.mag.covariance_scalar;
     mag_noise = gtsam::noiseModel::Gaussian::Covariance(mag_cov);
@@ -411,7 +427,8 @@ void FactorGraphCore::addDvlFactor(gtsam::NonlinearFactorGraph& graph,
   gtsam::SharedNoiseModel dvl_noise;
   if (params_.dvl.use_parameter_covariance) {
     dvl_noise = gtsam::noiseModel::Diagonal::Sigmas(
-        toGtsam(params_.dvl.parameter_covariance.velocity_noise_sigmas));
+        toGtsam(params_.dvl.parameter_covariance.velocity_noise_sigmas) *
+        std::sqrt(params_.dvl.covariance_scalar));
   } else {
     gtsam::Matrix33 dvl_cov =
         dvl_msg->twist_covariance.block<3, 3>(0, 0) * params_.dvl.covariance_scalar;
@@ -426,7 +443,8 @@ void FactorGraphCore::addDvlFactor(gtsam::NonlinearFactorGraph& graph,
 
 void FactorGraphCore::addConstVelFactor(gtsam::NonlinearFactorGraph& graph, double target_time) {
   double dt = (target_time - prev_time_);
-  Eigen::Vector3d vel_random_walk = toGtsam(params_.const_vel.velocity_sigma);
+  Eigen::Vector3d vel_random_walk = toGtsam(params_.const_vel.prediction_noise_sigmas) *
+                                    std::sqrt(params_.const_vel.covariance_scalar);
   double sqrt_dt = std::sqrt(std::max(dt, 0.001));
   Eigen::Vector3d scaled_sigma = vel_random_walk * sqrt_dt;
 
@@ -450,7 +468,8 @@ void FactorGraphCore::addAuvDynamicsFactor(
 
   const auto& wrench_msg = last_wrench_msg_;
 
-  gtsam::Vector3 dynamics_sigmas = toGtsam(params_.dynamics.prediction_noise_sigmas);
+  gtsam::Vector3 dynamics_sigmas = toGtsam(params_.dynamics.prediction_noise_sigmas) *
+                                   std::sqrt(params_.dynamics.covariance_scalar);
   gtsam::SharedNoiseModel dynamics_noise = gtsam::noiseModel::Diagonal::Sigmas(dynamics_sigmas);
 
   dynamics_noise =
@@ -586,7 +605,8 @@ void FactorGraphCore::addDvlLoosePreintFactor(
       if (params_.dvl.use_parameter_covariance) {
         last_dvl_covariance_ =
             toGtsamSquaredDiagonal(params_.dvl.parameter_covariance.velocity_noise_sigmas)
-                .block<3, 3>(0, 0);
+                .block<3, 3>(0, 0) *
+            params_.dvl.covariance_scalar;
       } else {
         last_dvl_covariance_ =
             dvl_msg->twist_covariance.block<3, 3>(0, 0) * params_.dvl.covariance_scalar;
@@ -696,7 +716,8 @@ void FactorGraphCore::addDvlTightPreintFactor(
       if (params_.dvl.use_parameter_covariance) {
         last_dvl_covariance_ =
             toGtsamSquaredDiagonal(params_.dvl.parameter_covariance.velocity_noise_sigmas)
-                .block<3, 3>(0, 0);
+                .block<3, 3>(0, 0) *
+            params_.dvl.covariance_scalar;
       } else {
         last_dvl_covariance_ =
             dvl_msg->twist_covariance.block<3, 3>(0, 0) * params_.dvl.covariance_scalar;
