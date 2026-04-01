@@ -502,7 +502,6 @@ def run_evo_evaluations(
 
 
 def plot_results(results: dict, pose_gt: dict, vel_gt: dict, bias_gt: dict) -> None:
-    """Plot FGO trajectory, velocity, and IMU bias estimates against ground truth."""
     t0 = results["time"][0]
     t_fgo = results["time"] - t0
 
