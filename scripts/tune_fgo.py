@@ -30,7 +30,7 @@ AUV_CONFIG_PATH = str(Path.home() / f"cougars-dev/config/{NAMESPACE}_params.yaml
 SCRIPTS_PATH = str(Path.home() / "cougars-dev/ros2_ws/src/coug_fgo/scripts")
 EVO_FLAGS = ["--align", "--project_to_plane", "xy"]
 
-DB_URL = f"sqlite:///{SCRIPTS_PATH}/fgo_tuning.db"
+DB_URL = f"sqlite:///{SCRIPTS_PATH}/optuna_fgo.db"
 timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 STUDY_NAME = f"{NAMESPACE}_scalar_sweep_{timestamp}"
 SCALARS_TO_TUNE = ["dvl", "const_vel"]
