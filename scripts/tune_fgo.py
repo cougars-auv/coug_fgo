@@ -26,7 +26,7 @@ FLEET_CONFIG_PATH = str(Path.home() / "cougars-dev/config/fleet/coug_fgo_params.
 AUV_CONFIG_PATH = str(Path.home() / f"cougars-dev/config/{NAMESPACE}_params.yaml")
 EVO_FLAGS = ["--align", "--project_to_plane", "xy"]
 
-SENSORS_TO_TUNE = ["dvl"]
+SCALARS_TO_TUNE = ["dvl"]
 N_OPTUNA_TRIALS = 50
 MIN_SCALAR = 80
 MAX_SCALAR = 120
@@ -42,7 +42,7 @@ def main() -> None:
     def objective(trial: optuna.Trial) -> float:
         scalars = {
             s: trial.suggest_float(s, MIN_SCALAR, MAX_SCALAR, log=True)
-            for s in SENSORS_TO_TUNE
+            for s in SCALARS_TO_TUNE
         }
         with fgo_utils.param_override_file(scalars) as override_path:
             results, crashed = fgo_utils.run_factor_graph(
