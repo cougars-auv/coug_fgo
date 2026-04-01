@@ -13,31 +13,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# %%
+import os
+import subprocess
 import sys
+import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import yaml
-import matplotlib.pyplot as plt
-from scipy.spatial.transform import Rotation as R
 from rosbags.highlevel import AnyReader
 from rosbags.typesys import Stores, get_typestore
+from scipy.spatial.transform import Rotation as R
 from tqdm import tqdm
 
 FGO_LIB_PATH = str(
     Path.home() / "cougars-dev/ros2_ws/install/coug_fgo/lib/python3.10/site-packages"
 )
+EVO_LIB_PATH = str(Path.home() / ".local/pipx/venvs/evo/lib/python3.10/site-packages")
 sys.path.insert(0, FGO_LIB_PATH)
+sys.path.insert(0, EVO_LIB_PATH)
 import pybind11fgo  # noqa: E402
+from evo.core import metrics, sync  # noqa: E402
+from evo.core.trajectory import PoseTrajectory3D  # noqa: E402
 
-NAMESPACE = "bluerov2"
-BAG_PATH = str(
-    Path.home() / "cougars-dev/bags/batch_ul_surface_1.0_2026-03-25-14-46-57"
-)
-FLEET_CONFIG_PATH = str(Path.home() / "cougars-dev/config/fleet/coug_fgo_params.yaml")
-AUV_CONFIG_PATH = str(Path.home() / f"cougars-dev/config/{NAMESPACE}_params.yaml")
-EVO_FLAGS = ["--align", "--project_to_plane", "xy"]
 EXTRACTORS = {
     "imu": lambda m: (
         np.array(
@@ -86,26 +86,25 @@ EXTRACTORS = {
 }
 
 
-# %%
-def load_config(
-    config_paths: list[str], namespace: str
+def _deep_merge(base: dict, override: dict) -> None:
+    for k, v in override.items():
+        if isinstance(v, dict) and isinstance(base.get(k), dict):
+            _deep_merge(base[k], v)
+        else:
+            base[k] = v
+
+
+def _parse_config(
+    config_paths: list[str], namespace: str, verbose: bool = True
 ) -> tuple[dict, set[str], dict, tuple, str]:
     params = {}
     for path in config_paths:
-        print(f"Loading config: {path}")
+        if verbose:
+            print(f"Loading config: {path}")
         with open(path, "r") as f:
             config = yaml.safe_load(f)
         for key in ["/**", f"/{namespace}/**"]:
-            layer = config.get(key, {}).get("ros__parameters", {})
-
-            def merge(base: dict, override: dict) -> None:
-                for k, v in override.items():
-                    if isinstance(v, dict) and isinstance(base.get(k), dict):
-                        merge(base[k], v)
-                    else:
-                        base[k] = v
-
-            merge(params, layer)
+            _deep_merge(params, config.get(key, {}).get("ros__parameters", {}))
 
     sensor_topics = {
         "imu": params["imu_topic"],
@@ -117,12 +116,11 @@ def load_config(
         "wrench": params["wrench_topic"],
     }
 
-    topic_map = {}
+    topic_map: dict[str, list[str]] = {}
     for sensor, topic in sensor_topics.items():
-        if topic not in topic_map:
-            topic_map[topic] = []
-        topic_map[topic].append(sensor)
+        topic_map.setdefault(topic, []).append(sensor)
 
+    # IMU is always required, other sensors required only when enabled
     required_sensors = {"imu"}
     for s in ["gps", "depth", "mag", "ahrs", "dvl"]:
         sensor_params = params[s]
@@ -143,80 +141,74 @@ def load_config(
         else params[source_to_topic_key[backup_source]]
     )
 
-    kf_timeout = params["keyframe_timeout"]
-    kf_period = 1.0 / max(params["keyframe_timer_hz"], 0.1)
-
-    base_tf = params["base"]["parameter_tf"]
-    base_pos = np.array(base_tf["position"])  # [x, y, z]
-    base_quat = base_tf["orientation"]  # [qx, qy, qz, qw]
-    target_T_base = (base_pos, R.from_quat(base_quat))
-
     kf_config = {
         "source": kf_source,
         "topic": kf_topic,
         "backup_source": backup_source,
         "backup_topic": backup_topic,
-        "timeout": kf_timeout,
-        "period": kf_period,
+        "timeout": params["keyframe_timeout"],
+        "period": 1.0 / max(params["keyframe_timer_hz"], 0.1),
     }
 
-    solver_type = params["solver_type"]
+    base_tf = params["base"]["parameter_tf"]
+    target_T_base = (np.array(base_tf["position"]), R.from_quat(base_tf["orientation"]))
 
-    return topic_map, required_sensors, kf_config, target_T_base, solver_type
+    return topic_map, required_sensors, kf_config, target_T_base, params["solver_type"]
 
 
-def process_bag(bag_path: str, config_paths: list[str], namespace: str) -> dict | None:
-    topic_map, required_sensors, kf_config, target_T_base, solver_type = load_config(
-        config_paths, namespace
+def run_factor_graph(
+    bag_path: str, config_paths: list[str], namespace: str, verbose: bool = True
+) -> tuple[dict | None, bool]:
+    topic_map, required_sensors, kf_config, target_T_base, solver_type = _parse_config(
+        config_paths, namespace, verbose
     )
-    is_lm = solver_type == "LevenbergMarquardt"
 
+    is_lm = solver_type == "LevenbergMarquardt"
     fg = pybind11fgo.FactorGraphPy(config_paths, namespace)
     raw_results = []
 
-    print(f"Opening bag: {bag_path}")
+    if verbose:
+        print(f"Opening bag: {bag_path}")
     with AnyReader(
         [Path(bag_path)], default_typestore=get_typestore(Stores.ROS2_HUMBLE)
     ) as reader:
-        conns = []
-        for c in reader.connections:
-            if not namespace or c.topic.startswith(f"/{namespace}/"):
-                conns.append(c)
+        conns = [
+            c
+            for c in reader.connections
+            if not namespace or c.topic.startswith(f"/{namespace}/")
+        ]
 
-        topic_to_sensors = {}
+        topic_to_sensors: dict[str, list[str]] = {}
         for c in conns:
             for suffix, sensors in topic_map.items():
                 if c.topic.endswith(suffix):
-                    if c.topic not in topic_to_sensors:
-                        topic_to_sensors[c.topic] = []
-                    topic_to_sensors[c.topic].extend(sensors)
+                    topic_to_sensors.setdefault(c.topic, []).extend(sensors)
 
-        matched_conns = []
-        for c in conns:
-            if c.topic in topic_to_sensors:
-                matched_conns.append(c)
+        matched_conns = [c for c in conns if c.topic in topic_to_sensors]
 
-        print("\nMatched Connections:")
-        for c in matched_conns:
-            print(f"- {c.topic} ({topic_to_sensors[c.topic]})")
-        print()
+        if verbose:
+            print("\nMatched Connections:")
+            for c in matched_conns:
+                print(f"- {c.topic} ({topic_to_sensors[c.topic]})")
+            print()
 
-        sensors_seen = set()
+        sensors_seen: set[str] = set()
         is_running = False
+        crashed = False
         last_kf_time = None
         current_time = 0.0
-        last_received = 0.0
+        last_kf_received = 0.0
+        kf_topic = kf_config["topic"]
 
-        total_msgs = sum(c.msgcount for c in matched_conns)
         pbar = tqdm(
             reader.messages(connections=matched_conns),
-            total=total_msgs,
+            total=sum(c.msgcount for c in matched_conns),
             desc="Processing FGO",
+            disable=not verbose,
         )
 
         for conn, _, rawdata in pbar:
             msg = reader.deserialize(rawdata, conn.msgtype)
-
             sensors = topic_to_sensors[conn.topic]
             t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
 
@@ -224,6 +216,7 @@ def process_bag(bag_path: str, config_paths: list[str], namespace: str) -> dict 
                 getattr(fg, f"add_{sensor}")(t, *EXTRACTORS[sensor](msg))
                 sensors_seen.add(sensor)
 
+            # Wait until all required sensors have been seen before initializing
             if not is_running:
                 if required_sensors.issubset(sensors_seen) and fg.initialize_graph(t):
                     is_running = True
@@ -232,15 +225,15 @@ def process_bag(bag_path: str, config_paths: list[str], namespace: str) -> dict 
 
             current_time = max(t, current_time)
 
-            kf_topic = kf_config["topic"]
             if kf_topic and conn.topic.endswith(kf_topic):
-                last_received = max(t, last_received)
+                last_kf_received = max(t, last_kf_received)
 
+            # Switch to backup keyframe source if primary has timed out
             active_topic = kf_topic
             if kf_config["source"] != "Timer" and kf_config["backup_source"] != "None":
                 if (
-                    last_received == 0.0
-                    or (current_time - last_received) > kf_config["timeout"]
+                    last_kf_received == 0.0
+                    or (current_time - last_kf_received) > kf_config["timeout"]
                 ):
                     active_topic = kf_config["backup_topic"]
 
@@ -248,7 +241,7 @@ def process_bag(bag_path: str, config_paths: list[str], namespace: str) -> dict 
             if (
                 kf_config["source"] == "Timer"
                 and "imu" in sensors
-                and (t >= last_kf_time + kf_config["period"])
+                and t >= last_kf_time + kf_config["period"]
             ):
                 last_kf_time += kf_config["period"]
                 trigger = True
@@ -258,7 +251,7 @@ def process_bag(bag_path: str, config_paths: list[str], namespace: str) -> dict 
                 kf_config["backup_source"] == "Timer"
                 and active_topic != kf_topic
                 and "imu" in sensors
-                and (t >= last_kf_time + kf_config["period"])
+                and t >= last_kf_time + kf_config["period"]
             ):
                 last_kf_time += kf_config["period"]
                 trigger = True
@@ -267,62 +260,63 @@ def process_bag(bag_path: str, config_paths: list[str], namespace: str) -> dict 
                 try:
                     fg.update_graph(t)
                     if not is_lm:
+                        # Incremental solvers (ISAM2, FixedLagSmoother) optimize each keyframe
                         if res := fg.optimize_graph():
                             raw_results.append(res)
                 except Exception as e:
-                    tqdm.write(f"{e}\n")
+                    if verbose:
+                        tqdm.write(f"{e}\n")
+                    crashed = True
                     break
 
         if is_lm and is_running:
+            # LevenbergMarquardt: run one full batch optimization over all keyframes
             if res := fg.optimize_graph():
                 raw_results = list(res.get("smoothed_path", []))
 
-    if not is_running:
-        missing = required_sensors - sensors_seen
-        print(f"\nGraph never initialized! Missing sensors: {missing}")
+    if not is_running and verbose:
+        print(
+            f"\nGraph never initialized! Missing sensors: {required_sensors - sensors_seen}"
+        )
 
-    if raw_results:
-        results = {
-            k: np.array([r[k] for r in raw_results])
-            for k in raw_results[0].keys()
-            if k != "smoothed_path"
-        }
+    if not raw_results:
+        return None, False
 
-        base_pos, base_rot = target_T_base
-        rolls, pitches, yaws = [], [], []
-        for i in range(len(raw_results)):
-            map_R_target = R.from_quat(
-                [results["qx"][i], results["qy"][i], results["qz"][i], results["qw"][i]]
-            )
-            map_R_base = map_R_target * base_rot
-            map_t_base = map_R_target.apply(base_pos) + np.array(
-                [results["x"][i], results["y"][i], results["z"][i]]
-            )
+    results = {
+        k: np.array([r[k] for r in raw_results])
+        for k in raw_results[0].keys()
+        if k != "smoothed_path"
+    }
 
-            results["x"][i] = map_t_base[0]
-            results["y"][i] = map_t_base[1]
-            results["z"][i] = map_t_base[2]
+    # Transform poses from target_frame (e.g. dvl_link) to base_link
+    base_pos, base_rot = target_T_base
+    rolls, pitches, yaws = [], [], []
+    for i in range(len(raw_results)):
+        map_R_target = R.from_quat(
+            [results["qx"][i], results["qy"][i], results["qz"][i], results["qw"][i]]
+        )
+        map_R_base = map_R_target * base_rot
+        map_t_base = map_R_target.apply(base_pos) + np.array(
+            [results["x"][i], results["y"][i], results["z"][i]]
+        )
 
-            q = map_R_base.as_quat()
-            results["qx"][i] = q[0]
-            results["qy"][i] = q[1]
-            results["qz"][i] = q[2]
-            results["qw"][i] = q[3]
+        results["x"][i], results["y"][i], results["z"][i] = map_t_base
+        q = map_R_base.as_quat()
+        results["qx"][i], results["qy"][i], results["qz"][i], results["qw"][i] = q
 
-            r, p, y = map_R_base.as_euler("xyz")
-            rolls.append(r)
-            pitches.append(p)
-            yaws.append(y)
+        r, p, y = map_R_base.as_euler("xyz")
+        rolls.append(r)
+        pitches.append(p)
+        yaws.append(y)
 
-        results["roll"] = np.array(rolls)
-        results["pitch"] = np.array(pitches)
-        results["yaw"] = np.array(yaws)
-
-        return results
+    results["roll"] = np.array(rolls)
+    results["pitch"] = np.array(pitches)
+    results["yaw"] = np.array(yaws)
+    return results, crashed
 
 
-def read_ground_truth(bag_path: str, namespace: str) -> tuple[dict, dict, dict]:
-    pose_dict = {
+def load_ground_truth(bag_path: str, namespace: str) -> tuple[dict, dict, dict]:
+    pose_dict: dict[str, list] = {
         "time": [],
         "x": [],
         "y": [],
@@ -335,8 +329,8 @@ def read_ground_truth(bag_path: str, namespace: str) -> tuple[dict, dict, dict]:
         "pitch": [],
         "yaw": [],
     }
-    vel_dict = {"time": [], "vx": [], "vy": [], "vz": []}
-    bias_dict = {
+    vel_dict: dict[str, list] = {"time": [], "vx": [], "vy": [], "vz": []}
+    bias_dict: dict[str, list] = {
         "time": [],
         "bias_accel_x": [],
         "bias_accel_y": [],
@@ -349,33 +343,31 @@ def read_ground_truth(bag_path: str, namespace: str) -> tuple[dict, dict, dict]:
     with AnyReader(
         [Path(bag_path)], default_typestore=get_typestore(Stores.ROS2_HUMBLE)
     ) as reader:
-        conns = []
-        for c in reader.connections:
-            if not namespace or c.topic.startswith(f"/{namespace}/"):
-                conns.append(c)
+        conns = [
+            c
+            for c in reader.connections
+            if not namespace or c.topic.startswith(f"/{namespace}/")
+        ]
 
-        target_conns = []
-        gt_labels = {}
-        for c in conns:
-            if c.topic.endswith("odometry/truth"):
-                target_conns.append(c)
-                gt_labels[c.topic] = "pose gt"
-            elif c.topic.endswith("VelocitySensor"):
-                target_conns.append(c)
-                gt_labels[c.topic] = "vel gt"
-            elif c.topic.endswith(f"{namespace}/imu_bias"):
-                target_conns.append(c)
-                gt_labels[c.topic] = "imu bias gt"
+        gt_topic_map = {
+            "odometry/truth": "pose gt",
+            "VelocitySensor": "vel gt",
+            f"{namespace}/imu_bias": "imu bias gt",
+        }
+        gt_conns = [c for c in conns if any(c.topic.endswith(k) for k in gt_topic_map)]
+        gt_labels = {
+            c.topic: next(v for k, v in gt_topic_map.items() if c.topic.endswith(k))
+            for c in gt_conns
+        }
 
         print("\nMatched GT Connections:")
-        for c in target_conns:
+        for c in gt_conns:
             print(f"- {c.topic} ({gt_labels[c.topic]})")
         print()
 
-        total_msgs = sum(c.msgcount for c in target_conns)
         pbar = tqdm(
-            reader.messages(connections=target_conns),
-            total=total_msgs,
+            reader.messages(connections=gt_conns),
+            total=sum(c.msgcount for c in gt_conns),
             desc="Processing GT",
         )
 
@@ -385,8 +377,7 @@ def read_ground_truth(bag_path: str, namespace: str) -> tuple[dict, dict, dict]:
 
             if conn.topic.endswith("odometry/truth"):
                 q, pos = msg.pose.pose.orientation, msg.pose.pose.position
-                rot = R.from_quat([q.x, q.y, q.z, q.w])
-                roll, pitch, yaw = rot.as_euler("xyz")
+                roll, pitch, yaw = R.from_quat([q.x, q.y, q.z, q.w]).as_euler("xyz")
                 pose_dict["time"].append(t)
                 pose_dict["x"].append(pos.x)
                 pose_dict["y"].append(pos.y)
@@ -419,67 +410,99 @@ def read_ground_truth(bag_path: str, namespace: str) -> tuple[dict, dict, dict]:
     pose = {k: np.array(v) for k, v in pose_dict.items()} if pose_dict["time"] else {}
     vel = {k: np.array(v) for k, v in vel_dict.items()} if vel_dict["time"] else {}
     bias = {k: np.array(v) for k, v in bias_dict.items()} if bias_dict["time"] else {}
-
     return pose, vel, bias
 
 
-def save_tum(filepath: str | Path, data: dict) -> None:
+def write_tum(filepath: str | Path, data: dict) -> None:
     with open(filepath, "w") as f:
-        for i in range(len(data["time"])):
+        for t, x, y, z, qx, qy, qz, qw in zip(
+            data["time"],
+            data["x"],
+            data["y"],
+            data["z"],
+            data["qx"],
+            data["qy"],
+            data["qz"],
+            data["qw"],
+        ):
             f.write(
-                f"{data['time'][i]:.9f} "
-                f"{data['x'][i]:.9f} {data['y'][i]:.9f} {data['z'][i]:.9f} "
-                f"{data['qx'][i]:.9f} {data['qy'][i]:.9f} {data['qz'][i]:.9f} {data['qw'][i]:.9f}\n"
+                f"{t:.9f} {x:.9f} {y:.9f} {z:.9f} {qx:.9f} {qy:.9f} {qz:.9f} {qw:.9f}\n"
             )
     print(f"Saved: {filepath}")
 
 
-# %%
-print("\n--- Factor Graph Optimization ---\n")
-results = process_bag(BAG_PATH, [FLEET_CONFIG_PATH, AUV_CONFIG_PATH], NAMESPACE)
+def compute_ape_rmse(
+    gt: dict | None, est: dict | None, crashed: bool = False, max_diff: float = 0.05
+) -> float:
+    if not gt or not est or crashed:
+        return float("inf")
+    gt_traj = PoseTrajectory3D(
+        positions_xyz=np.column_stack([gt["x"], gt["y"], gt["z"]]),
+        orientations_quat_wxyz=np.column_stack(
+            [gt["qw"], gt["qx"], gt["qy"], gt["qz"]]
+        ),
+        timestamps=gt["time"],
+    )
+    est_traj = PoseTrajectory3D(
+        positions_xyz=np.column_stack([est["x"], est["y"], est["z"]]),
+        orientations_quat_wxyz=np.column_stack(
+            [est["qw"], est["qx"], est["qy"], est["qz"]]
+        ),
+        timestamps=est["time"],
+    )
+    gt_sync, est_sync = sync.associate_trajectories(
+        gt_traj, est_traj, max_diff=max_diff
+    )
+    est_sync.align(gt_sync)
+    ape = metrics.APE(metrics.PoseRelation.translation_part)
+    ape.process_data((gt_sync, est_sync))
+    return ape.get_statistic(metrics.StatisticsType.rmse)
 
-print("\n--- Ground Truth ---")
-pose_gt, vel_gt, bias_gt = read_ground_truth(BAG_PATH, NAMESPACE)
 
-# %%
-print("\n--- Saving TUM Files ---\n")
-evo_dir = Path(BAG_PATH) / "evo" / NAMESPACE / "odometry" / "batch"
-evo_dir.mkdir(parents=True, exist_ok=True)
-if results:
-    save_tum(evo_dir / "batch.tum", results)
-if pose_gt:
-    save_tum(evo_dir / "ground_truth.tum", pose_gt)
+@contextmanager
+def param_override_file(scalars: dict[str, float]):
+    override = {
+        "/**": {
+            "ros__parameters": {s: {"covariance_scalar": v} for s, v in scalars.items()}
+        }
+    }
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(override, f)
+        override_path = f.name
+    try:
+        yield override_path
+    finally:
+        os.unlink(override_path)
 
-# %%
-print("\n--- Evo Evaluation ---")
-if results and pose_gt:
-    import subprocess
 
-    gt_file = str(evo_dir / "ground_truth.tum")
-    est_file = str(evo_dir / "batch.tum")
+def run_evo_evaluations(
+    gt_file: str, est_file: str, evo_dir: Path, evo_flags: list[str]
+) -> None:
     evo_base = ["--t_max_diff", "0.05", "--no_warnings"]
     plane_flags = [
-        f for f in EVO_FLAGS if f.startswith("--project") or f in ("xy", "xz", "yz")
+        f for f in evo_flags if f.startswith("--project") or f in ("xy", "xz", "yz")
     ]
-    non_plane_flags = [f for f in EVO_FLAGS if f not in plane_flags]
+    non_plane_flags = [f for f in evo_flags if f not in plane_flags]
 
     for metric, cmd in [("APE", "evo_ape"), ("RPE", "evo_rpe")]:
-        for mode, flag, suffix in [
+        for mode, pose_relation, suffix in [
             ("Translation", "trans_part", "trans"),
             ("Rotation", "angle_deg", "rot"),
         ]:
-            out_file = str(evo_dir / f"{metric.lower()}_{suffix}.zip")
-            flags = EVO_FLAGS if flag == "trans_part" else non_plane_flags
-            args = [cmd, "tum", gt_file, est_file, "-r", flag] + evo_base + flags
-            args += ["--save_results", out_file]
+            # Only apply xy projection flags to translation (no depth GT)
+            flags = evo_flags if pose_relation == "trans_part" else non_plane_flags
+            args = (
+                [cmd, "tum", gt_file, est_file, "-r", pose_relation] + evo_base + flags
+            )
+            args += ["--save_results", str(evo_dir / f"{metric.lower()}_{suffix}.zip")]
             if metric == "RPE":
                 args += ["--delta", "1", "--delta_unit", "m", "--all_pairs"]
             print(f"\n{metric} ({mode}):")
             subprocess.run(args)
 
-# %%
-print("\n--- Plotting ---\n")
-if results:
+
+def plot_results(results: dict, pose_gt: dict, vel_gt: dict, bias_gt: dict) -> None:
+    """Plot FGO trajectory, velocity, and IMU bias estimates against ground truth."""
     t0 = results["time"][0]
     t_fgo = results["time"] - t0
 
@@ -499,27 +522,13 @@ if results:
         ),
     ]
 
-    fig, axes = plt.subplots(5, 3, figsize=(12, 10))
-
+    _, axes = plt.subplots(5, 3, figsize=(12, 10))
     for row, (keys, labels, gt_data) in enumerate(layout):
         for col, (key, label) in enumerate(zip(keys, labels)):
             ax = axes[row, col]
-
             if gt_data:
-                ax.plot(
-                    gt_data["time"] - t0,
-                    gt_data[key],
-                    "-k",
-                    label="GT",
-                )
-
-            ax.plot(
-                t_fgo,
-                results[key],
-                "-r",
-                label="FGO",
-            )
-
+                ax.plot(gt_data["time"] - t0, gt_data[key], "-k", label="GT")
+            ax.plot(t_fgo, results[key], "-r", label="FGO")
             ax.set_ylabel(label)
             if row == 4:
                 ax.set_xlabel("Time (s)")
