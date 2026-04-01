@@ -19,8 +19,9 @@ import fgo_utils
 
 NAMESPACE = "bluerov2"
 BAG_PATHS = [
-    str(Path.home() / "cougars-dev/bags/bluerov2_dropout_2026-03-31-12-00-00"),
-    str(Path.home() / "cougars-dev/bags/bluerov2_dropout_2026-03-31-11-05-33"),
+    str(Path.home() / "cougars-dev/bags/dropout_1.0_2026-04-01-15-47-59"),
+    str(Path.home() / "cougars-dev/bags/dropout_5.0_2026-04-01-15-42-34"),
+    str(Path.home() / "cougars-dev/bags/dropout_7.0_2026-04-01-15-36-25"),
 ]
 FLEET_CONFIG_PATH = str(Path.home() / "cougars-dev/config/fleet/coug_fgo_params.yaml")
 AUV_CONFIG_PATH = str(Path.home() / f"cougars-dev/config/{NAMESPACE}_params.yaml")
