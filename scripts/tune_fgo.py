@@ -27,9 +27,9 @@ AUV_CONFIG_PATH = str(Path.home() / f"cougars-dev/config/{NAMESPACE}_params.yaml
 EVO_FLAGS = ["--align", "--project_to_plane", "xy"]
 
 SCALARS_TO_TUNE = ["dvl"]
-N_OPTUNA_TRIALS = 50
-MIN_SCALAR = 80
-MAX_SCALAR = 120
+N_OPTUNA_TRIALS = 2
+MIN_SCALAR = 0.5
+MAX_SCALAR = 100
 
 
 def main() -> None:
@@ -37,7 +37,7 @@ def main() -> None:
     pose_gt, vel_gt, bias_gt = fgo_utils.load_ground_truth(BAG_PATH, NAMESPACE)
 
     if not pose_gt:
-        raise RuntimeError("No ground truth found in bag. Cannot calibrate.")
+        raise RuntimeError("No ground truth found in bag. Aborting.")
 
     def objective(trial: optuna.Trial) -> float:
         scalars = {
@@ -55,13 +55,10 @@ def main() -> None:
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(direction="minimize")
-    print("\n--- Running Optuna Trials ---\n")
-    study.optimize(objective, n_trials=N_OPTUNA_TRIALS, show_progress_bar=True)
 
-    print("\n--- Results ---")
-    for sensor, scalar in study.best_params.items():
-        print(f"  {sensor}: covariance_scalar: {scalar:.4f}")
-    print(f"\nBest APE RMSE: {study.best_value:.4f} m")
+    print("\n--- Optuna Hyperparameter Trials ---\n")
+    study.optimize(objective, n_trials=N_OPTUNA_TRIALS, show_progress_bar=True)
+    print(f"\nResults: {study.best_params}")
 
     print("\n--- Factor Graph Optimization ---\n")
     with fgo_utils.param_override_file(study.best_params) as best_override_path:
@@ -72,10 +69,10 @@ def main() -> None:
         )
 
     print("\n--- Saving TUM Files ---\n")
-    evo_dir = Path(BAG_PATH) / "evo" / NAMESPACE / "odometry" / "batch"
+    evo_dir = Path(BAG_PATH) / "evo" / NAMESPACE / "odometry" / "tuned"
     evo_dir.mkdir(parents=True, exist_ok=True)
     if results:
-        fgo_utils.write_tum(evo_dir / "batch.tum", results)
+        fgo_utils.write_tum(evo_dir / "tuned.tum", results)
     if pose_gt:
         fgo_utils.write_tum(evo_dir / "ground_truth.tum", pose_gt)
 
@@ -83,7 +80,7 @@ def main() -> None:
     if results and pose_gt:
         fgo_utils.run_evo_evaluations(
             str(evo_dir / "ground_truth.tum"),
-            str(evo_dir / "batch.tum"),
+            str(evo_dir / "tuned.tum"),
             evo_dir,
             EVO_FLAGS,
         )
