@@ -27,7 +27,6 @@ import fgo_utils
 NAMESPACE = "bluerov2"
 BAG_PATHS = [
     str(Path.home() / "cougars-dev/bags/dropout_1.0_2026-04-01-15-47-59"),
-    str(Path.home() / "cougars-dev/bags/fake"),
     str(Path.home() / "cougars-dev/bags/dropout_5.0_2026-04-01-15-42-34"),
     str(Path.home() / "cougars-dev/bags/dropout_7.0_2026-04-01-15-36-25"),
 ]
@@ -40,7 +39,7 @@ DB_URL = f"sqlite:///{SCRIPTS_PATH}/optuna_fgo.db"
 timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 STUDY_NAME = f"{NAMESPACE}_scalar_sweep_{timestamp}"
 SCALARS_TO_TUNE = ["dvl"]
-N_OPTUNA_TRIALS = 200
+N_OPTUNA_TRIALS = 50
 MIN_SCALAR = 0.5
 MAX_SCALAR = 100
 
