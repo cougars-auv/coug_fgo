@@ -35,6 +35,7 @@ AUV_CONFIG_PATH = str(Path.home() / f"cougars-dev/config/{NAMESPACE}_params.yaml
 SCRIPTS_PATH = str(Path.home() / "cougars-dev/ros2_ws/src/coug_fgo/scripts")
 EVO_FLAGS = ["--align", "--project_to_plane", "xy"]
 
+DASHBOARD_PORT = 9000
 DB_URL = f"sqlite:///{SCRIPTS_PATH}/optuna_fgo.db"
 timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 STUDY_NAME = f"{NAMESPACE}_scalar_sweep_{timestamp}"
@@ -86,12 +87,19 @@ def main() -> None:
     print("\n--- Starting Optuna Dashboard ---\n")
     subprocess.run(["pkill", "-9", "-f", "optuna-dashboard"], capture_output=True)
     dashboard_process = subprocess.Popen(
-        ["optuna-dashboard", DB_URL, "--host", "0.0.0.0", "--port", "9000"],
+        [
+            "optuna-dashboard",
+            DB_URL,
+            "--host",
+            "0.0.0.0",
+            "--port",
+            str(DASHBOARD_PORT),
+        ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
     atexit.register(dashboard_process.terminate)
-    print("Dashboard running at http://localhost:9000.")
+    print(f"Dashboard running at http://localhost:{DASHBOARD_PORT}/")
 
     print("\n--- Running Optuna Trials ---\n")
     study.optimize(objective, n_trials=N_OPTUNA_TRIALS, show_progress_bar=True)
