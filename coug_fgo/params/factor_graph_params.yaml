@@ -421,7 +421,7 @@ factor_graph_node:
       default_value: 1.0
     prediction_noise_sigmas:
       type: double_array
-      default_value: [0.05, 0.05, 0.05]
+      default_value: [0.005, 0.005, 0.005]
 
   dynamics:
     enable_dynamics:

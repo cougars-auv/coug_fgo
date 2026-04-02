@@ -177,7 +177,7 @@
       enable_const_vel: false
       enable_const_vel_dropout_only: false
       covariance_scalar: 1.0 # Scales the prediction noise sigmas.
-      prediction_noise_sigmas: [0.05, 0.05, 0.05] # [m/s/sqrt(s)] Velocity prediction uncertainty sigmas.
+      prediction_noise_sigmas: [0.005, 0.005, 0.005] # [m/s/sqrt(s)] Velocity prediction uncertainty sigmas.
 
     dynamics:
       enable_dynamics: false

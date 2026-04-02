@@ -39,8 +39,8 @@ DB_URL = f"sqlite:///{SCRIPTS_PATH}/optuna_fgo.db"
 timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 STUDY_NAME = f"{NAMESPACE}_scalar_sweep_{timestamp}"
 SCALARS_TO_TUNE = ["dvl"]
-N_OPTUNA_TRIALS = 50
-MIN_SCALAR = 0.5
+N_OPTUNA_TRIALS = 30
+MIN_SCALAR = 0.01
 MAX_SCALAR = 100
 
 
