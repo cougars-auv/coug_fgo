@@ -91,26 +91,40 @@ def generate_plots(data_map: dict[str, pd.DataFrame], output_dir: Path) -> None:
         )
         df = df.sort_values("Algorithm")
 
-        for plot_type in ["violin", "box"]:
+        for plot_type in ["violin", "box", "strip"]:
             fig, ax = plt.subplots()
 
-            plot_func = sns.violinplot if plot_type == "violin" else sns.boxplot
-            kwargs = (
-                {"inner": "box", "linewidth": 0.5, "cut": 0}
-                if plot_type == "violin"
-                else {}
-            )
+            if plot_type == "strip":
+                sns.stripplot(
+                    x="Algorithm",
+                    y="RMSE",
+                    data=df,
+                    hue="Algorithm",
+                    palette=COLORS,
+                    legend=False,
+                    ax=ax,
+                    jitter=False,
+                    marker="x",
+                    linewidth=1.0,
+                )
+            else:
+                plot_func = sns.violinplot if plot_type == "violin" else sns.boxplot
+                kwargs = (
+                    {"inner": "box", "linewidth": 0.5, "cut": 0}
+                    if plot_type == "violin"
+                    else {}
+                )
 
-            plot_func(
-                x="Algorithm",
-                y="RMSE",
-                data=df,
-                hue="Algorithm",
-                palette=COLORS,
-                legend=False,
-                ax=ax,
-                **kwargs,
-            )
+                plot_func(
+                    x="Algorithm",
+                    y="RMSE",
+                    data=df,
+                    hue="Algorithm",
+                    palette=COLORS,
+                    legend=False,
+                    ax=ax,
+                    **kwargs,
+                )
 
             ax.set(title="", xlabel="", ylabel=label)
             save_path = output_dir / f"{prefix}_{plot_type}.png"
