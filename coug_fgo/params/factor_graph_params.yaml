@@ -460,7 +460,7 @@ factor_graph_node:
       default_value: [1.59, 3.02, 3.02]
     quad_drag:
       type: double_array
-      default_value: [6.11, 154.0, 154.0]
+      default_value: [6.11, 196.13, 196.13]
     diagnostic_timeout:
       type: double
       default_value: 1.0
