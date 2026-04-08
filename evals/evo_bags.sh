@@ -94,7 +94,8 @@ for bag_path in ${bags_to_eval}; do
   done
 done
 
+# --- Plots ---
 evo_python="${HOME}/.local/pipx/venvs/evo/bin/python"
-${evo_python} $(dirname "$0")/plots/trajectory_plot.py "${target_dir}"
-${evo_python} $(dirname "$0")/plots/timing_plot.py "${target_dir}"
-${evo_python} $(dirname "$0")/plots/benchmark_plot.py "${target_dir}"
+${evo_python} $(dirname "$0")/trajectory_plot.py "${target_dir}"
+${evo_python} $(dirname "$0")/timing_plot.py "${target_dir}"
+${evo_python} $(dirname "$0")/benchmark_plot.py "${target_dir}"
