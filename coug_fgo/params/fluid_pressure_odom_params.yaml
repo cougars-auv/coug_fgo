@@ -1,0 +1,34 @@
+fluid_pressure_odom_node:
+  input_topic:
+    type: string
+    default_value: "depth/pressure"
+  output_topic:
+    type: string
+    default_value: "odometry/depth"
+  publish_diagnostics:
+    type: bool
+    default_value: false
+  diagnostic_timeout:
+    type: double
+    default_value: 0.5
+
+  map_frame:
+    type: string
+    default_value: "map"
+
+  use_parameter_child_frame:
+    type: bool
+    default_value: false
+  parameter_child_frame:
+    type: string
+    default_value: "depth_link"
+
+  atmospheric_pressure:
+    type: double
+    default_value: 101325.0
+  water_density:
+    type: double
+    default_value: 997.0
+  gravity:
+    type: double
+    default_value: 9.81

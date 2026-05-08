@@ -1,0 +1,30 @@
+dvl_a50_odom_node:
+  input_topic:
+    type: string
+    default_value: "dvl/position"
+  output_topic:
+    type: string
+    default_value: "odometry/dvl"
+  publish_diagnostics:
+    type: bool
+    default_value: false
+  diagnostic_timeout:
+    type: double
+    default_value: 0.5
+
+  use_parameter_frame:
+    type: bool
+    default_value: false
+  parameter_frame:
+    type: string
+    default_value: "dvl_link"
+  dvl_odom_frame:
+    type: string
+    default_value: "dvl_odom"
+  base_frame:
+    type: string
+    default_value: "base_link"
+
+  publish_local_tf:
+    type: bool
+    default_value: false

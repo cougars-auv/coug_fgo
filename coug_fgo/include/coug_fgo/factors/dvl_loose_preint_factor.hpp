@@ -1,0 +1,99 @@
+// Copyright (c) 2026 BYU FROST Lab
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+/**
+ * @file dvl_loose_preint_factor.hpp
+ * @brief GTSAM factor for loosely-coupled preintegrated DVL measurements with a lever arm.
+ * @author Nelson Durrant
+ * @date May 2026
+ */
+
+#pragma once
+
+#include <gtsam/base/Matrix.h>
+#include <gtsam/base/Vector.h>
+#include <gtsam/geometry/Pose3.h>
+#include <gtsam/nonlinear/NonlinearFactor.h>
+
+namespace coug_fgo::factors {
+
+/**
+ * @class DvlLoosePreintFactorArm
+ * @brief GTSAM factor for loosely-coupled preintegrated DVL translation measurements
+ * with a lever arm.
+ */
+class DvlLoosePreintFactorArm : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3> {
+  gtsam::Pose3 target_T_sensor_;
+  gtsam::Vector3 measured_translation_;
+
+ public:
+  /**
+   * @brief Constructor for DvlLoosePreintFactorArm.
+   * @param pose_key_i GTSAM key for the starting AUV pose.
+   * @param pose_key_j GTSAM key for the ending AUV pose.
+   * @param target_T_sensor The static transformation from target to sensor.
+   * @param measured_translation The preintegrated translation measurement.
+   * @param noise_model The noise model for the measurement.
+   */
+  DvlLoosePreintFactorArm(gtsam::Key pose_key_i, gtsam::Key pose_key_j,
+                          const gtsam::Pose3& target_T_sensor,
+                          const gtsam::Vector3& measured_translation,
+                          gtsam::SharedNoiseModel noise_model)
+      : gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>(noise_model, pose_key_i, pose_key_j),
+        target_T_sensor_(target_T_sensor),
+        measured_translation_(measured_translation) {}
+
+  /**
+   * @brief Evaluates the error and Jacobians for the factor.
+   * @param pose_i Starting AUV pose estimate.
+   * @param pose_j Ending AUV pose estimate.
+   * @param H_pose_i Optional Jacobian matrix with respect to pose_i.
+   * @param H_pose_j Optional Jacobian matrix with respect to pose_j.
+   * @return The 3D error vector (predicted - measured).
+   */
+  gtsam::Vector evaluateError(const gtsam::Pose3& pose_i, const gtsam::Pose3& pose_j,
+                              gtsam::OptionalMatrixType H_pose_i = nullptr,
+                              gtsam::OptionalMatrixType H_pose_j = nullptr) const override {
+    gtsam::Matrix66 H_posei_compose, H_posej_compose;
+    gtsam::Pose3 pose_dvl_i =
+        pose_i.compose(target_T_sensor_, H_pose_i ? &H_posei_compose : nullptr);
+    gtsam::Pose3 pose_dvl_j =
+        pose_j.compose(target_T_sensor_, H_pose_j ? &H_posej_compose : nullptr);
+
+    gtsam::Matrix36 H_position_j = gtsam::Matrix36::Zero();
+    gtsam::Point3 position_j = pose_dvl_j.translation(H_pose_j ? &H_position_j : nullptr);
+
+    gtsam::Matrix36 H_pred_pose_i = gtsam::Matrix36::Zero();
+    gtsam::Matrix33 H_pred_pos_j = gtsam::Matrix33::Zero();
+    gtsam::Point3 predicted_translation = pose_dvl_i.transformTo(
+        position_j, H_pose_i ? &H_pred_pose_i : nullptr, H_pose_j ? &H_pred_pos_j : nullptr);
+
+    // 3D translation residual
+    gtsam::Vector3 error = predicted_translation - measured_translation_;
+
+    if (H_pose_i) {
+      // Jacobian with respect to pose_i (3x6)
+      *H_pose_i = H_pred_pose_i * H_posei_compose;
+    }
+
+    if (H_pose_j) {
+      // Jacobian with respect to pose_j (3x6)
+      *H_pose_j = H_pred_pos_j * H_position_j * H_posej_compose;
+    }
+
+    return error;
+  }
+};
+
+}  // namespace coug_fgo::factors

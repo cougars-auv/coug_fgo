@@ -1,0 +1,9 @@
+repositories:
+  coug_description:
+    type: git
+    url: https://github.com/cougars-auv/coug_description.git
+    version: main
+  dvl_msgs:
+    type: zip
+    url: https://github.com/paagutie/dvl_msgs/archive/555525ebc027f4ca21fdd654a6f30cecd259772f.zip
+    version: dvl_msgs-555525ebc027f4ca21fdd654a6f30cecd259772f

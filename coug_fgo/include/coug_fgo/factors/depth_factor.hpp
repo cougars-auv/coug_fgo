@@ -1,0 +1,76 @@
+// Copyright (c) 2026 BYU FROST Lab
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+/**
+ * @file depth_factor.hpp
+ * @brief GTSAM factor for depth (Z) measurements with a lever arm.
+ * @author Nelson Durrant
+ * @date May 2026
+ */
+
+#pragma once
+
+#include <gtsam/base/Matrix.h>
+#include <gtsam/base/Vector.h>
+#include <gtsam/geometry/Pose3.h>
+#include <gtsam/nonlinear/NonlinearFactor.h>
+
+namespace coug_fgo::factors {
+
+/**
+ * @class DepthFactorArm
+ * @brief GTSAM factor for depth measurements (Z-axis) with a lever arm.
+ */
+class DepthFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
+  double measured_depth_;
+  gtsam::Point3 target_p_sensor_;
+
+ public:
+  /**
+   * @brief Constructor for DepthFactorArm.
+   * @param pose_key GTSAM key for the AUV pose.
+   * @param measured_depth The depth measurement (Z-axis).
+   * @param target_T_sensor The static transformation from target to sensor.
+   * @param noise_model The noise model for the measurement.
+   */
+  DepthFactorArm(gtsam::Key pose_key, double measured_depth, const gtsam::Pose3& target_T_sensor,
+                 const gtsam::SharedNoiseModel& noise_model)
+      : NoiseModelFactor1<gtsam::Pose3>(noise_model, pose_key),
+        measured_depth_(measured_depth),
+        target_p_sensor_(target_T_sensor.translation()) {}
+
+  /**
+   * @brief Evaluates the error and Jacobians for the factor.
+   * @param pose The AUV pose estimate.
+   * @param H Optional Jacobian matrix.
+   * @return The 1D error vector (predicted - measured).
+   */
+  gtsam::Vector evaluateError(const gtsam::Pose3& pose,
+                              gtsam::OptionalMatrixType H = nullptr) const override {
+    gtsam::Matrix36 H_full = gtsam::Matrix36::Zero();
+    gtsam::Point3 predicted_position = pose.transformFrom(target_p_sensor_, H ? &H_full : nullptr);
+
+    // 1D depth residual
+    double error = predicted_position.z() - measured_depth_;
+
+    if (H) {
+      // Jacobian with respect to pose (1x6)
+      *H = H_full.row(2);
+    }
+
+    return gtsam::Vector1(error);
+  }
+};
+
+}  // namespace coug_fgo::factors

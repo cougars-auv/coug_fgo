@@ -1,0 +1,47 @@
+navsat_odom_node:
+  input_topic:
+    type: string
+    default_value: "gps/fix"
+  output_topic:
+    type: string
+    default_value: "odometry/gps"
+  origin_topic:
+    type: string
+    default_value: "/origin"
+  publish_diagnostics:
+    type: bool
+    default_value: false
+  diagnostic_timeout:
+    type: double
+    default_value: 1.0
+
+  map_frame:
+    type: string
+    default_value: "map"
+
+  use_parameter_child_frame:
+    type: bool
+    default_value: false
+  parameter_child_frame:
+    type: string
+    default_value: "gps_link"
+
+  set_origin:
+    type: bool
+    default_value: true
+  origin_pub_rate:
+    type: double
+    default_value: 1.0
+
+  use_parameter_origin:
+    type: bool
+    default_value: true
+  origin_latitude:
+    type: double
+    default_value: 40.33940
+  origin_longitude:
+    type: double
+    default_value: -111.90721
+  origin_altitude:
+    type: double
+    default_value: 1412.0

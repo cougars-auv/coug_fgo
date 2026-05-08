@@ -1,0 +1,40 @@
+dvl_a50_twist_node:
+  input_topic:
+    type: string
+    default_value: "dvl/data"
+  output_topic:
+    type: string
+    default_value: "dvl/twist"
+  publish_diagnostics:
+    type: bool
+    default_value: false
+  diagnostic_timeout:
+    type: double
+    default_value: 0.5
+
+  use_parameter_frame:
+    type: bool
+    default_value: false
+  parameter_frame:
+    type: string
+    default_value: "dvl_link"
+
+  simulate_dropout:
+    type: bool
+    default_value: false
+  dropout_frequency:
+    type: double
+    default_value: 0.033
+  dropout_duration:
+    type: double
+    default_value: 5.0
+
+  fom_valid_threshold:
+    type: double
+    default_value: 0.02
+  use_fom_covariance:
+    type: bool
+    default_value: false
+  fom_covariance_scale:
+    type: double
+    default_value: 4.0

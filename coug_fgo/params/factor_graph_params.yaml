@@ -1,0 +1,523 @@
+factor_graph_node:
+  # --- Node Settings ---
+  publish_global_tf:
+    type: bool
+    default_value: true
+  publish_smoothed_path:
+    type: bool
+    default_value: false
+  publish_velocity:
+    type: bool
+    default_value: false
+  publish_imu_bias:
+    type: bool
+    default_value: false
+  publish_pose_cov:
+    type: bool
+    default_value: false
+  publish_velocity_cov:
+    type: bool
+    default_value: false
+  publish_imu_bias_cov:
+    type: bool
+    default_value: false
+  publish_diagnostics:
+    type: bool
+    default_value: false
+  publish_graph_metrics:
+    type: bool
+    default_value: false
+
+  # --- GTSAM Settings ---
+  solver_type:
+    type: string
+    default_value: "IncrementalFixedLagSmoother"
+    validation:
+      one_of<>: [["IncrementalFixedLagSmoother", "ISAM2", "LevenbergMarquardt"]]
+  max_update_rate:
+    type: double
+    default_value: -1.0
+  max_opt_rate:
+    type: double
+    default_value: -1.0
+  smoother_lag:
+    type: double
+    default_value: 10.0
+  relinearize_threshold:
+    type: double
+    default_value: 0.1
+  relinearize_skip:
+    type: int
+    default_value: 1
+
+   # --- Keyframe Settings ---
+  keyframe_source:
+    type: string
+    default_value: "DVL"
+    validation:
+      one_of<>: [["DVL", "Depth", "Timer"]]
+  backup_keyframe_source:
+    type: string
+    default_value: "None"
+    validation:
+      one_of<>: [["None", "DVL", "Depth", "Timer"]]
+  keyframe_timeout:
+    type: double
+    default_value: 0.5
+  keyframe_timer_hz:
+    type: double
+    default_value: 10.0
+
+  # --- ROS Topics and Frames ---
+  imu_topic:
+    type: string
+    default_value: "imu/data"
+  gps_odom_topic:
+    type: string
+    default_value: "odometry/gps"
+  depth_odom_topic:
+    type: string
+    default_value: "odometry/depth"
+  mag_topic:
+    type: string
+    default_value: "imu/mag"
+  ahrs_topic:
+    type: string
+    default_value: "imu/data"
+  dvl_topic:
+    type: string
+    default_value: "dvl/twist"
+  wrench_topic:
+    type: string
+    default_value: "cmd_wrench"
+  global_odom_topic:
+    type: string
+    default_value: "odometry/global"
+  smoothed_path_topic:
+    type: string
+    default_value: "smoothed_path"
+  graph_metrics_topic:
+    type: string
+    default_value: "~/metrics"
+  velocity_topic:
+    type: string
+    default_value: "~/velocity"
+  imu_bias_topic:
+    type: string
+    default_value: "~/imu_bias"
+
+  map_frame:
+    type: string
+    default_value: "map"
+  odom_frame:
+    type: string
+    default_value: "odom"
+  target_frame:
+    type: string
+    default_value: "dvl_link"
+  base_frame:
+    type: string
+    default_value: "base_link"
+
+  # --- Sensor Settings ---
+  base:
+    use_parameter_tf:
+      type: bool
+      default_value: false
+    parameter_tf:
+      position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0, 1.0]
+
+  imu:
+    use_parameter_frame:
+      type: bool
+      default_value: false
+    parameter_frame:
+      type: string
+      default_value: "imu_link"
+    use_parameter_tf:
+      type: bool
+      default_value: false
+    parameter_tf:
+      position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0, 1.0]
+    covariance_scalar:
+      type: double
+      default_value: 1.0
+    use_parameter_covariance:
+      type: bool
+      default_value: false
+    parameter_covariance:
+      accel_noise_sigmas:
+        type: double_array
+        default_value: [0.0078, 0.0078, 0.0078]
+      gyro_noise_sigmas:
+        type: double_array
+        default_value: [0.0012, 0.0012, 0.0012]
+    accel_bias_rw_sigmas:
+      type: double_array
+      default_value: [0.000105, 0.000105, 0.000105]
+    gyro_bias_rw_sigmas:
+      type: double_array
+      default_value: [0.0000391, 0.0000391, 0.0000391]
+    integration_covariance:
+      type: double
+      default_value: 0.00001
+    gravity:
+      type: double_array
+      default_value: [0.0, 0.0, -9.8]
+    diagnostic_timeout:
+      type: double
+      default_value: 1.0
+
+  gps:
+    enable_gps:
+      type: bool
+      default_value: false
+    enable_gps_init_only:
+      type: bool
+      default_value: false
+    use_parameter_frame:
+      type: bool
+      default_value: false
+    parameter_frame:
+      type: string
+      default_value: "gps_link"
+    use_parameter_tf:
+      type: bool
+      default_value: false
+    parameter_tf:
+      position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0, 1.0]
+    covariance_scalar:
+      type: double
+      default_value: 1.0
+    use_parameter_covariance:
+      type: bool
+      default_value: false
+    parameter_covariance:
+      position_noise_sigmas:
+        type: double_array
+        default_value: [0.015, 0.015]
+    diagnostic_timeout:
+      type: double
+      default_value: 2.0
+    robust_kernel:
+      type: string
+      default_value: "None"
+      validation:
+        one_of<>: [["None", "Huber", "Tukey"]]
+    robust_k:
+      type: double
+      default_value: 1.345
+
+  depth:
+    enable_depth:
+      type: bool
+      default_value: true
+    enable_depth_init_only:
+      type: bool
+      default_value: false
+    use_parameter_frame:
+      type: bool
+      default_value: false
+    parameter_frame:
+      type: string
+      default_value: "depth_link"
+    use_parameter_tf:
+      type: bool
+      default_value: false
+    parameter_tf:
+      position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0, 1.0]
+    covariance_scalar:
+      type: double
+      default_value: 1.0
+    use_parameter_covariance:
+      type: bool
+      default_value: false
+    parameter_covariance:
+      position_z_noise_sigma:
+        type: double
+        default_value: 0.02
+    diagnostic_timeout:
+      type: double
+      default_value: 1.0
+    robust_kernel:
+      type: string
+      default_value: "None"
+      validation:
+        one_of<>: [["None", "Huber", "Tukey"]]
+    robust_k:
+      type: double
+      default_value: 1.345
+
+  mag:
+    enable_mag:
+      type: bool
+      default_value: false
+    enable_mag_init_only:
+      type: bool
+      default_value: false
+    use_parameter_frame:
+      type: bool
+      default_value: false
+    parameter_frame:
+      type: string
+      default_value: "mag_link"
+    use_parameter_tf:
+      type: bool
+      default_value: false
+    parameter_tf:
+      position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0, 1.0]
+    covariance_scalar:
+      type: double
+      default_value: 1.0
+    use_parameter_covariance:
+      type: bool
+      default_value: false
+    parameter_covariance:
+      magnetic_field_noise_sigmas:
+        type: double_array
+        default_value: [0.003, 0.003, 0.003]
+    reference_field:
+      type: double_array
+      default_value: [0.07857, 0.41316, -0.90726]
+    diagnostic_timeout:
+      type: double
+      default_value: 1.0
+    robust_kernel:
+      type: string
+      default_value: "None"
+      validation:
+        one_of<>: [["None", "Huber", "Tukey"]]
+    robust_k:
+      type: double
+      default_value: 1.345
+
+  ahrs:
+    enable_ahrs:
+      type: bool
+      default_value: false
+    enable_ahrs_init_only:
+      type: bool
+      default_value: false
+    use_parameter_frame:
+      type: bool
+      default_value: false
+    parameter_frame:
+      type: string
+      default_value: "ahrs_link"
+    use_parameter_tf:
+      type: bool
+      default_value: false
+    parameter_tf:
+      position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0, 1.0]
+    covariance_scalar:
+      type: double
+      default_value: 1.0
+    use_parameter_covariance:
+      type: bool
+      default_value: false
+    parameter_covariance:
+      orientation_noise_sigmas:
+        type: double_array
+        default_value: [0.00349, 0.00349, 0.01745]
+    mag_declination_radians:
+      type: double
+      default_value: 0.0
+    diagnostic_timeout:
+      type: double
+      default_value: 1.0
+    robust_kernel:
+      type: string
+      default_value: "None"
+      validation:
+        one_of<>: [["None", "Huber", "Tukey"]]
+    robust_k:
+      type: double
+      default_value: 1.345
+
+  dvl:
+    enable_dvl:
+      type: bool
+      default_value: true
+    enable_dvl_init_only:
+      type: bool
+      default_value: false
+    use_parameter_frame:
+      type: bool
+      default_value: false
+    parameter_frame:
+      type: string
+      default_value: "dvl_link"
+    use_parameter_tf:
+      type: bool
+      default_value: false
+    parameter_tf:
+      position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0, 1.0]
+    covariance_scalar:
+      type: double
+      default_value: 1.0
+    use_parameter_covariance:
+      type: bool
+      default_value: false
+    parameter_covariance:
+      velocity_noise_sigmas:
+        type: double_array
+        default_value: [0.02, 0.02, 0.02]
+    diagnostic_timeout:
+      type: double
+      default_value: 0.25
+    robust_kernel:
+      type: string
+      default_value: "None"
+      validation:
+        one_of<>: [["None", "Huber", "Tukey"]]
+    robust_k:
+      type: double
+      default_value: 1.345
+
+  const_vel:
+    enable_const_vel:
+      type: bool
+      default_value: false
+    enable_const_vel_dropout_only:
+      type: bool
+      default_value: false
+    covariance_scalar:
+      type: double
+      default_value: 1.0
+    prediction_noise_sigmas:
+      type: double_array
+      default_value: [0.001, 0.001, 0.001]
+
+  dynamics:
+    enable_dynamics:
+      type: bool
+      default_value: false
+    enable_dynamics_dropout_only:
+      type: bool
+      default_value: false
+    use_parameter_frame:
+      type: bool
+      default_value: false
+    parameter_frame:
+      type: string
+      default_value: "com_link"
+    use_parameter_tf:
+      type: bool
+      default_value: false
+    parameter_tf:
+      position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0, 1.0]
+    covariance_scalar:
+      type: double
+      default_value: 1.0
+    prediction_noise_sigmas:
+      type: double_array
+      default_value: [0.1, 0.1, 0.1]
+    mass:
+      type: double_array
+      default_value: [31.87, 60.46, 60.46]
+    linear_drag:
+      type: double_array
+      default_value: [1.59, 3.02, 3.02]
+    quad_drag:
+      type: double_array
+      default_value: [6.11, 196.13, 196.13]
+    diagnostic_timeout:
+      type: double
+      default_value: 1.0
+    robust_kernel:
+      type: string
+      default_value: "None"
+      validation:
+        one_of<>: [["None", "Huber", "Tukey"]]
+    robust_k:
+      type: double
+      default_value: 1.345
+
+  # --- Prior Settings ---
+  prior:
+    initialization_duration:
+      type: double
+      default_value: 5.0
+    use_parameter_priors:
+      type: bool
+      default_value: false
+    parameter_priors:
+      initial_position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      initial_orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      initial_velocity:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      initial_accel_bias:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      initial_gyro_bias:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+      initial_position_sigmas:
+        type: double_array
+        default_value: [0.001, 0.001, 0.001]
+      initial_orientation_sigmas:
+        type: double_array
+        default_value: [0.001, 0.001, 0.001]
+      initial_velocity_sigmas:
+        type: double_array
+        default_value: [0.001, 0.001, 0.001]
+    initial_accel_bias_sigmas:
+      type: double_array
+      default_value: [0.01, 0.01, 0.01]
+    initial_gyro_bias_sigmas:
+      type: double_array
+      default_value: [0.001, 0.001, 0.001]
+
+  # --- Comparison Methods ---
+  comparison:
+    enable_loose_dvl_preintegration:
+      type: bool
+      default_value: false
+    enable_tight_dvl_preintegration:
+      type: bool
+      default_value: false
