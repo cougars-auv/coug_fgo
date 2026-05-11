@@ -30,7 +30,7 @@
 
 #include <atomic>
 #include <condition_variable>
-#include <coug_fgo_msgs/msg/graph_metrics.hpp>
+#include <coug_interfaces/msg/graph_metrics.hpp>
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/wrench_stamped.hpp>
@@ -234,7 +234,7 @@ class FactorGraphNode : public rclcpp::Node {
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr smoothed_path_pub_;
   rclcpp::Publisher<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr velocity_pub_;
   rclcpp::Publisher<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr imu_bias_pub_;
-  rclcpp::Publisher<coug_fgo_msgs::msg::GraphMetrics>::SharedPtr graph_metrics_pub_;
+  rclcpp::Publisher<coug_interfaces::msg::GraphMetrics>::SharedPtr graph_metrics_pub_;
 
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr gps_sub_;

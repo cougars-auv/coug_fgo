@@ -1,4 +1,8 @@
 repositories:
+  coug_interfaces:
+    type: git
+    url: https://github.com/cougars-auv/coug_interfaces.git
+    version: main
   coug_description:
     type: git
     url: https://github.com/cougars-auv/coug_description.git

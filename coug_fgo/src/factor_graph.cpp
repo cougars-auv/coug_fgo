@@ -61,7 +61,7 @@ void FactorGraphNode::setupRosInterfaces() {
         params_.imu_bias_topic, rclcpp::SystemDefaultsQoS());
   }
   if (params_.publish_graph_metrics) {
-    graph_metrics_pub_ = create_publisher<coug_fgo_msgs::msg::GraphMetrics>(
+    graph_metrics_pub_ = create_publisher<coug_interfaces::msg::GraphMetrics>(
         params_.graph_metrics_topic, rclcpp::SystemDefaultsQoS());
   }
 
@@ -472,7 +472,7 @@ void FactorGraphNode::publishImuBias(const gtsam::imuBias::ConstantBias& current
 }
 
 void FactorGraphNode::publishGraphMetrics(const rclcpp::Time& timestamp) {
-  coug_fgo_msgs::msg::GraphMetrics metrics_msg;
+  coug_interfaces::msg::GraphMetrics metrics_msg;
   metrics_msg.header.stamp = timestamp;
 
   metrics_msg.total_duration = last_total_duration_.load();
