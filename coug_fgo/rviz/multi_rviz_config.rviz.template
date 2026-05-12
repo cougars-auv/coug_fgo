@@ -154,5 +154,5 @@ displays:
           Filter size: 10
           History Policy: Keep Last
           Reliability Policy: Reliable
-          Value: /AUV_NS/waypoints
+          Value: /AUV_NS/waypoints_map
         Value: true
