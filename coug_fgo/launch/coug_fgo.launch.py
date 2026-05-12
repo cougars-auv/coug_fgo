@@ -368,7 +368,6 @@ def generate_launch_description() -> LaunchDescription:
                     dvl_odom_frame,
                 ],
                 parameters=[{"use_sim_time": use_sim_time}],
-                condition=IfCondition(EqualsSubstitution(auv_ns, "bluerov2")),
             ),
             Node(
                 package="tf2_ros",
