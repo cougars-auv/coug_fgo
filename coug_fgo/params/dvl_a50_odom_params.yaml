@@ -4,7 +4,7 @@ dvl_a50_odom_node:
     default_value: "dvl/position"
   output_topic:
     type: string
-    default_value: "odometry/dvl"
+    default_value: "odometry/dvl_ned"
   publish_diagnostics:
     type: bool
     default_value: false

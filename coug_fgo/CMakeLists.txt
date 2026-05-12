@@ -49,8 +49,13 @@ generate_parameter_library(
 )
 
 generate_parameter_library(
-  ned_to_enu_parameters
-  "params/ned_to_enu_params.yaml"
+  imu_ned_to_enu_parameters
+  "params/imu_ned_to_enu_params.yaml"
+)
+
+generate_parameter_library(
+  odom_ned_to_enu_parameters
+  "params/odom_ned_to_enu_params.yaml"
 )
 
 generate_parameter_library(
@@ -66,7 +71,8 @@ ament_auto_add_library(factor_graph_component SHARED
   src/dvl_a50_twist.cpp
   src/dvl_a50_odom.cpp
   src/fluid_pressure_odom.cpp
-  src/ned_to_enu.cpp
+  src/imu_ned_to_enu.cpp
+  src/odom_ned_to_enu.cpp
   src/navsat_odom.cpp
 )
 
@@ -82,7 +88,8 @@ target_link_libraries(factor_graph_component
   dvl_a50_twist_parameters
   dvl_a50_odom_parameters
   fluid_pressure_odom_parameters
-  ned_to_enu_parameters
+  imu_ned_to_enu_parameters
+  odom_ned_to_enu_parameters
   navsat_odom_parameters
   PkgConfig::GeographicLib
 )
@@ -92,7 +99,8 @@ rclcpp_components_register_nodes(factor_graph_component
   "coug_fgo::DvlA50TwistNode"
   "coug_fgo::DvlA50OdomNode"
   "coug_fgo::FluidPressureOdomNode"
-  "coug_fgo::NedToEnuNode"
+  "coug_fgo::ImuNedToEnuNode"
+  "coug_fgo::OdomNedToEnuNode"
   "coug_fgo::NavsatOdomNode"
 )
 
@@ -109,8 +117,11 @@ target_link_libraries(dvl_a50_odom factor_graph_component)
 ament_auto_add_executable(fluid_pressure_odom src/fluid_pressure_odom_node.cpp)
 target_link_libraries(fluid_pressure_odom factor_graph_component)
 
-ament_auto_add_executable(ned_to_enu src/ned_to_enu_node.cpp)
-target_link_libraries(ned_to_enu factor_graph_component)
+ament_auto_add_executable(imu_ned_to_enu src/imu_ned_to_enu_node.cpp)
+target_link_libraries(imu_ned_to_enu factor_graph_component)
+
+ament_auto_add_executable(odom_ned_to_enu src/odom_ned_to_enu_node.cpp)
+target_link_libraries(odom_ned_to_enu factor_graph_component)
 
 ament_auto_add_executable(navsat_odom src/navsat_odom_node.cpp)
 target_link_libraries(navsat_odom factor_graph_component)

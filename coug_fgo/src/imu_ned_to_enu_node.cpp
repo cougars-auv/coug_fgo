@@ -13,8 +13,8 @@
 // limitations under the License.
 
 /**
- * @file ned_to_enu_node.cpp
- * @brief Standalone executable for the NedToEnuNode.
+ * @file imu_ned_to_enu_node.cpp
+ * @brief Standalone executable for the ImuNedToEnuNode.
  * @author Nelson Durrant
  * @date May 2026
  */
@@ -22,11 +22,11 @@
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
 
-#include "coug_fgo/ned_to_enu.hpp"
+#include "coug_fgo/imu_ned_to_enu.hpp"
 
 int main(int argc, char* argv[]) {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<coug_fgo::NedToEnuNode>(rclcpp::NodeOptions());
+  auto node = std::make_shared<coug_fgo::ImuNedToEnuNode>(rclcpp::NodeOptions());
   rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;

@@ -309,8 +309,20 @@ def generate_launch_description() -> LaunchDescription:
             ),
             Node(
                 package="coug_fgo",
-                executable="ned_to_enu",
-                name="ned_to_enu_node",
+                executable="imu_ned_to_enu",
+                name="imu_ned_to_enu_node",
+                parameters=[
+                    fleet_params,
+                    auv_params,
+                    {
+                        "use_sim_time": use_sim_time,
+                    },
+                ],
+            ),
+            Node(
+                package="coug_fgo",
+                executable="odom_ned_to_enu",
+                name="odom_ned_to_enu_node",
                 parameters=[
                     fleet_params,
                     auv_params,
@@ -350,18 +362,6 @@ def generate_launch_description() -> LaunchDescription:
                 executable="static_transform_publisher",
                 name="map_to_dvl_odom_transform",
                 arguments=[
-                    "--x",
-                    "0",
-                    "--y",
-                    "0",
-                    "--z",
-                    "0",
-                    "--yaw",
-                    "1.57079632679",
-                    "--pitch",
-                    "0",
-                    "--roll",
-                    "3.14159265359",
                     "--frame-id",
                     "map",
                     "--child-frame-id",

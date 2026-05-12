@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /**
- * @file ned_to_enu.hpp
+ * @file imu_ned_to_enu.hpp
  * @brief ROS 2 node that converts AHRS IMU orientation from a NED to an ENU world convention.
  * @author Nelson Durrant
  * @date May 2026
@@ -25,21 +25,21 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 
-#include "coug_fgo/ned_to_enu_parameters.hpp"
+#include "coug_fgo/imu_ned_to_enu_parameters.hpp"
 
 namespace coug_fgo {
 
 /**
- * @class NedToEnuNode
+ * @class ImuNedToEnuNode
  * @brief ROS 2 node that converts AHRS IMU orientation from a NED to an ENU world convention.
  */
-class NedToEnuNode : public rclcpp::Node {
+class ImuNedToEnuNode : public rclcpp::Node {
  public:
   /**
    * @brief Constructs the node and sets up the NED to ENU orientation conversion.
    * @param options The node options.
    */
-  explicit NedToEnuNode(const rclcpp::NodeOptions& options);
+  explicit ImuNedToEnuNode(const rclcpp::NodeOptions& options);
 
  protected:
   /**
@@ -60,8 +60,8 @@ class NedToEnuNode : public rclcpp::Node {
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
 
   // --- Parameters ---
-  std::shared_ptr<ned_to_enu_node::ParamListener> param_listener_;
-  ned_to_enu_node::Params params_;
+  std::shared_ptr<imu_ned_to_enu_node::ParamListener> param_listener_;
+  imu_ned_to_enu_node::Params params_;
 };
 
 }  // namespace coug_fgo

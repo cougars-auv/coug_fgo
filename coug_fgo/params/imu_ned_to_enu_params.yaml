@@ -1,4 +1,4 @@
-ned_to_enu_node:
+imu_ned_to_enu_node:
   input_topic:
     type: string
     default_value: "imu/data_ned"
