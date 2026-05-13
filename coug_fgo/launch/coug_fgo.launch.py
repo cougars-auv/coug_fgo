@@ -110,15 +110,15 @@ def generate_launch_description() -> LaunchDescription:
         ]
     )
 
-    # modem_link_frame = PythonExpression(
-    #     [
-    #         "'",
-    #         auv_ns,
-    #         "/modem_link' if '",
-    #         auv_ns,
-    #         "' != '' else 'modem_link'",
-    #     ]
-    # )
+    modem_link_frame = PythonExpression(
+        [
+            "'",
+            auv_ns,
+            "/modem_link' if '",
+            auv_ns,
+            "' != '' else 'modem_link'",
+        ]
+    )
 
     return LaunchDescription(
         [
@@ -299,6 +299,46 @@ def generate_launch_description() -> LaunchDescription:
             ),
             Node(
                 package="coug_fgo",
+                executable="navsat_odom",
+                name="navsat_odom_node",
+                parameters=[
+                    fleet_params,
+                    auv_params,
+                    {
+                        "use_sim_time": use_sim_time,
+                        "map_frame": "map",
+                        "parameter_child_frame": gps_link_frame,
+                        "set_origin": set_origin,
+                    },
+                ],
+            ),
+            Node(
+                package="coug_fgo",
+                executable="seatrac_x150_imu",
+                name="seatrac_x150_imu_node",
+                parameters=[
+                    fleet_params,
+                    auv_params,
+                    {
+                        "use_sim_time": use_sim_time,
+                        "parameter_frame": modem_link_frame,
+                    },
+                ],
+            ),
+            Node(
+                package="coug_fgo",
+                executable="imu_ned_to_enu",
+                name="seatrac_imu_ned_to_enu_node",
+                parameters=[
+                    fleet_params,
+                    auv_params,
+                    {
+                        "use_sim_time": use_sim_time,
+                    },
+                ],
+            ),
+            Node(
+                package="coug_fgo",
                 executable="imu_ned_to_enu",
                 name="imu_ned_to_enu_node",
                 parameters=[
@@ -318,21 +358,6 @@ def generate_launch_description() -> LaunchDescription:
                     auv_params,
                     {
                         "use_sim_time": use_sim_time,
-                    },
-                ],
-            ),
-            Node(
-                package="coug_fgo",
-                executable="navsat_odom",
-                name="navsat_odom_node",
-                parameters=[
-                    fleet_params,
-                    auv_params,
-                    {
-                        "use_sim_time": use_sim_time,
-                        "map_frame": "map",
-                        "parameter_child_frame": gps_link_frame,
-                        "set_origin": set_origin,
                     },
                 ],
             ),
@@ -384,6 +409,8 @@ def generate_launch_description() -> LaunchDescription:
                 executable="static_transform_publisher",
                 name="map_to_apriltag_odom_transform",
                 arguments=[
+                    # AQUA-SLAM's orientations and positions are in different frames
+                    # This just corrects the position
                     "--x",
                     "0.0",
                     "--y",

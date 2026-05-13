@@ -63,6 +63,11 @@ generate_parameter_library(
   "params/navsat_odom_params.yaml"
 )
 
+generate_parameter_library(
+  seatrac_x150_imu_parameters
+  "params/seatrac_x150_imu_params.yaml"
+)
+
 # --- Component Library ---
 ament_auto_add_library(factor_graph_component SHARED
   src/factor_graph_core.cpp
@@ -74,6 +79,7 @@ ament_auto_add_library(factor_graph_component SHARED
   src/imu_ned_to_enu.cpp
   src/odom_ned_to_enu.cpp
   src/navsat_odom.cpp
+  src/seatrac_x150_imu.cpp
 )
 
 target_include_directories(factor_graph_component PUBLIC
@@ -91,6 +97,7 @@ target_link_libraries(factor_graph_component
   imu_ned_to_enu_parameters
   odom_ned_to_enu_parameters
   navsat_odom_parameters
+  seatrac_x150_imu_parameters
   PkgConfig::GeographicLib
 )
 
@@ -102,6 +109,7 @@ rclcpp_components_register_nodes(factor_graph_component
   "coug_fgo::ImuNedToEnuNode"
   "coug_fgo::OdomNedToEnuNode"
   "coug_fgo::NavsatOdomNode"
+  "coug_fgo::SeatracX150ImuNode"
 )
 
 # --- Executables ---
@@ -125,6 +133,9 @@ target_link_libraries(odom_ned_to_enu factor_graph_component)
 
 ament_auto_add_executable(navsat_odom src/navsat_odom_node.cpp)
 target_link_libraries(navsat_odom factor_graph_component)
+
+ament_auto_add_executable(seatrac_x150_imu src/seatrac_x150_imu_node.cpp)
+target_link_libraries(seatrac_x150_imu factor_graph_component)
 
 # --- Python Bindings ---
 pybind11_add_module(pybind11fgo src/factor_graph_py.cpp)

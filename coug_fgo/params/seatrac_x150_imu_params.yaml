@@ -1,0 +1,36 @@
+seatrac_x150_imu_node:
+  input_topic:
+    type: string
+    default_value: "modem_status"
+  imu_output_topic:
+    type: string
+    default_value: "seatrac/imu/data_ned"
+  mag_output_topic:
+    type: string
+    default_value: "seatrac/imu/mag"
+  publish_diagnostics:
+    type: bool
+    default_value: false
+  diagnostic_timeout:
+    type: double
+    default_value: 0.5
+
+  use_parameter_frame:
+    type: bool
+    default_value: false
+  parameter_frame:
+    type: string
+    default_value: "modem_link"
+
+  accel_noise_sigmas:
+    type: double_array
+    default_value: [0.0078, 0.0078, 0.0078]  # [m/s^2] Accelerometer measurement noise sigmas.
+  gyro_noise_sigmas:
+    type: double_array
+    default_value: [0.0012, 0.0012, 0.0012]  # [rad/s] Gyroscope measurement noise sigmas.
+  orientation_noise_sigmas:
+    type: double_array
+    default_value: [0.00349, 0.00349, 0.01745]  # [rad] Orientation uncertainty sigmas [roll, pitch, yaw].
+  magnetic_field_noise_sigmas:
+    type: double_array
+    default_value: [0.003, 0.003, 0.003]  # Magnetometer measurement noise sigmas.
