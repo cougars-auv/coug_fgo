@@ -102,13 +102,17 @@ sensor_msgs::msg::Imu SeatracX150ImuNode::convertToImu(
   }
 
   if (msg->includes_comp_ahrs) {
-    imu_msg.linear_acceleration.x = msg->acc_x;
-    imu_msg.linear_acceleration.y = msg->acc_y;
-    imu_msg.linear_acceleration.z = msg->acc_z;
+    // Convert raw units and correct for 45° physical mounting offset of IMU chip
+    constexpr double kAccScale = 9.80665 / 250.0;
+    constexpr double kDegToRad = M_PI / 180.0;
 
-    imu_msg.angular_velocity.x = msg->gyro_x;
-    imu_msg.angular_velocity.y = msg->gyro_y;
-    imu_msg.angular_velocity.z = msg->gyro_z;
+    imu_msg.linear_acceleration.x = kAccScale * M_SQRT1_2 * (msg->acc_x - msg->acc_y);
+    imu_msg.linear_acceleration.y = -kAccScale * M_SQRT1_2 * (msg->acc_x + msg->acc_y);
+    imu_msg.linear_acceleration.z = kAccScale * msg->acc_z;
+
+    imu_msg.angular_velocity.x = kDegToRad * M_SQRT1_2 * (msg->gyro_y - msg->gyro_x);
+    imu_msg.angular_velocity.y = kDegToRad * M_SQRT1_2 * (msg->gyro_x + msg->gyro_y);
+    imu_msg.angular_velocity.z = -kDegToRad * msg->gyro_z;
 
     auto& a = params_.accel_noise_sigmas;
     imu_msg.linear_acceleration_covariance[0] = a[0] * a[0];
