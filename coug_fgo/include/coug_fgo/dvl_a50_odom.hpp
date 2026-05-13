@@ -22,7 +22,6 @@
 #pragma once
 
 #include <tf2_ros/buffer.h>
-#include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
 
 #include <diagnostic_updater/diagnostic_updater.hpp>
@@ -68,7 +67,6 @@ class DvlA50OdomNode : public rclcpp::Node {
 
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
-  std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
   // --- Parameters ---
   std::shared_ptr<dvl_a50_odom_node::ParamListener> param_listener_;

@@ -50,16 +50,6 @@ def generate_launch_description() -> LaunchDescription:
         ["'", auv_ns, "/odom' if '", auv_ns, "' != '' else 'odom'"]
     )
 
-    dvl_odom_frame = PythonExpression(
-        [
-            "'",
-            auv_ns,
-            "/dvl_odom' if '",
-            auv_ns,
-            "' != '' else 'dvl_odom'",
-        ]
-    )
-
     base_link_frame = PythonExpression(
         [
             "'",
@@ -287,7 +277,7 @@ def generate_launch_description() -> LaunchDescription:
                     auv_params,
                     {
                         "use_sim_time": use_sim_time,
-                        "dvl_odom_frame": dvl_odom_frame,
+                        "odom_frame": "map",
                         "base_frame": base_link_frame,
                         "parameter_frame": dvl_link_frame,
                     },
@@ -356,18 +346,6 @@ def generate_launch_description() -> LaunchDescription:
                     {"use_sim_time": use_sim_time},
                 ],
                 condition=IfCondition(EqualsSubstitution(auv_ns, "bluerov2")),
-            ),
-            Node(
-                package="tf2_ros",
-                executable="static_transform_publisher",
-                name="map_to_dvl_odom_transform",
-                arguments=[
-                    "--frame-id",
-                    "map",
-                    "--child-frame-id",
-                    dvl_odom_frame,
-                ],
-                parameters=[{"use_sim_time": use_sim_time}],
             ),
             Node(
                 package="tf2_ros",

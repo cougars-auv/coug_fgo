@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <tf2_ros/transform_broadcaster.h>
+
 #include <memory>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -58,6 +60,7 @@ class OdomNedToEnuNode : public rclcpp::Node {
   // --- ROS Interfaces ---
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
+  std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
   // --- Parameters ---
   std::shared_ptr<odom_ned_to_enu_node::ParamListener> param_listener_;

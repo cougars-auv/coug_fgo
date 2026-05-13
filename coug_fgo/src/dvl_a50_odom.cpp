@@ -38,7 +38,6 @@ DvlA50OdomNode::DvlA50OdomNode(const rclcpp::NodeOptions& options)
   // --- ROS Interfaces ---
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
-  tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
   dvl_sub_ = create_subscription<dvl_msgs::msg::DVLDR>(
       params_.input_topic, rclcpp::SensorDataQoS(),
@@ -85,7 +84,7 @@ void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
   p_base_in_dvl.pose.orientation = dvl_T_base_tf.transform.rotation;
 
   geometry_msgs::msg::TransformStamped odom_T_dvl_tf;
-  odom_T_dvl_tf.header.frame_id = params_.dvl_odom_frame;
+  odom_T_dvl_tf.header.frame_id = params_.odom_frame;
   odom_T_dvl_tf.child_frame_id = current_dvl_frame;
   odom_T_dvl_tf.transform.translation.x = msg->position.x;
   odom_T_dvl_tf.transform.translation.y = msg->position.y;
@@ -99,7 +98,7 @@ void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
   tf2::doTransform(p_base_in_dvl.pose, p_base_in_odom, odom_T_dvl_tf);
 
   nav_msgs::msg::Odometry odom;
-  odom.header.frame_id = params_.dvl_odom_frame;
+  odom.header.frame_id = params_.odom_frame;
 
   odom.child_frame_id = params_.base_frame;
 
@@ -115,17 +114,6 @@ void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
   odom.pose.covariance[14] = var;
 
   odom_pub_->publish(odom);
-
-  if (params_.publish_local_tf) {
-    geometry_msgs::msg::TransformStamped ts;
-    ts.header = odom.header;
-    ts.child_frame_id = odom.child_frame_id;
-    ts.transform.translation.x = p_base_in_odom.position.x;
-    ts.transform.translation.y = p_base_in_odom.position.y;
-    ts.transform.translation.z = p_base_in_odom.position.z;
-    ts.transform.rotation = p_base_in_odom.orientation;
-    tf_broadcaster_->sendTransform(ts);
-  }
 }
 
 void DvlA50OdomNode::checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper& stat) {
