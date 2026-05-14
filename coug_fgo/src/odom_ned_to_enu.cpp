@@ -24,7 +24,6 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Vector3.h>
 
-#include <cmath>
 #include <rclcpp_components/register_node_macro.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
@@ -39,8 +38,6 @@ OdomNedToEnuNode::OdomNedToEnuNode(const rclcpp::NodeOptions& options)
   params_ = param_listener_->get_params();
 
   // --- ROS Interfaces ---
-  tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
-
   odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
       params_.input_topic, rclcpp::SensorDataQoS(),
       std::bind(&OdomNedToEnuNode::odomCallback, this, std::placeholders::_1));
@@ -52,19 +49,7 @@ OdomNedToEnuNode::OdomNedToEnuNode(const rclcpp::NodeOptions& options)
 }
 
 void OdomNedToEnuNode::odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {
-  nav_msgs::msg::Odometry enu = convertToEnu(msg);
-  odom_pub_->publish(enu);
-
-  if (params_.publish_tf) {
-    geometry_msgs::msg::TransformStamped ts;
-    ts.header = enu.header;
-    ts.child_frame_id = enu.child_frame_id;
-    ts.transform.translation.x = enu.pose.pose.position.x;
-    ts.transform.translation.y = enu.pose.pose.position.y;
-    ts.transform.translation.z = enu.pose.pose.position.z;
-    ts.transform.rotation = enu.pose.pose.orientation;
-    tf_broadcaster_->sendTransform(ts);
-  }
+  odom_pub_->publish(convertToEnu(msg));
 }
 
 nav_msgs::msg::Odometry OdomNedToEnuNode::convertToEnu(

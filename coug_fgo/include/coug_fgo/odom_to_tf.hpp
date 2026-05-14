@@ -13,33 +13,35 @@
 // limitations under the License.
 
 /**
- * @file odom_ned_to_enu.hpp
- * @brief ROS 2 node that converts odometry pose from a NED to an ENU world convention.
+ * @file odom_to_tf.hpp
+ * @brief ROS 2 node that broadcasts a TF transform from an odometry topic.
  * @author Nelson Durrant
  * @date May 2026
  */
 
 #pragma once
 
+#include <tf2_ros/transform_broadcaster.h>
+
 #include <memory>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-#include "coug_fgo/odom_ned_to_enu_parameters.hpp"
+#include "coug_fgo/odom_to_tf_parameters.hpp"
 
 namespace coug_fgo {
 
 /**
- * @class OdomNedToEnuNode
- * @brief ROS 2 node that converts odometry pose from a NED to an ENU world convention.
+ * @class OdomToTfNode
+ * @brief ROS 2 node that broadcasts a TF transform from an odometry topic.
  */
-class OdomNedToEnuNode : public rclcpp::Node {
+class OdomToTfNode : public rclcpp::Node {
  public:
   /**
-   * @brief Constructs the node and sets up the NED to ENU odometry conversion.
+   * @brief Constructs the node and sets up the odometry-to-TF broadcaster.
    * @param options The node options.
    */
-  explicit OdomNedToEnuNode(const rclcpp::NodeOptions& options);
+  explicit OdomToTfNode(const rclcpp::NodeOptions& options);
 
  protected:
   /**
@@ -48,20 +50,13 @@ class OdomNedToEnuNode : public rclcpp::Node {
    */
   void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
 
-  /**
-   * @brief Converts an Odometry message from a NED to an ENU world convention.
-   * @param msg The incoming Odometry message.
-   * @return The converted Odometry message.
-   */
-  nav_msgs::msg::Odometry convertToEnu(const nav_msgs::msg::Odometry::SharedPtr msg);
-
   // --- ROS Interfaces ---
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
-  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
+  std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
   // --- Parameters ---
-  std::shared_ptr<odom_ned_to_enu_node::ParamListener> param_listener_;
-  odom_ned_to_enu_node::Params params_;
+  std::shared_ptr<odom_to_tf_node::ParamListener> param_listener_;
+  odom_to_tf_node::Params params_;
 };
 
 }  // namespace coug_fgo

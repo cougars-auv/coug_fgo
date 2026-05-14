@@ -5,7 +5,3 @@ odom_ned_to_enu_node:
   output_topic:
     type: string
     default_value: "odometry/dvl"
-
-  publish_tf:
-    type: bool
-    default_value: false

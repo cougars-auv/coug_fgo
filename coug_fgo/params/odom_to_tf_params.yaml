@@ -1,0 +1,4 @@
+odom_to_tf_node:
+  input_topic:
+    type: string
+    default_value: "odometry/dvl"

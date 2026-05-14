@@ -229,6 +229,18 @@ def generate_launch_description() -> LaunchDescription:
                 ],
             ),
             Node(
+                package="coug_fgo",
+                executable="odom_to_tf",
+                name="odom_to_tf_node",
+                parameters=[
+                    fleet_params,
+                    auv_params,
+                    {
+                        "use_sim_time": use_sim_time,
+                    },
+                ],
+            ),
+            Node(
                 package="topic_tools",
                 executable="relay",
                 name="gps_to_truth_relay",

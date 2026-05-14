@@ -68,6 +68,11 @@ generate_parameter_library(
   "params/seatrac_x150_imu_params.yaml"
 )
 
+generate_parameter_library(
+  odom_to_tf_parameters
+  "params/odom_to_tf_params.yaml"
+)
+
 # --- Component Library ---
 ament_auto_add_library(factor_graph_component SHARED
   src/factor_graph_core.cpp
@@ -78,6 +83,7 @@ ament_auto_add_library(factor_graph_component SHARED
   src/fluid_pressure_odom.cpp
   src/imu_ned_to_enu.cpp
   src/odom_ned_to_enu.cpp
+  src/odom_to_tf.cpp
   src/navsat_odom.cpp
   src/seatrac_x150_imu.cpp
 )
@@ -96,6 +102,7 @@ target_link_libraries(factor_graph_component
   fluid_pressure_odom_parameters
   imu_ned_to_enu_parameters
   odom_ned_to_enu_parameters
+  odom_to_tf_parameters
   navsat_odom_parameters
   seatrac_x150_imu_parameters
   PkgConfig::GeographicLib
@@ -108,6 +115,7 @@ rclcpp_components_register_nodes(factor_graph_component
   "coug_fgo::FluidPressureOdomNode"
   "coug_fgo::ImuNedToEnuNode"
   "coug_fgo::OdomNedToEnuNode"
+  "coug_fgo::OdomToTfNode"
   "coug_fgo::NavsatOdomNode"
   "coug_fgo::SeatracX150ImuNode"
 )
@@ -130,6 +138,9 @@ target_link_libraries(imu_ned_to_enu factor_graph_component)
 
 ament_auto_add_executable(odom_ned_to_enu src/odom_ned_to_enu_node.cpp)
 target_link_libraries(odom_ned_to_enu factor_graph_component)
+
+ament_auto_add_executable(odom_to_tf src/odom_to_tf_node.cpp)
+target_link_libraries(odom_to_tf factor_graph_component)
 
 ament_auto_add_executable(navsat_odom src/navsat_odom_node.cpp)
 target_link_libraries(navsat_odom factor_graph_component)
