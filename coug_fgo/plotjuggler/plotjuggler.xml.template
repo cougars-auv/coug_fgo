@@ -156,45 +156,45 @@
             <plot flip_x="false" mode="TimeSeries" flip_y="false" line_width="1.0">
               <range bottom="-0.003079" left="25.941049" top="0.000075" right="30.956488" />
               <limitY />
-              <curve color="#000000" name="/AUV_NS/imu_bias/twist/twist/linear/x" />
-              <curve color="#aa00ff" name="/AUV_NS/iekf_node/imu_bias/twist/twist/linear/x" />
+              <curve color="#000000" name="/AUV_NS/imu/bias/twist/twist/linear/x" />
+              <curve color="#aa00ff" name="/AUV_NS/iekf_node/imu/bias/twist/twist/linear/x" />
               <curve color="#ff0000"
-                name="/AUV_NS/factor_graph_node_tpi/imu_bias/twist/twist/linear/x" />
+                name="/AUV_NS/factor_graph_node_tpi/imu/bias/twist/twist/linear/x" />
               <curve color="#55aaff"
-                name="/AUV_NS/factor_graph_node_lpi/imu_bias/twist/twist/linear/x" />
+                name="/AUV_NS/factor_graph_node_lpi/imu/bias/twist/twist/linear/x" />
               <curve color="#ffaa00"
-                name="/AUV_NS/factor_graph_node_isam2/imu_bias/twist/twist/linear/x" />
-              <curve color="#00ff00" name="/AUV_NS/factor_graph_node/imu_bias/twist/twist/linear/x" />
+                name="/AUV_NS/factor_graph_node_isam2/imu/bias/twist/twist/linear/x" />
+              <curve color="#00ff00" name="/AUV_NS/factor_graph_node/imu/bias/twist/twist/linear/x" />
             </plot>
           </DockArea>
           <DockArea name="...">
             <plot flip_x="false" mode="TimeSeries" flip_y="false" line_width="1.0">
               <range bottom="-0.004368" left="25.941049" top="0.000106" right="30.956488" />
               <limitY />
-              <curve color="#000000" name="/AUV_NS/imu_bias/twist/twist/linear/y" />
-              <curve color="#aa00ff" name="/AUV_NS/iekf_node/imu_bias/twist/twist/linear/y" />
+              <curve color="#000000" name="/AUV_NS/imu/bias/twist/twist/linear/y" />
+              <curve color="#aa00ff" name="/AUV_NS/iekf_node/imu/bias/twist/twist/linear/y" />
               <curve color="#ff0000"
-                name="/AUV_NS/factor_graph_node_tpi/imu_bias/twist/twist/linear/y" />
+                name="/AUV_NS/factor_graph_node_tpi/imu/bias/twist/twist/linear/y" />
               <curve color="#55aaff"
-                name="/AUV_NS/factor_graph_node_lpi/imu_bias/twist/twist/linear/y" />
+                name="/AUV_NS/factor_graph_node_lpi/imu/bias/twist/twist/linear/y" />
               <curve color="#ffaa00"
-                name="/AUV_NS/factor_graph_node_isam2/imu_bias/twist/twist/linear/y" />
-              <curve color="#00ff00" name="/AUV_NS/factor_graph_node/imu_bias/twist/twist/linear/y" />
+                name="/AUV_NS/factor_graph_node_isam2/imu/bias/twist/twist/linear/y" />
+              <curve color="#00ff00" name="/AUV_NS/factor_graph_node/imu/bias/twist/twist/linear/y" />
             </plot>
           </DockArea>
           <DockArea name="...">
             <plot flip_x="false" mode="TimeSeries" flip_y="false" line_width="1.0">
               <range bottom="-0.000036" left="25.941049" top="0.000584" right="30.956488" />
               <limitY />
-              <curve color="#000000" name="/AUV_NS/imu_bias/twist/twist/linear/z" />
-              <curve color="#aa00ff" name="/AUV_NS/iekf_node/imu_bias/twist/twist/linear/z" />
+              <curve color="#000000" name="/AUV_NS/imu/bias/twist/twist/linear/z" />
+              <curve color="#aa00ff" name="/AUV_NS/iekf_node/imu/bias/twist/twist/linear/z" />
               <curve color="#ff0000"
-                name="/AUV_NS/factor_graph_node_tpi/imu_bias/twist/twist/linear/z" />
+                name="/AUV_NS/factor_graph_node_tpi/imu/bias/twist/twist/linear/z" />
               <curve color="#55aaff"
-                name="/AUV_NS/factor_graph_node_lpi/imu_bias/twist/twist/linear/z" />
+                name="/AUV_NS/factor_graph_node_lpi/imu/bias/twist/twist/linear/z" />
               <curve color="#ffaa00"
-                name="/AUV_NS/factor_graph_node_isam2/imu_bias/twist/twist/linear/z" />
-              <curve color="#00ff00" name="/AUV_NS/factor_graph_node/imu_bias/twist/twist/linear/z" />
+                name="/AUV_NS/factor_graph_node_isam2/imu/bias/twist/twist/linear/z" />
+              <curve color="#00ff00" name="/AUV_NS/factor_graph_node/imu/bias/twist/twist/linear/z" />
             </plot>
           </DockArea>
         </DockSplitter>
@@ -207,45 +207,45 @@
             <plot flip_x="false" mode="TimeSeries" flip_y="false" line_width="1.0">
               <range bottom="-0.001693" left="25.941049" top="0.000041" right="30.956488" />
               <limitY />
-              <curve color="#000000" name="/AUV_NS/imu_bias/twist/twist/angular/x" />
-              <curve color="#aa00ff" name="/AUV_NS/iekf_node/imu_bias/twist/twist/angular/x" />
+              <curve color="#000000" name="/AUV_NS/imu/bias/twist/twist/angular/x" />
+              <curve color="#aa00ff" name="/AUV_NS/iekf_node/imu/bias/twist/twist/angular/x" />
               <curve color="#ff0000"
-                name="/AUV_NS/factor_graph_node_tpi/imu_bias/twist/twist/angular/x" />
+                name="/AUV_NS/factor_graph_node_tpi/imu/bias/twist/twist/angular/x" />
               <curve color="#55aaff"
-                name="/AUV_NS/factor_graph_node_lpi/imu_bias/twist/twist/angular/x" />
+                name="/AUV_NS/factor_graph_node_lpi/imu/bias/twist/twist/angular/x" />
               <curve color="#ffaa00"
-                name="/AUV_NS/factor_graph_node_isam2/imu_bias/twist/twist/angular/x" />
-              <curve color="#00ff00" name="/AUV_NS/factor_graph_node/imu_bias/twist/twist/angular/x" />
+                name="/AUV_NS/factor_graph_node_isam2/imu/bias/twist/twist/angular/x" />
+              <curve color="#00ff00" name="/AUV_NS/factor_graph_node/imu/bias/twist/twist/angular/x" />
             </plot>
           </DockArea>
           <DockArea name="...">
             <plot flip_x="false" mode="TimeSeries" flip_y="false" line_width="1.0">
               <range bottom="-0.000354" left="25.941049" top="0.000014" right="30.956488" />
               <limitY />
-              <curve color="#000000" name="/AUV_NS/imu_bias/twist/twist/angular/y" />
-              <curve color="#aa00ff" name="/AUV_NS/iekf_node/imu_bias/twist/twist/angular/y" />
+              <curve color="#000000" name="/AUV_NS/imu/bias/twist/twist/angular/y" />
+              <curve color="#aa00ff" name="/AUV_NS/iekf_node/imu/bias/twist/twist/angular/y" />
               <curve color="#ff0000"
-                name="/AUV_NS/factor_graph_node_tpi/imu_bias/twist/twist/angular/y" />
+                name="/AUV_NS/factor_graph_node_tpi/imu/bias/twist/twist/angular/y" />
               <curve color="#55aaff"
-                name="/AUV_NS/factor_graph_node_lpi/imu_bias/twist/twist/angular/y" />
+                name="/AUV_NS/factor_graph_node_lpi/imu/bias/twist/twist/angular/y" />
               <curve color="#ffaa00"
-                name="/AUV_NS/factor_graph_node_isam2/imu_bias/twist/twist/angular/y" />
-              <curve color="#00ff00" name="/AUV_NS/factor_graph_node/imu_bias/twist/twist/angular/y" />
+                name="/AUV_NS/factor_graph_node_isam2/imu/bias/twist/twist/angular/y" />
+              <curve color="#00ff00" name="/AUV_NS/factor_graph_node/imu/bias/twist/twist/angular/y" />
             </plot>
           </DockArea>
           <DockArea name="...">
             <plot flip_x="false" mode="TimeSeries" flip_y="false" line_width="1.0">
               <range bottom="-0.001157" left="25.941049" top="0.000028" right="30.956488" />
               <limitY />
-              <curve color="#000000" name="/AUV_NS/imu_bias/twist/twist/angular/z" />
-              <curve color="#aa00ff" name="/AUV_NS/iekf_node/imu_bias/twist/twist/angular/z" />
+              <curve color="#000000" name="/AUV_NS/imu/bias/twist/twist/angular/z" />
+              <curve color="#aa00ff" name="/AUV_NS/iekf_node/imu/bias/twist/twist/angular/z" />
               <curve color="#ff0000"
-                name="/AUV_NS/factor_graph_node_tpi/imu_bias/twist/twist/angular/z" />
+                name="/AUV_NS/factor_graph_node_tpi/imu/bias/twist/twist/angular/z" />
               <curve color="#55aaff"
-                name="/AUV_NS/factor_graph_node_lpi/imu_bias/twist/twist/angular/z" />
+                name="/AUV_NS/factor_graph_node_lpi/imu/bias/twist/twist/angular/z" />
               <curve color="#ffaa00"
-                name="/AUV_NS/factor_graph_node_isam2/imu_bias/twist/twist/angular/z" />
-              <curve color="#00ff00" name="/AUV_NS/factor_graph_node/imu_bias/twist/twist/angular/z" />
+                name="/AUV_NS/factor_graph_node_isam2/imu/bias/twist/twist/angular/z" />
+              <curve color="#00ff00" name="/AUV_NS/factor_graph_node/imu/bias/twist/twist/angular/z" />
             </plot>
           </DockArea>
         </DockSplitter>
@@ -275,7 +275,7 @@
       <boolean_strings_to_number value="true" />
       <remove_suffix_from_strings value="true" />
       <selected_topics
-        value="/AUV_NS/imu_bias;/AUV_NS/VelocitySensor;/AUV_NS/odometry/global;AUV_NS/odometry/global_isam2;/AUV_NS/odometry/global_lpi;/AUV_NS/odometry/global_tpi;/AUV_NS/odometry/global_iekf;/AUV_NS/odometry/global_ukf;/AUV_NS/odometry/global_ekf;/AUV_NS/odometry/truth;/AUV_NS/factor_graph_node/velocity;/AUV_NS/factor_graph_node/imu_bias;/AUV_NS/factor_graph_node_isam2/imu_bias;/AUV_NS/factor_graph_node_isam2/velocity;/AUV_NS/factor_graph_node_lpi/velocity;/AUV_NS/factor_graph_node_lpi/imu_bias;/AUV_NS/factor_graph_node_tpi/velocity;/AUV_NS/factor_graph_node_tpi/imu_bias;/AUV_NS/iekf_node/velocity;/AUV_NS/iekf_node/imu_bias" />
+        value="/AUV_NS/imu/bias;/AUV_NS/VelocitySensor;/AUV_NS/odometry/global;AUV_NS/odometry/global_isam2;/AUV_NS/odometry/global_lpi;/AUV_NS/odometry/global_tpi;/AUV_NS/odometry/global_iekf;/AUV_NS/odometry/global_ukf;/AUV_NS/odometry/global_ekf;/AUV_NS/odometry/truth;/AUV_NS/factor_graph_node/velocity;/AUV_NS/factor_graph_node/imu/bias;/AUV_NS/factor_graph_node_isam2/imu/bias;/AUV_NS/factor_graph_node_isam2/velocity;/AUV_NS/factor_graph_node_lpi/velocity;/AUV_NS/factor_graph_node_lpi/imu/bias;/AUV_NS/factor_graph_node_tpi/velocity;/AUV_NS/factor_graph_node_tpi/imu/bias;/AUV_NS/iekf_node/velocity;/AUV_NS/iekf_node/imu/bias" />
     </plugin>
     <plugin ID="UDP Server" />
     <plugin ID="WebSocket Server" />

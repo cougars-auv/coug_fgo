@@ -104,7 +104,7 @@ factor_graph_node:
     default_value: "~/velocity"
   imu_bias_topic:
     type: string
-    default_value: "~/imu_bias"
+    default_value: "~/imu/bias"
 
   map_frame:
     type: string
