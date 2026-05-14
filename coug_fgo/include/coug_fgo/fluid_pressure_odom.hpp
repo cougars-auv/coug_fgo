@@ -69,6 +69,7 @@ class FluidPressureOdomNode : public rclcpp::Node {
   // --- State ---
   double last_pressure_time_{0.0};
   double last_depth_{0.0};
+  double last_pressure_{-1.0};
 };
 
 }  // namespace coug_fgo

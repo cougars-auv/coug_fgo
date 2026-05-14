@@ -58,6 +58,15 @@ FluidPressureOdomNode::FluidPressureOdomNode(const rclcpp::NodeOptions& options)
 void FluidPressureOdomNode::pressureCallback(const sensor_msgs::msg::FluidPressure::SharedPtr msg) {
   last_pressure_time_ = this->get_clock()->now().seconds();
 
+  double pressure = msg->fluid_pressure;
+
+  if (params_.max_pressure_delta > 0.0 && last_pressure_ >= 0.0 &&
+      std::abs(pressure - last_pressure_) > params_.max_pressure_delta) {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Rejected pressure spike.");
+    return;
+  }
+  last_pressure_ = pressure;
+
   nav_msgs::msg::Odometry odom_msg;
   odom_msg.header.stamp = msg->header.stamp;
   odom_msg.header.frame_id = params_.map_frame;
@@ -70,7 +79,7 @@ void FluidPressureOdomNode::pressureCallback(const sensor_msgs::msg::FluidPressu
 
   // depth [m] = (pressure [Pa] - atmospheric_pressure [Pa]) / (water_density [kg/m^3] * g [m/s^2])
   double pressure_to_depth = 1.0 / (params_.water_density * params_.gravity);
-  double gauge_pressure = msg->fluid_pressure - params_.atmospheric_pressure;
+  double gauge_pressure = pressure - params_.atmospheric_pressure;
   odom_msg.pose.pose.position.z = gauge_pressure * pressure_to_depth;
 
   // var_depth = var_pressure / (rho*g)^2
