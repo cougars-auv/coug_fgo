@@ -74,7 +74,10 @@ void FluidPressureOdomNode::pressureCallback(const sensor_msgs::msg::FluidPressu
   odom_msg.pose.pose.position.z = gauge_pressure * pressure_to_depth;
 
   // var_depth = var_pressure / (rho*g)^2
-  odom_msg.pose.covariance[14] = msg->variance * pressure_to_depth * pressure_to_depth;
+  double var_depth = (msg->variance > 0.0)
+                         ? msg->variance * pressure_to_depth * pressure_to_depth
+                         : params_.fallback_depth_noise_sigma * params_.fallback_depth_noise_sigma;
+  odom_msg.pose.covariance[14] = var_depth;
 
   last_depth_ = odom_msg.pose.pose.position.z;
   odom_pub_->publish(odom_msg);

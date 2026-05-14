@@ -102,9 +102,11 @@ void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
 
   odom.child_frame_id = params_.base_frame;
 
-  uint64_t sec = static_cast<uint64_t>(msg->time);
-  uint64_t nanosec = static_cast<uint64_t>((msg->time - sec) * 1e9);
-  odom.header.stamp = rclcpp::Time(sec, nanosec, RCL_ROS_TIME);
+  // TODO: Fix DVL time sync so we don't have to do this
+  // uint64_t sec = static_cast<uint64_t>(msg->time);
+  // uint64_t nanosec = static_cast<uint64_t>((msg->time - sec) * 1e9);
+  // odom.header.stamp = rclcpp::Time(sec, nanosec, RCL_ROS_TIME);
+  odom.header.stamp = this->get_clock()->now();
 
   odom.pose.pose = p_base_in_odom;
 

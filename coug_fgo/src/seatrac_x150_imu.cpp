@@ -86,7 +86,7 @@ sensor_msgs::msg::Imu SeatracX150ImuNode::convertToImu(
   if (msg->includes_local_attitude) {
     double roll_rad = (msg->attitude_roll / 10.0) * M_PI / 180.0;
     double pitch_rad = (msg->attitude_pitch / 10.0) * M_PI / 180.0;
-    double yaw_rad = (msg->attitude_yaw / 10.0) * M_PI / 180.0;
+    double yaw_rad = (msg->attitude_yaw / 10.0) * M_PI / 180.0 + params_.mag_declination_radians;
 
     tf2::Quaternion q_ned_b;
     q_ned_b.setRPY(roll_rad, pitch_rad, yaw_rad);

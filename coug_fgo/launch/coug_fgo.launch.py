@@ -368,7 +368,9 @@ def generate_launch_description() -> LaunchDescription:
                 parameters=[
                     fleet_params,
                     auv_params,
-                    {"use_sim_time": use_sim_time},
+                    {
+                        "use_sim_time": use_sim_time,
+                    },
                 ],
                 condition=IfCondition(EqualsSubstitution(auv_ns, "bluerov2")),
             ),

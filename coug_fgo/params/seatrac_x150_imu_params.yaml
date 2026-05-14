@@ -24,13 +24,16 @@ seatrac_x150_imu_node:
 
   accel_noise_sigmas:
     type: double_array
-    default_value: [0.0078, 0.0078, 0.0078]  # [m/s^2] Accelerometer measurement noise sigmas.
+    default_value: [0.0078, 0.0078, 0.0078]
   gyro_noise_sigmas:
     type: double_array
-    default_value: [0.0012, 0.0012, 0.0012]  # [rad/s] Gyroscope measurement noise sigmas.
+    default_value: [0.0012, 0.0012, 0.0012]
   orientation_noise_sigmas:
     type: double_array
-    default_value: [0.00349, 0.00349, 0.01745]  # [rad] Orientation uncertainty sigmas [roll, pitch, yaw].
+    default_value: [0.00349, 0.00349, 0.01745]
   magnetic_field_noise_sigmas:
     type: double_array
-    default_value: [0.003, 0.003, 0.003]  # Magnetometer measurement noise sigmas.
+    default_value: [0.003, 0.003, 0.003]
+  mag_declination_radians:
+    type: double
+    default_value: 0.0

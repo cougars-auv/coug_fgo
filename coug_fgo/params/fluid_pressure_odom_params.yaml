@@ -32,3 +32,7 @@ fluid_pressure_odom_node:
   gravity:
     type: double
     default_value: 9.81
+
+  fallback_depth_noise_sigma:
+    type: double
+    default_value: 0.02
