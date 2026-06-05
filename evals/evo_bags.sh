@@ -47,7 +47,7 @@ evo_rot_args=("${evo_base_args[@]}")
 # --- Evaluation ---
 evo_config set save_traj_in_zip true &>/dev/null
 
-AGENTS=("coug0sim" "coug1sim" "coug2sim" "blue0sim" \
+AGENTS=("coug1sim" "coug2sim" "coug3sim" "blue1sim" \
   "bluerov2" "turtlmap" "aquaslam" "aquaslam_wt")
 SUFFIXES=("odometry/global" "odometry/global_isam2" "odometry/global_lpi" "odometry/global_tpi" \
   # "odometry/global_iekf" "odometry/global_ukf" "odometry/global_ekf" \
