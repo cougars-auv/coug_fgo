@@ -1,10 +1,8 @@
 #!/bin/bash
 set -e
 
-BAG_DIR="${HOME}/cougars-dev/bags"
-
 # --- Selection ---
-leaf_dirs=$(cd "${BAG_DIR}" && find . -name "metadata.yaml" -exec dirname {} \; | sed 's|^\./||')
+leaf_dirs=$(cd "${BAGS_DIR}" && find . -name "metadata.yaml" -exec dirname {} \; | sed 's|^\./||')
 
 dir_list="bags\n"
 for d in ${leaf_dirs}; do
@@ -19,9 +17,9 @@ selected_dir=$(echo -e "${dir_list}" | sort -u | gum filter --placeholder "Selec
 [ -z "${selected_dir}" ] && exit 0
 
 if [ "${selected_dir}" == "bags" ]; then
-  target_dir="${BAG_DIR}"
+  target_dir="${BAGS_DIR}"
 else
-  target_dir="${BAG_DIR}/${selected_dir}"
+  target_dir="${BAGS_DIR}/${selected_dir}"
 fi
 
 bags_to_eval=$(find "${target_dir}" -name "metadata.yaml" -exec dirname {} \;)
