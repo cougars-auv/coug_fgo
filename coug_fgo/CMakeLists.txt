@@ -233,7 +233,6 @@ ament_auto_package(
   INSTALL_TO_SHARE
   launch
   config
-  params
   rviz
   plotjuggler
   USE_SCOPED_HEADER_INSTALL_DIR
