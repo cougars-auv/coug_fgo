@@ -23,6 +23,9 @@ fluid_pressure_odom_node:
     type: string
     default_value: "depth_link"
 
+  pressure_scale:
+    type: double
+    default_value: 1.0
   atmospheric_pressure:
     type: double
     default_value: 101325.0

@@ -58,7 +58,7 @@ FluidPressureOdomNode::FluidPressureOdomNode(const rclcpp::NodeOptions& options)
 void FluidPressureOdomNode::pressureCallback(const sensor_msgs::msg::FluidPressure::SharedPtr msg) {
   last_pressure_time_ = this->get_clock()->now().seconds();
 
-  double pressure = msg->fluid_pressure;
+  double pressure = msg->fluid_pressure * params_.pressure_scale;
 
   if (params_.max_pressure_delta > 0.0 && last_pressure_ >= 0.0 &&
       std::abs(pressure - last_pressure_) > params_.max_pressure_delta) {
@@ -80,11 +80,12 @@ void FluidPressureOdomNode::pressureCallback(const sensor_msgs::msg::FluidPressu
   // depth [m] = (pressure [Pa] - atmospheric_pressure [Pa]) / (water_density [kg/m^3] * g [m/s^2])
   double pressure_to_depth = 1.0 / (params_.water_density * params_.gravity);
   double gauge_pressure = pressure - params_.atmospheric_pressure;
-  odom_msg.pose.pose.position.z = gauge_pressure * pressure_to_depth;
+  odom_msg.pose.pose.position.z = -gauge_pressure * pressure_to_depth;
 
   // var_depth = var_pressure / (rho*g)^2
+  double var_pressure = msg->variance * params_.pressure_scale * params_.pressure_scale;
   double var_depth = (msg->variance > 0.0)
-                         ? msg->variance * pressure_to_depth * pressure_to_depth
+                         ? var_pressure * pressure_to_depth * pressure_to_depth
                          : params_.fallback_depth_noise_sigma * params_.fallback_depth_noise_sigma;
   odom_msg.pose.covariance[14] = var_depth;
 
