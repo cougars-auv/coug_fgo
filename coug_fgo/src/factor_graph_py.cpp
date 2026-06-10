@@ -220,7 +220,7 @@ pybind11::dict FactorGraphPy::optimize_graph() {
         gtsam::Pose3 sp = opt_result->all_estimates.at<gtsam::Pose3>(x_key);
         gtsam::Quaternion sq = sp.rotation().toQuaternion();
         pybind11::dict entry;
-        entry["time"] = time;
+        entry["time"] = static_cast<double>(time) * 1e-9;
         entry["x"] = sp.translation().x();
         entry["y"] = sp.translation().y();
         entry["z"] = sp.translation().z();

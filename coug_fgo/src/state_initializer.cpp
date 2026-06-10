@@ -41,21 +41,39 @@ StateInitializer::StateInitializer(const factor_graph_node::Params& params) : pa
 
 bool StateInitializer::update(double current_time, QueueBundle& queues) {
   if (params_.prior.use_parameter_priors) {
+    if (queues.imu.empty()) {
+      return false;
+    }
     initial_imu_ = queues.imu.back();
     if (params_.gps.enable_gps || params_.gps.enable_gps_init_only) {
+      if (queues.gps.empty()) {
+        return false;
+      }
       initial_gps_ = queues.gps.back();
     }
     if (params_.depth.enable_depth || params_.depth.enable_depth_init_only) {
+      if (queues.depth.empty()) {
+        return false;
+      }
       initial_depth_ = queues.depth.back();
     }
     if (params_.mag.enable_mag || params_.mag.enable_mag_init_only) {
+      if (queues.mag.empty()) {
+        return false;
+      }
       initial_mag_ = queues.mag.back();
     }
     if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only ||
         params_.comparison.enable_loose_dvl_preintegration) {
+      if (queues.ahrs.empty()) {
+        return false;
+      }
       initial_ahrs_ = queues.ahrs.back();
     }
     if (params_.dvl.enable_dvl || params_.dvl.enable_dvl_init_only) {
+      if (queues.dvl.empty()) {
+        return false;
+      }
       initial_dvl_ = queues.dvl.back();
     }
     return true;

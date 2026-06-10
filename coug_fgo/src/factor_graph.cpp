@@ -428,7 +428,7 @@ void FactorGraphNode::publishSmoothedPath(const gtsam::Values& values,
     if (values.exists(pair.second)) {
       geometry_msgs::msg::PoseStamped ps;
       ps.header.frame_id = params_.map_frame;
-      ps.header.stamp = rclcpp::Time(static_cast<int64_t>(pair.first * 1e9));
+      ps.header.stamp = rclcpp::Time(pair.first);
       ps.pose = toPoseMsg(values.at<gtsam::Pose3>(pair.second) * target_T_base);
       path_msg.poses.push_back(ps);
     }
