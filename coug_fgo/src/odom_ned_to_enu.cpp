@@ -24,6 +24,7 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Vector3.h>
 
+#include <Eigen/Core>
 #include <rclcpp_components/register_node_macro.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
@@ -72,6 +73,15 @@ nav_msgs::msg::Odometry OdomNedToEnuNode::convertToEnu(
   tf2::Quaternion q_enu_b = q_enu_ned * q_ned_b;
   q_enu_b.normalize();
   out.pose.pose.orientation = tf2::toMsg(q_enu_b);
+
+  if (out.pose.covariance[0] >= 0.0) {
+    static const Eigen::Matrix3d M = (Eigen::Matrix3d() << 0, 1, 0, 1, 0, 0, 0, 0, -1).finished();
+    Eigen::Matrix<double, 6, 6> T = Eigen::Matrix<double, 6, 6>::Zero();
+    T.block<3, 3>(0, 0) = M;
+    T.block<3, 3>(3, 3) = M;
+    Eigen::Map<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> cov(out.pose.covariance.data());
+    cov = (T * cov * T.transpose()).eval();
+  }
 
   return out;
 }

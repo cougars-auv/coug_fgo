@@ -23,6 +23,7 @@
 
 #include <tf2/LinearMath/Quaternion.h>
 
+#include <Eigen/Core>
 #include <cmath>
 #include <rclcpp_components/register_node_macro.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
@@ -62,6 +63,12 @@ sensor_msgs::msg::Imu ImuNedToEnuNode::convertToEnu(const sensor_msgs::msg::Imu:
   tf2::Quaternion q_enu_b = q_enu_ned * q_ned_b;
   q_enu_b.normalize();
   out.orientation = tf2::toMsg(q_enu_b);
+
+  if (out.orientation_covariance[0] >= 0.0) {
+    static const Eigen::Matrix3d M = (Eigen::Matrix3d() << 0, 1, 0, 1, 0, 0, 0, 0, -1).finished();
+    Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>> cov(out.orientation_covariance.data());
+    cov = (M * cov * M.transpose()).eval();
+  }
 
   return out;
 }
