@@ -31,6 +31,7 @@ def generate_launch_description() -> LaunchDescription:
     use_sim_time = LaunchConfiguration("use_sim_time")
     auv_ns = LaunchConfiguration("auv_ns")
     set_origin = LaunchConfiguration("set_origin")
+    compare = LaunchConfiguration("compare")
 
     fleet_params = PathJoinSubstitution(
         [
@@ -170,7 +171,7 @@ def generate_launch_description() -> LaunchDescription:
                 package="coug_fgo",
                 executable="factor_graph",
                 name="factor_graph_node_isam2",
-                condition=IfCondition(LaunchConfiguration("compare")),
+                condition=IfCondition(compare),
                 parameters=[
                     fleet_params,
                     auv_params,
@@ -200,7 +201,7 @@ def generate_launch_description() -> LaunchDescription:
                 package="coug_fgo",
                 executable="factor_graph",
                 name="factor_graph_node_lpi",
-                condition=IfCondition(LaunchConfiguration("compare")),
+                condition=IfCondition(compare),
                 parameters=[
                     fleet_params,
                     auv_params,
@@ -229,7 +230,7 @@ def generate_launch_description() -> LaunchDescription:
                 package="coug_fgo",
                 executable="factor_graph",
                 name="factor_graph_node_tpi",
-                condition=IfCondition(LaunchConfiguration("compare")),
+                condition=IfCondition(compare),
                 parameters=[
                     fleet_params,
                     auv_params,
@@ -459,7 +460,7 @@ def generate_launch_description() -> LaunchDescription:
                 package="robot_localization",
                 executable="ekf_node",
                 name="ekf_filter_node_map",
-                condition=IfCondition(LaunchConfiguration("compare")),
+                condition=IfCondition(compare),
                 parameters=[
                     fleet_params,
                     auv_params,
@@ -478,7 +479,7 @@ def generate_launch_description() -> LaunchDescription:
                 package="robot_localization",
                 executable="ukf_node",
                 name="ukf_filter_node_map",
-                condition=IfCondition(LaunchConfiguration("compare")),
+                condition=IfCondition(compare),
                 parameters=[
                     fleet_params,
                     auv_params,
