@@ -94,8 +94,6 @@ void FluidPressureOdomNode::pressureCallback(const sensor_msgs::msg::FluidPressu
 }
 
 void FluidPressureOdomNode::checkPressureStatus(diagnostic_updater::DiagnosticStatusWrapper& stat) {
-  stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Pressure data acquired.");
-
   double time_since = (last_pressure_time_ > 0.0)
                           ? (this->get_clock()->now().seconds() - last_pressure_time_)
                           : -1.0;
@@ -103,7 +101,9 @@ void FluidPressureOdomNode::checkPressureStatus(diagnostic_updater::DiagnosticSt
   stat.add("Last Depth (m)", last_depth_);
 
   if (time_since > params_.diagnostic_timeout || last_pressure_time_ == 0.0) {
-    stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Pressure sensor is offline.");
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Pressure sensor is offline.");
+  } else {
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Pressure data acquired.");
   }
 }
 

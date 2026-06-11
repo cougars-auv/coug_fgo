@@ -152,14 +152,14 @@ sensor_msgs::msg::MagneticField SeatracX150ImuNode::convertToMag(
 }
 
 void SeatracX150ImuNode::checkModemStatus(diagnostic_updater::DiagnosticStatusWrapper& stat) {
-  stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Modem data acquired.");
-
   double time_since =
       (last_modem_time_ > 0.0) ? (this->get_clock()->now().seconds() - last_modem_time_) : -1.0;
   stat.add("Time Since Last (s)", time_since);
 
   if (time_since > params_.diagnostic_timeout || last_modem_time_ == 0.0) {
-    stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Modem is offline.");
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Modem is offline.");
+  } else {
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Modem data acquired.");
   }
 }
 

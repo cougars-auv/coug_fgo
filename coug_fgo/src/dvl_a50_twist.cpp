@@ -118,8 +118,6 @@ geometry_msgs::msg::TwistWithCovarianceStamped DvlA50TwistNode::convertToTwist(
 }
 
 void DvlA50TwistNode::checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper& stat) {
-  stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "DVL data acquired.");
-
   stat.add("Velocity Valid", last_velocity_valid_);
 
   double time_since =
@@ -127,10 +125,11 @@ void DvlA50TwistNode::checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper
   stat.add("Time Since Last (s)", time_since);
 
   if (time_since > params_.diagnostic_timeout || last_dvl_time_ == 0.0) {
-    stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "DVL is offline.");
-  }
-  if (!last_velocity_valid_ && last_dvl_time_ > 0.0) {
-    stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "DVL velocity is invalid.");
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "DVL is offline.");
+  } else if (!last_velocity_valid_) {
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "DVL velocity is invalid.");
+  } else {
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "DVL data acquired.");
   }
 }
 

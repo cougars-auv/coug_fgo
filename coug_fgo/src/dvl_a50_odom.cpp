@@ -119,14 +119,14 @@ void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
 }
 
 void DvlA50OdomNode::checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper& stat) {
-  stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "DVL DR data acquired.");
-
   double time_since =
       (last_dvl_time_ > 0.0) ? (this->get_clock()->now().seconds() - last_dvl_time_) : -1.0;
   stat.add("Time Since Last (s)", time_since);
 
   if (time_since > params_.diagnostic_timeout || last_dvl_time_ == 0.0) {
-    stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "DVL DR is offline.");
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "DVL DR is offline.");
+  } else {
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "DVL DR data acquired.");
   }
 }
 

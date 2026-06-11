@@ -183,8 +183,6 @@ void NavsatOdomNode::checkOriginStatus(diagnostic_updater::DiagnosticStatusWrapp
 }
 
 void NavsatOdomNode::checkNavSatFix(diagnostic_updater::DiagnosticStatusWrapper& stat) {
-  stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "GPS fix acquired.");
-
   stat.add("Fix Status", last_fix_status_);
 
   double time_since =
@@ -192,10 +190,11 @@ void NavsatOdomNode::checkNavSatFix(diagnostic_updater::DiagnosticStatusWrapper&
   stat.add("Time Since Last (s)", time_since);
 
   if (time_since > params_.diagnostic_timeout || last_navsat_time_ == 0.0) {
-    stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "GPS is offline.");
-  }
-  if (last_fix_status_ == sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX) {
-    stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "No GPS fix acquired.");
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "GPS is offline.");
+  } else if (last_fix_status_ == sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX) {
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "No GPS fix acquired.");
+  } else {
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "GPS fix acquired.");
   }
 }
 
