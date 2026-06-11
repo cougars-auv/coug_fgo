@@ -78,8 +78,11 @@ def _parse_config(
             print(f"Loading config: {path}")
         with open(path, "r") as f:
             config = yaml.safe_load(f)
-        for key in ["/**", f"/{namespace}/**"]:
-            _deep_merge(params, config.get(key, {}).get("ros__parameters", {}))
+        _deep_merge(params, config.get("/**", {}).get("ros__parameters", {}))
+        _deep_merge(
+            params,
+            config.get(f"/{namespace}", {}).get("**", {}).get("ros__parameters", {}),
+        )
 
     sensor_topics = {
         "imu": params["imu_topic"],

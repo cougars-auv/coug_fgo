@@ -43,8 +43,12 @@ def get_smoother_lag(bag_dir: Path, agent_name: str) -> float | None:
         try:
             with open(path) as f:
                 config = yaml.safe_load(f)
-            for key in ["/**", f"/{agent_name}/**"]:
-                params.update(config.get(key, {}).get("ros__parameters", {}))
+            params.update(config.get("/**", {}).get("ros__parameters", {}))
+            params.update(
+                config.get(f"/{agent_name}", {})
+                .get("**", {})
+                .get("ros__parameters", {})
+            )
             found_any = True
         except Exception:
             continue
