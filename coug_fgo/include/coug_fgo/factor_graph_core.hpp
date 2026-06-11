@@ -235,12 +235,15 @@ class FactorGraphCore {
    * @param dvl_msgs Drained, time-sorted DVL structs.
    * @param imu_msgs Drained, time-sorted IMU structs for relative rotation calculation.
    * @param target_time Integration endpoint timestamp.
+   * @param held_imu_acc IMU acceleration at the start of the window.
+   * @param held_imu_gyr IMU angular velocity at the start of the window.
    * @param[out] unused_dvl Messages with timestamps beyond target_time for re-queueing.
    */
   void addDvlTightPreintFactor(gtsam::NonlinearFactorGraph& graph,
                                const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
                                const std::deque<std::shared_ptr<utils::ImuData>>& imu_msgs,
-                               double target_time,
+                               double target_time, const gtsam::Vector3& held_imu_acc,
+                               const gtsam::Vector3& held_imu_gyr,
                                std::deque<std::shared_ptr<utils::TwistData>>& unused_dvl);
 
   // --- Parameters ---

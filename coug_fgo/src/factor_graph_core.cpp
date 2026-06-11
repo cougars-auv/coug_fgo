@@ -312,16 +312,21 @@ void FactorGraphCore::addPriorFactors(const StateInitializer& state_init,
         gtsam::noiseModel::Diagonal::Sigmas(Eigen::Map<const Eigen::Vector3d>(sigmas.data()));
   } else {
     if (params_.dvl.enable_dvl) {
+      // Rotate DVL covariance into the map frame
+      gtsam::Matrix33 dvl_cov;
       if (params_.dvl.use_parameter_covariance) {
-        auto& sigmas = params_.dvl.parameter_covariance.velocity_noise_sigmas;
-        prior_vel_noise =
-            gtsam::noiseModel::Diagonal::Sigmas(Eigen::Map<const Eigen::Vector3d>(sigmas.data()) *
-                                                std::sqrt(params_.dvl.covariance_scalar));
+        const auto& sig = params_.dvl.parameter_covariance.velocity_noise_sigmas;
+        dvl_cov = (Eigen::Map<const Eigen::Vector3d>(sig.data()).array().square() *
+                   params_.dvl.covariance_scalar)
+                      .matrix()
+                      .asDiagonal();
       } else {
-        gtsam::Matrix33 dvl_cov = state_init.getInitialDvl()->twist_covariance.block<3, 3>(0, 0) *
-                                  params_.dvl.covariance_scalar;
-        prior_vel_noise = gtsam::noiseModel::Diagonal::Covariance(dvl_cov);
+        dvl_cov = state_init.getInitialDvl()->twist_covariance.block<3, 3>(0, 0) *
+                  params_.dvl.covariance_scalar;
       }
+      gtsam::Matrix33 map_R_dvl = (prev_pose_.rotation() * tfs_.target_T_dvl.rotation()).matrix();
+      prior_vel_noise =
+          gtsam::noiseModel::Gaussian::Covariance(map_R_dvl * dvl_cov * map_R_dvl.transpose());
     } else {
       auto& sigmas = params_.prior.parameter_priors.initial_velocity_sigmas;
       prior_vel_noise =
@@ -682,6 +687,7 @@ void FactorGraphCore::addDvlTightPreintFactor(
     gtsam::NonlinearFactorGraph& graph,
     const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
     const std::deque<std::shared_ptr<utils::ImuData>>& imu_msgs, double target_time,
+    const gtsam::Vector3& held_imu_acc, const gtsam::Vector3& held_imu_gyr,
     std::deque<std::shared_ptr<utils::TwistData>>& unused_dvl) {
   // Implements a zero-order hold (ZOH) for DVL velocity measurements
   if (!dvl_tight_preintegrator_ || imu_msgs.empty()) {
@@ -699,8 +705,8 @@ void FactorGraphCore::addDvlTightPreintFactor(
       std::make_unique<gtsam::PreintegratedCombinedMeasurements>(*imu_preintegrator_);
   temp_imu_preint->resetIntegrationAndSetBias(prev_imu_bias_);
 
-  gtsam::Vector3 current_imu_acc = last_imu_acc_;
-  gtsam::Vector3 current_imu_gyr = last_imu_gyr_;
+  gtsam::Vector3 current_imu_acc = held_imu_acc;
+  gtsam::Vector3 current_imu_gyr = held_imu_gyr;
   auto imu_it = imu_msgs.begin();
 
   dvl_tight_preintegrator_->reset();
@@ -825,6 +831,9 @@ std::optional<UpdateResult> FactorGraphCore::update(double target_time,
 
   std::scoped_lock update_lock(buffer_mutex_);
 
+  const gtsam::Vector3 held_imu_acc = last_imu_acc_;
+  const gtsam::Vector3 held_imu_gyr = last_imu_gyr_;
+
   addImuPreintFactor(new_graph, queues.imu, target_time, result.unused_imu);
   if (params_.gps.enable_gps) {
     addGpsFactor(new_graph, queues.gps);
@@ -859,7 +868,8 @@ std::optional<UpdateResult> FactorGraphCore::update(double target_time,
     if (params_.comparison.enable_loose_dvl_preintegration) {
       addDvlLoosePreintFactor(new_graph, queues.dvl, queues.ahrs, target_time, result.unused_dvl);
     } else if (params_.comparison.enable_tight_dvl_preintegration) {
-      addDvlTightPreintFactor(new_graph, queues.dvl, queues.imu, target_time, result.unused_dvl);
+      addDvlTightPreintFactor(new_graph, queues.dvl, queues.imu, target_time, held_imu_acc,
+                              held_imu_gyr, result.unused_dvl);
     } else {
       addDvlFactor(new_graph, queues.dvl);
 
