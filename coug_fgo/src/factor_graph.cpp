@@ -762,7 +762,7 @@ void FactorGraphNode::optimizeGraph() {
 }
 
 void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrapper& stat) {
-  stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "All requested sensors online.");
+  bool has_offline = false;
 
   auto check_queue = [&](const std::string& name, size_t size, std::optional<double> last_time,
                          bool enabled, bool is_critical, double timeout) {
@@ -777,6 +777,7 @@ void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrap
     stat.add(name + " Time Since Last (s)", time_since);
 
     if (time_since > timeout || (!last_time.has_value() && size == 0)) {
+      has_offline = true;
       if (is_critical) {
         stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, name + " is offline.");
       } else {
@@ -799,6 +800,10 @@ void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrap
               params_.dvl.enable_dvl, params_.dvl.diagnostic_timeout);
   check_queue("Wrench", wrench_queue_.size(), wrench_queue_.getLastTime(),
               params_.dynamics.enable_dynamics, false, params_.dynamics.diagnostic_timeout);
+
+  if (!has_offline) {
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "All requested sensors online.");
+  }
 }
 
 void FactorGraphNode::checkGraphState(diagnostic_updater::DiagnosticStatusWrapper& stat) {
