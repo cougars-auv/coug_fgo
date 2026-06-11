@@ -27,7 +27,6 @@ def generate_launch_description() -> LaunchDescription:
 
     use_sim_time = LaunchConfiguration("use_sim_time")
     auv_ns = LaunchConfiguration("auv_ns")
-    set_origin = LaunchConfiguration("set_origin")
 
     fleet_params = PathJoinSubstitution(
         [
@@ -129,11 +128,6 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="auv0",
                 description="Namespace for the AUV (e.g. auv0)",
             ),
-            DeclareLaunchArgument(
-                "set_origin",
-                default_value="true",
-                description="Whether navsat_odom_node owns and publishes the ENU origin",
-            ),
             Node(
                 package="coug_fgo",
                 executable="dvl_a50_twist",
@@ -187,7 +181,6 @@ def generate_launch_description() -> LaunchDescription:
                         "use_sim_time": use_sim_time,
                         "map_frame": "map",
                         "parameter_child_frame": gps_link_frame,
-                        "set_origin": set_origin,
                     },
                 ],
             ),

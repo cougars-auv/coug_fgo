@@ -30,7 +30,6 @@ def generate_launch_description() -> LaunchDescription:
 
     use_sim_time = LaunchConfiguration("use_sim_time")
     auv_ns = LaunchConfiguration("auv_ns")
-    set_origin = LaunchConfiguration("set_origin")
     compare = LaunchConfiguration("compare")
 
     fleet_params = PathJoinSubstitution(
@@ -137,11 +136,6 @@ def generate_launch_description() -> LaunchDescription:
                 "compare",
                 default_value="false",
                 description="Launch additional localization nodes if true",
-            ),
-            DeclareLaunchArgument(
-                "set_origin",
-                default_value="true",
-                description="Whether navsat_odom_node owns and publishes the ENU origin",
             ),
             Node(
                 package="coug_fgo",
@@ -307,7 +301,6 @@ def generate_launch_description() -> LaunchDescription:
                         "use_sim_time": use_sim_time,
                         "map_frame": "map",
                         "parameter_child_frame": gps_link_frame,
-                        "set_origin": set_origin,
                     },
                 ],
             ),
