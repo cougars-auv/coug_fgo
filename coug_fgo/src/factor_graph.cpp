@@ -202,7 +202,7 @@ void FactorGraphNode::setupRosInterfaces() {
   if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only ||
       params_.comparison.enable_loose_dvl_preintegration) {
     ahrs_sub_ = create_subscription<sensor_msgs::msg::Imu>(
-        params_.ahrs_topic, rclcpp::SensorDataQoS(),
+        params_.ahrs_topic, rclcpp::SensorDataQoS().keep_last(200),
         [this, load_or_lookup_tf](const sensor_msgs::msg::Imu::SharedPtr msg) {
           std::string child = params_.ahrs.use_parameter_frame ? params_.ahrs.parameter_frame
                                                                : msg->header.frame_id;
@@ -685,25 +685,16 @@ void FactorGraphNode::updateGraph() {
   queues.dvl = dvl_queue_.drain();
   queues.wrench = wrench_queue_.drain();
 
-  auto result = core_->update(*target_time, queues);
+  auto unused = core_->update(*target_time, queues);
 
-  // Re-queue unused messages
-  if (result) {
-    if (!result->unused_imu.empty()) {
-      imu_queue_.restore(result->unused_imu);
-    }
-    if (!result->unused_dvl.empty()) {
-      dvl_queue_.restore(result->unused_dvl);
-    }
-  } else {
-    imu_queue_.restore(queues.imu);
-    gps_queue_.restore(queues.gps);
-    depth_queue_.restore(queues.depth);
-    mag_queue_.restore(queues.mag);
-    ahrs_queue_.restore(queues.ahrs);
-    dvl_queue_.restore(queues.dvl);
-    wrench_queue_.restore(queues.wrench);
-  }
+  const utils::QueueBundle& to_restore = unused ? *unused : queues;
+  imu_queue_.restore(to_restore.imu);
+  gps_queue_.restore(to_restore.gps);
+  depth_queue_.restore(to_restore.depth);
+  mag_queue_.restore(to_restore.mag);
+  ahrs_queue_.restore(to_restore.ahrs);
+  dvl_queue_.restore(to_restore.dvl);
+  wrench_queue_.restore(to_restore.wrench);
 }
 
 void FactorGraphNode::optimizeGraph() {
@@ -762,7 +753,8 @@ void FactorGraphNode::optimizeGraph() {
 }
 
 void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrapper& stat) {
-  bool has_offline = false;
+  bool any_critical_offline = false;
+  std::vector<std::string> offline_sensors;
 
   auto check_queue = [&](const std::string& name, size_t size, std::optional<double> last_time,
                          bool enabled, bool is_critical, double timeout) {
@@ -777,11 +769,9 @@ void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrap
     stat.add(name + " Time Since Last (s)", time_since);
 
     if (time_since > timeout || (!last_time.has_value() && size == 0)) {
-      has_offline = true;
+      offline_sensors.push_back(name + " is offline.");
       if (is_critical) {
-        stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, name + " is offline.");
-      } else {
-        stat.mergeSummary(diagnostic_msgs::msg::DiagnosticStatus::WARN, name + " is offline.");
+        any_critical_offline = true;
       }
     }
   };
@@ -801,7 +791,15 @@ void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrap
   check_queue("Wrench", wrench_queue_.size(), wrench_queue_.getLastTime(),
               params_.dynamics.enable_dynamics, false, params_.dynamics.diagnostic_timeout);
 
-  if (!has_offline) {
+  if (!offline_sensors.empty()) {
+    std::string msg = "";
+    for (size_t i = 0; i < offline_sensors.size(); ++i) {
+      msg += (i > 0 ? " " : "") + offline_sensors[i];
+    }
+    auto level = any_critical_offline ? diagnostic_msgs::msg::DiagnosticStatus::ERROR
+                                      : diagnostic_msgs::msg::DiagnosticStatus::WARN;
+    stat.summary(level, msg);
+  } else {
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "All requested sensors online.");
   }
 }
@@ -817,7 +815,7 @@ void FactorGraphNode::checkGraphState(diagnostic_updater::DiagnosticStatusWrappe
 void FactorGraphNode::checkProcessingOverflow(diagnostic_updater::DiagnosticStatusWrapper& stat) {
   if (processing_overflow_.load()) {
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN,
-                 "Processing overflow detected. Skipping keyframes.");
+                 "Processing overflow detected. Batching keyframes.");
   } else {
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "No processing overflow detected.");
   }

@@ -145,28 +145,11 @@ bool FactorGraphPy::update_graph(double target_time) {
   }
 
   coug_fgo::utils::QueueBundle update_queues = std::move(queues_);
-  queues_ = coug_fgo::utils::QueueBundle();
 
-  auto update_result = core_->update(target_time, update_queues);
+  auto unused = core_->update(target_time, update_queues);
 
-  if (update_result) {
-    queues_.imu.insert(queues_.imu.end(), update_result->unused_imu.begin(),
-                       update_result->unused_imu.end());
-    queues_.dvl.insert(queues_.dvl.end(), update_result->unused_dvl.begin(),
-                       update_result->unused_dvl.end());
-  } else {
-    queues_.imu.insert(queues_.imu.end(), update_queues.imu.begin(), update_queues.imu.end());
-    queues_.dvl.insert(queues_.dvl.end(), update_queues.dvl.begin(), update_queues.dvl.end());
-    queues_.gps.insert(queues_.gps.end(), update_queues.gps.begin(), update_queues.gps.end());
-    queues_.depth.insert(queues_.depth.end(), update_queues.depth.begin(),
-                         update_queues.depth.end());
-    queues_.ahrs.insert(queues_.ahrs.end(), update_queues.ahrs.begin(), update_queues.ahrs.end());
-    queues_.mag.insert(queues_.mag.end(), update_queues.mag.begin(), update_queues.mag.end());
-    queues_.wrench.insert(queues_.wrench.end(), update_queues.wrench.begin(),
-                          update_queues.wrench.end());
-    return false;
-  }
-  return true;
+  queues_ = unused ? std::move(*unused) : std::move(update_queues);
+  return unused.has_value();
 }
 
 pybind11::dict FactorGraphPy::optimize_graph() {

@@ -37,15 +37,14 @@ TEST(DvlTightPreintFactorArmTest, Jacobians) {
   gtsam::Key pose_key_j = gtsam::symbol_shorthand::X(2);
   gtsam::Key bias_key_i = gtsam::symbol_shorthand::B(1);
   gtsam::SharedNoiseModel model = gtsam::noiseModel::Isotropic::Sigma(3, 0.1);
-  gtsam::Pose3 target_T_imu(gtsam::Rot3::Ypr(0.1, -0.1, 0.1), gtsam::Point3(0.1, 0.2, 0.3));
   gtsam::Pose3 target_T_dvl(gtsam::Rot3::Ypr(-0.1, 0.1, -0.1), gtsam::Point3(0.5, 0.5, 0.5));
   gtsam::Vector3 measured_translation(1.0, 0.5, -0.2);
   gtsam::Matrix3 d_translation_d_bias = gtsam::Matrix3::Identity() * 0.01;
   gtsam::Vector3 gyro_bias_hat(0.01, -0.02, 0.005);
 
-  coug_fgo::factors::DvlTightPreintFactorArm factor(
-      pose_key_i, pose_key_j, bias_key_i, target_T_imu, target_T_dvl, measured_translation,
-      d_translation_d_bias, gyro_bias_hat, model);
+  coug_fgo::factors::DvlTightPreintFactorArm factor(pose_key_i, pose_key_j, bias_key_i,
+                                                    target_T_dvl, measured_translation,
+                                                    d_translation_d_bias, gyro_bias_hat, model);
 
   gtsam::Pose3 pose_i(gtsam::Rot3::Ypr(0.1, 0.2, 0.3), gtsam::Point3(1.0, 2.0, 4.0));
   gtsam::Pose3 pose_j(gtsam::Rot3::Ypr(-0.2, 0.4, 0.1), gtsam::Point3(2.0, 3.0, 2.5));

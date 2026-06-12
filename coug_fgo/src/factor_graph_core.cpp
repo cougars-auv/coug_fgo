@@ -460,7 +460,8 @@ void FactorGraphCore::addMagFactor(
 }
 
 void FactorGraphCore::addDvlFactor(gtsam::NonlinearFactorGraph& graph,
-                                   const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs) {
+                                   const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
+                                   const gtsam::Vector3& held_imu_gyr) {
   if (dvl_msgs.empty()) {
     return;
   }
@@ -480,8 +481,9 @@ void FactorGraphCore::addDvlFactor(gtsam::NonlinearFactorGraph& graph,
 
   dvl_noise = applyRobustKernel(dvl_noise, params_.dvl.robust_kernel, params_.dvl.robust_k);
 
-  graph.emplace_shared<DvlFactorArm>(X(current_step_), V(current_step_), tfs_.target_T_dvl,
-                                     dvl_msg->linear_velocity, dvl_noise);
+  graph.emplace_shared<DvlFactorArm>(X(current_step_), V(current_step_), B(current_step_),
+                                     tfs_.target_T_dvl, tfs_.target_T_imu, dvl_msg->linear_velocity,
+                                     held_imu_gyr, dvl_noise);
 }
 
 void FactorGraphCore::addConstVelFactor(gtsam::NonlinearFactorGraph& graph, double target_time) {
@@ -535,7 +537,7 @@ void FactorGraphCore::addAuvDynamicsFactor(
 
 void FactorGraphCore::addImuPreintFactor(
     gtsam::NonlinearFactorGraph& graph, const std::deque<std::shared_ptr<utils::ImuData>>& imu_msgs,
-    double target_time, std::deque<std::shared_ptr<utils::ImuData>>& unused_imu) {
+    double target_time) {
   if (!imu_preintegrator_ || imu_msgs.empty()) {
     return;
   }
@@ -544,10 +546,6 @@ void FactorGraphCore::addImuPreintFactor(
 
   for (const auto& imu_msg : imu_msgs) {
     double current_imu_time = imu_msg->timestamp;
-    if (current_imu_time > target_time) {
-      unused_imu.push_back(imu_msg);
-      continue;
-    }
 
     if (current_imu_time <= last_imu_time) {
       continue;
@@ -611,8 +609,7 @@ gtsam::Rot3 FactorGraphCore::getInterpolatedOrientation(
 void FactorGraphCore::addDvlLoosePreintFactor(
     gtsam::NonlinearFactorGraph& graph,
     const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
-    const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs, double target_time,
-    std::deque<std::shared_ptr<utils::TwistData>>& unused_dvl) {
+    const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs, double target_time) {
   // Implements a zero-order hold (ZOH) for DVL velocity measurements
   if (!dvl_loose_preintegrator_ || ahrs_msgs.empty()) {
     return;
@@ -630,11 +627,6 @@ void FactorGraphCore::addDvlLoosePreintFactor(
 
   for (const auto& dvl_msg : dvl_msgs) {
     double current_dvl_time = dvl_msg->timestamp;
-    if (current_dvl_time > target_time) {
-      unused_dvl.push_back(dvl_msg);
-      continue;
-    }
-
     if (current_dvl_time <= last_dvl_time) {
       continue;
     }
@@ -687,8 +679,7 @@ void FactorGraphCore::addDvlTightPreintFactor(
     gtsam::NonlinearFactorGraph& graph,
     const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
     const std::deque<std::shared_ptr<utils::ImuData>>& imu_msgs, double target_time,
-    const gtsam::Vector3& held_imu_acc, const gtsam::Vector3& held_imu_gyr,
-    std::deque<std::shared_ptr<utils::TwistData>>& unused_dvl) {
+    const gtsam::Vector3& held_imu_acc, const gtsam::Vector3& held_imu_gyr) {
   // Implements a zero-order hold (ZOH) for DVL velocity measurements
   if (!dvl_tight_preintegrator_ || imu_msgs.empty()) {
     return;
@@ -697,9 +688,7 @@ void FactorGraphCore::addDvlTightPreintFactor(
   double last_dvl_time = prev_time_;
   double last_imu_time = prev_time_;
 
-  gtsam::Rot3 target_R_imu = tfs_.target_T_imu.rotation();
   gtsam::Rot3 target_R_dvl = tfs_.target_T_dvl.rotation();
-  gtsam::Rot3 imu_R_dvl = target_R_imu.between(target_R_dvl);
 
   auto temp_imu_preint =
       std::make_unique<gtsam::PreintegratedCombinedMeasurements>(*imu_preintegrator_);
@@ -738,11 +727,6 @@ void FactorGraphCore::addDvlTightPreintFactor(
 
   for (const auto& dvl_msg : dvl_msgs) {
     double current_dvl_time = dvl_msg->timestamp;
-    if (current_dvl_time > target_time) {
-      unused_dvl.push_back(dvl_msg);
-      continue;
-    }
-
     if (current_dvl_time <= last_dvl_time) {
       continue;
     }
@@ -759,8 +743,8 @@ void FactorGraphCore::addDvlTightPreintFactor(
       temp_imu_preint->biasCorrectedDelta(prev_imu_bias_, H_bias);
       gtsam::Matrix3 J_bg_k = H_bias.block<3, 3>(0, 3);
 
-      dvl_tight_preintegrator_->integrateMeasurement(last_dvl_velocity_, delta_R_ik, imu_R_dvl, dt,
-                                                     last_dvl_covariance_, rot_cov_k, J_bg_k);
+      dvl_tight_preintegrator_->integrateMeasurement(last_dvl_velocity_, delta_R_ik, target_R_dvl,
+                                                     dt, last_dvl_covariance_, rot_cov_k, J_bg_k);
 
       last_dvl_velocity_ = dvl_msg->linear_velocity;
 
@@ -792,31 +776,34 @@ void FactorGraphCore::addDvlTightPreintFactor(
       temp_imu_preint->biasCorrectedDelta(prev_imu_bias_, H_bias);
       gtsam::Matrix3 J_bg_k = H_bias.block<3, 3>(0, 3);
 
-      dvl_tight_preintegrator_->integrateMeasurement(last_dvl_velocity_, delta_R_ik, imu_R_dvl, dt,
-                                                     last_dvl_covariance_, rot_cov_k, J_bg_k);
+      dvl_tight_preintegrator_->integrateMeasurement(last_dvl_velocity_, delta_R_ik, target_R_dvl,
+                                                     dt, last_dvl_covariance_, rot_cov_k, J_bg_k);
     }
     last_dvl_time = target_time;
   }
 
   graph.emplace_shared<DvlTightPreintFactorArm>(
-      X(prev_step_), X(current_step_), B(prev_step_), tfs_.target_T_imu, tfs_.target_T_dvl,
+      X(prev_step_), X(current_step_), B(prev_step_), tfs_.target_T_dvl,
       dvl_tight_preintegrator_->delta(), dvl_tight_preintegrator_->preintMeasDerivativeWrtBias(),
       prev_imu_bias_.gyroscope(),
       gtsam::noiseModel::Gaussian::Covariance(dvl_tight_preintegrator_->covariance()));
 }
 
-std::optional<UpdateResult> FactorGraphCore::update(double target_time,
-                                                    utils::QueueBundle& queues) {
+std::optional<utils::QueueBundle> FactorGraphCore::update(double target_time,
+                                                          utils::QueueBundle& queues) {
   if (target_time <= prev_time_ + 1e-6) {
     return std::nullopt;
   }
 
-  // Sort IMU/AHRS messages
+  // Sort sensor messages by timestamp
   auto by_time = [](const auto& a, const auto& b) { return a->timestamp < b->timestamp; };
   std::sort(queues.imu.begin(), queues.imu.end(), by_time);
-  if (params_.comparison.enable_loose_dvl_preintegration) {
-    std::sort(queues.ahrs.begin(), queues.ahrs.end(), by_time);
-  }
+  std::sort(queues.gps.begin(), queues.gps.end(), by_time);
+  std::sort(queues.depth.begin(), queues.depth.end(), by_time);
+  std::sort(queues.mag.begin(), queues.mag.end(), by_time);
+  std::sort(queues.ahrs.begin(), queues.ahrs.end(), by_time);
+  std::sort(queues.dvl.begin(), queues.dvl.end(), by_time);
+  std::sort(queues.wrench.begin(), queues.wrench.end(), by_time);
 
   if (queues.imu.empty() || queues.imu.front()->timestamp > target_time) {
     return std::nullopt;
@@ -827,14 +814,33 @@ std::optional<UpdateResult> FactorGraphCore::update(double target_time,
   gtsam::Values new_values;
   gtsam::IncrementalFixedLagSmoother::KeyTimestampMap new_timestamps;
 
-  UpdateResult result;
+  utils::QueueBundle unused;
 
   std::scoped_lock update_lock(buffer_mutex_);
 
   const gtsam::Vector3 held_imu_acc = last_imu_acc_;
   const gtsam::Vector3 held_imu_gyr = last_imu_gyr_;
 
-  addImuPreintFactor(new_graph, queues.imu, target_time, result.unused_imu);
+  // Re-queue messages newer than the keyframe for the next update
+  auto splitAfterTarget = [target_time](auto& msgs, auto& split) {
+    while (!msgs.empty() && msgs.back()->timestamp > target_time) {
+      split.push_front(msgs.back());
+      msgs.pop_back();
+    }
+  };
+  splitAfterTarget(queues.imu, unused.imu);
+  splitAfterTarget(queues.gps, unused.gps);
+  splitAfterTarget(queues.depth, unused.depth);
+  splitAfterTarget(queues.mag, unused.mag);
+  splitAfterTarget(queues.ahrs, unused.ahrs);
+  splitAfterTarget(queues.dvl, unused.dvl);
+  splitAfterTarget(queues.wrench, unused.wrench);
+
+  if (params_.comparison.enable_loose_dvl_preintegration && !queues.ahrs.empty()) {
+    unused.ahrs.push_front(queues.ahrs.back());
+  }
+
+  addImuPreintFactor(new_graph, queues.imu, target_time);
   if (params_.gps.enable_gps) {
     addGpsFactor(new_graph, queues.gps);
   }
@@ -866,12 +872,12 @@ std::optional<UpdateResult> FactorGraphCore::update(double target_time,
     addDropoutFactors(new_graph);
   } else {
     if (params_.comparison.enable_loose_dvl_preintegration) {
-      addDvlLoosePreintFactor(new_graph, queues.dvl, queues.ahrs, target_time, result.unused_dvl);
+      addDvlLoosePreintFactor(new_graph, queues.dvl, queues.ahrs, target_time);
     } else if (params_.comparison.enable_tight_dvl_preintegration) {
       addDvlTightPreintFactor(new_graph, queues.dvl, queues.imu, target_time, held_imu_acc,
-                              held_imu_gyr, result.unused_dvl);
+                              held_imu_gyr);
     } else {
-      addDvlFactor(new_graph, queues.dvl);
+      addDvlFactor(new_graph, queues.dvl, last_imu_gyr_);
 
       if (params_.dynamics.enable_dynamics) {
         addAuvDynamicsFactor(new_graph, queues.wrench, target_time);
@@ -918,7 +924,7 @@ std::optional<UpdateResult> FactorGraphCore::update(double target_time,
   buffer_last_step_ = prev_step_;
   has_buffer_ = true;
 
-  return result;
+  return unused;
 }
 
 std::optional<OptimizeResult> FactorGraphCore::optimize() {

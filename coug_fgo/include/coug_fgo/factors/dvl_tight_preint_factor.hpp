@@ -36,9 +36,7 @@ namespace coug_fgo::factors {
  */
 class DvlTightPreintFactorArm
     : public gtsam::NoiseModelFactor3<gtsam::Pose3, gtsam::Pose3, gtsam::imuBias::ConstantBias> {
-  gtsam::Pose3 target_T_imu_;
-  gtsam::Pose3 target_T_dvl_;
-  gtsam::Pose3 imu_T_dvl_;
+  gtsam::Point3 target_p_dvl_;
   gtsam::Vector3 measured_translation_;
   gtsam::Matrix3 d_translation_d_bias_;
   gtsam::Vector3 gyro_bias_hat_;
@@ -49,23 +47,20 @@ class DvlTightPreintFactorArm
    * @param pose_key_i GTSAM key for the starting AUV pose.
    * @param pose_key_j GTSAM key for the ending AUV pose.
    * @param bias_key_i GTSAM key for the IMU bias at the start of the interval.
-   * @param target_T_imu The static transformation from target (Base) to IMU.
    * @param target_T_dvl The static transformation from target (Base) to DVL.
-   * @param measured_translation The preintegrated translation measurement (in IMU frame).
+   * @param measured_translation The preintegrated translation measurement (target frame at i).
    * @param dp_ij_dbias Jacobian mapping changes in gyro bias to changes in the measurement.
    * @param gyro_bias_hat The gyro bias estimate used during pre-integration.
    * @param noise_model The noise model for the measurement.
    */
   DvlTightPreintFactorArm(gtsam::Key pose_key_i, gtsam::Key pose_key_j, gtsam::Key bias_key_i,
-                          const gtsam::Pose3& target_T_imu, const gtsam::Pose3& target_T_dvl,
+                          const gtsam::Pose3& target_T_dvl,
                           const gtsam::Vector3& measured_translation,
                           const gtsam::Matrix3& d_translation_d_bias,
                           const gtsam::Vector3& gyro_bias_hat, gtsam::SharedNoiseModel noise_model)
       : gtsam::NoiseModelFactor3<gtsam::Pose3, gtsam::Pose3, gtsam::imuBias::ConstantBias>(
             noise_model, pose_key_i, pose_key_j, bias_key_i),
-        target_T_imu_(target_T_imu),
-        target_T_dvl_(target_T_dvl),
-        imu_T_dvl_(target_T_imu.between(target_T_dvl)),
+        target_p_dvl_(target_T_dvl.translation()),
         measured_translation_(measured_translation),
         d_translation_d_bias_(d_translation_d_bias),
         gyro_bias_hat_(gyro_bias_hat) {}
@@ -89,33 +84,28 @@ class DvlTightPreintFactorArm
     gtsam::Vector3 corrected_translation =
         measured_translation_ + (d_translation_d_bias_ * gyro_bias_update);
 
-    gtsam::Matrix66 H_posej_compose;
-    gtsam::Pose3 pose_dvl_j = pose_j.compose(target_T_dvl_, H_pose_j ? &H_posej_compose : nullptr);
-
     gtsam::Matrix36 H_position_j = gtsam::Matrix36::Zero();
-    gtsam::Point3 position_j = pose_dvl_j.translation(H_pose_j ? &H_position_j : nullptr);
-
-    gtsam::Matrix66 H_posei_compose;
-    gtsam::Pose3 pose_imu_i = pose_i.compose(target_T_imu_, H_pose_i ? &H_posei_compose : nullptr);
+    gtsam::Point3 position_j =
+        pose_j.transformFrom(target_p_dvl_, H_pose_j ? &H_position_j : nullptr);
 
     gtsam::Matrix36 H_pred_pose_i = gtsam::Matrix36::Zero();
     gtsam::Matrix33 H_pred_pos_j = gtsam::Matrix33::Zero();
-    gtsam::Point3 relative_position = pose_imu_i.transformTo(
+    gtsam::Point3 relative_position = pose_i.transformTo(
         position_j, H_pose_i ? &H_pred_pose_i : nullptr, H_pose_j ? &H_pred_pos_j : nullptr);
 
-    gtsam::Vector3 predicted_translation = relative_position - imu_T_dvl_.translation();
+    gtsam::Vector3 predicted_translation = relative_position - target_p_dvl_;
 
     // 3D translation residual
     gtsam::Vector3 error = predicted_translation - corrected_translation;
 
     if (H_pose_i) {
       // Jacobian with respect to pose_i (3x6)
-      *H_pose_i = H_pred_pose_i * H_posei_compose;
+      *H_pose_i = H_pred_pose_i;
     }
 
     if (H_pose_j) {
       // Jacobian with respect to pose_j (3x6)
-      *H_pose_j = H_pred_pos_j * H_position_j * H_posej_compose;
+      *H_pose_j = H_pred_pos_j * H_position_j;
     }
 
     if (H_bias_i) {

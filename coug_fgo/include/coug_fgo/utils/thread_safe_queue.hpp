@@ -94,15 +94,6 @@ class ThreadSafeQueue {
     queue_.insert(queue_.begin(), items.begin(), items.end());
   }
 
-  /**
-   * @brief Gets the last item in the queue.
-   * @return The last item.
-   */
-  T back() const {
-    std::scoped_lock lock(mutex_);
-    return queue_.back();
-  }
-
  private:
   mutable std::mutex mutex_;
   std::deque<T> queue_;

@@ -68,15 +68,6 @@ struct OptimizeResult {
 };
 
 /**
- * @struct UpdateResult
- * @brief Output from a successful update step (unused structs for re-queueing).
- */
-struct UpdateResult {
-  std::deque<std::shared_ptr<utils::ImuData>> unused_imu;
-  std::deque<std::shared_ptr<utils::TwistData>> unused_dvl;
-};
-
-/**
  * @class FactorGraphCore
  * @brief C++ GTSAM factor graph logic for AUV state estimation.
  */
@@ -99,9 +90,9 @@ class FactorGraphCore {
    * @brief Builds factors for one keyframe and writes the graph to the buffer.
    * @param target_time The keyframe timestamp.
    * @param queues Drained sensor data structs (consumed).
-   * @return UpdateResult with unused structs, or nullopt if timestamp was stale.
+   * @return Unused structs for re-queueing, or nullopt if timestamp was stale.
    */
-  std::optional<UpdateResult> update(double target_time, utils::QueueBundle& queues);
+  std::optional<utils::QueueBundle> update(double target_time, utils::QueueBundle& queues);
 
   /**
    * @brief Consumes the buffer and runs the GTSAM smoother.
@@ -171,9 +162,11 @@ class FactorGraphCore {
    * @brief Adds a DVL body-frame velocity factor with lever arm compensation.
    * @param graph The target factor graph.
    * @param dvl_msgs Drained DVL twist structs.
+   * @param held_imu_gyr The held gyro measurement (IMU frame) for the lever arm term.
    */
   void addDvlFactor(gtsam::NonlinearFactorGraph& graph,
-                    const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs);
+                    const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
+                    const gtsam::Vector3& held_imu_gyr);
 
   /**
    * @brief Adds a constant-velocity (zero-acceleration) factor between keyframes.
@@ -197,12 +190,10 @@ class FactorGraphCore {
    * @param graph The target factor graph.
    * @param imu_msgs Drained, time-sorted IMU structs.
    * @param target_time Integration endpoint timestamp.
-   * @param[out] unused_imu Messages with timestamps beyond target_time for re-queueing.
    */
   void addImuPreintFactor(gtsam::NonlinearFactorGraph& graph,
                           const std::deque<std::shared_ptr<utils::ImuData>>& imu_msgs,
-                          double target_time,
-                          std::deque<std::shared_ptr<utils::ImuData>>& unused_imu);
+                          double target_time);
 
   /**
    * @brief Interpolates AHRS-derived orientation at a target timestamp via SLERP.
@@ -220,13 +211,11 @@ class FactorGraphCore {
    * @param dvl_msgs Drained, time-sorted DVL structs.
    * @param ahrs_msgs Drained AHRS structs for orientation interpolation.
    * @param target_time Integration endpoint timestamp.
-   * @param[out] unused_dvl Messages with timestamps beyond target_time for re-queueing.
    */
   void addDvlLoosePreintFactor(gtsam::NonlinearFactorGraph& graph,
                                const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
                                const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs,
-                               double target_time,
-                               std::deque<std::shared_ptr<utils::TwistData>>& unused_dvl);
+                               double target_time);
 
   /**
    * @brief Integrates DVL measurements (rotated via relative IMU rotations) and adds a
@@ -237,14 +226,12 @@ class FactorGraphCore {
    * @param target_time Integration endpoint timestamp.
    * @param held_imu_acc IMU acceleration at the start of the window.
    * @param held_imu_gyr IMU angular velocity at the start of the window.
-   * @param[out] unused_dvl Messages with timestamps beyond target_time for re-queueing.
    */
   void addDvlTightPreintFactor(gtsam::NonlinearFactorGraph& graph,
                                const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
                                const std::deque<std::shared_ptr<utils::ImuData>>& imu_msgs,
                                double target_time, const gtsam::Vector3& held_imu_acc,
-                               const gtsam::Vector3& held_imu_gyr,
-                               std::deque<std::shared_ptr<utils::TwistData>>& unused_dvl);
+                               const gtsam::Vector3& held_imu_gyr);
 
   // --- Parameters ---
   const factor_graph_node::Params& params_;

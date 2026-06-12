@@ -53,30 +53,30 @@ class DvlTightPreintegrator {
   /**
    * @brief Integrates a new DVL velocity measurement.
    * @param measured_vel The velocity measurement in the DVL sensor frame.
-   * @param delta_R_ik Relative IMU rotation from start of interval (i) to current measurement (k).
-   * @param imu_R_dvl Static extrinsic rotation from the DVL to the IMU frame.
+   * @param delta_R_ik Relative target-frame rotation from interval start (i) to measurement (k).
+   * @param target_R_dvl Static extrinsic rotation from the DVL to the target frame.
    * @param dt The time delta since the last measurement.
    * @param measured_cov The measurement noise covariance.
    * @param rot_cov_k Current rotation covariance from the IMU preintegrator at step k.
    * @param J_bg_k Jacobian of delta_R_ik w.r.t. the gyro bias (from IMU preintegrator).
    */
   void integrateMeasurement(const gtsam::Vector3& measured_vel, const gtsam::Rot3& delta_R_ik,
-                            const gtsam::Rot3& imu_R_dvl, double dt,
+                            const gtsam::Rot3& target_R_dvl, double dt,
                             const gtsam::Matrix3& measured_cov, const gtsam::Matrix3& rot_cov_k,
                             const gtsam::Matrix3& J_bg_k) {
-    // Calculate velocity in the IMU frame at time k
-    gtsam::Vector3 vel_in_imu = imu_R_dvl.rotate(measured_vel);
+    // Calculate velocity in the target frame at time k
+    gtsam::Vector3 vel_in_target = target_R_dvl.rotate(measured_vel);
 
-    // Rotate into the IMU frame at the start of the interval (time i)
-    gtsam::Vector3 vel_in_i = delta_R_ik.rotate(vel_in_imu);
+    // Rotate into the target frame at the start of the interval (time i)
+    gtsam::Vector3 vel_in_i = delta_R_ik.rotate(vel_in_target);
     measured_translation_ += vel_in_i * dt;
 
     // Compute Jacobians for uncertainty and bias correction
     // J_vel maps DVL velocity noise to translation noise
-    gtsam::Matrix3 J_vel = delta_R_ik.matrix() * imu_R_dvl.matrix() * dt;
+    gtsam::Matrix3 J_vel = delta_R_ik.matrix() * target_R_dvl.matrix() * dt;
 
     // J_rot maps Gyro rotation noise to translation noise
-    gtsam::Matrix3 J_rot = -delta_R_ik.matrix() * gtsam::skewSymmetric(vel_in_imu) * dt;
+    gtsam::Matrix3 J_rot = -delta_R_ik.matrix() * gtsam::skewSymmetric(vel_in_target) * dt;
 
     // Propagate combined DVL and Gyroscope uncertainty
     covariance_ +=
@@ -88,7 +88,7 @@ class DvlTightPreintegrator {
 
   /**
    * @brief Gets the preintegrated translation delta.
-   * @return The translation delta in the IMU frame at the start of the interval (i).
+   * @return The translation delta in the target frame at the start of the interval (i).
    */
   gtsam::Vector3 delta() const { return measured_translation_; }
 

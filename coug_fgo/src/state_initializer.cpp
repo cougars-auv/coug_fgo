@@ -235,7 +235,7 @@ gtsam::Rot3 StateInitializer::computeInitialOrientation(const TfBundle& tfs) {
 
     // Use the tilt-compensated magnetic vector
     gtsam::Rot3 R_rp = gtsam::Rot3::Ypr(0.0, pitch, roll);
-    gtsam::Vector3 mag_horizontal = R_rp.unrotate(mag_target);
+    gtsam::Vector3 mag_horizontal = R_rp.rotate(mag_target);
 
     double measured_yaw = std::atan2(mag_horizontal.y(), mag_horizontal.x());
     double ref_yaw = std::atan2(params_.mag.reference_field[1], params_.mag.reference_field[0]);

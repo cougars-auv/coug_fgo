@@ -32,7 +32,10 @@ from scipy.spatial.transform import Rotation
 from tqdm import tqdm
 
 FGO_LIB_PATH = str(
-    Path.home() / "cougars-dev/ros2_ws/install/coug_fgo/lib/python3.10/site-packages"
+    Path.home()
+    / "cougars-dev/ros2_ws/install/coug_fgo/lib"
+    / f"python{sys.version_info.major}.{sys.version_info.minor}"
+    / "site-packages"
 )
 sys.path.insert(0, FGO_LIB_PATH)
 import pybind11fgo  # noqa: E402
