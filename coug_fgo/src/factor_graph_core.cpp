@@ -963,13 +963,13 @@ std::optional<OptimizeResult> FactorGraphCore::optimize() {
   }
 
   // --- Smoother Optimization ---
-  auto total_start = std::chrono::high_resolution_clock::now();
+  auto total_start = std::chrono::steady_clock::now();
   result.new_factors = batch_graph.size();
 
   if (inc_smoother_) {
-    auto smoother_start = std::chrono::high_resolution_clock::now();
+    auto smoother_start = std::chrono::steady_clock::now();
     inc_smoother_->update(batch_graph, batch_values, batch_timestamps);
-    auto smoother_end = std::chrono::high_resolution_clock::now();
+    auto smoother_end = std::chrono::steady_clock::now();
     result.smoother_duration = std::chrono::duration<double>(smoother_end - smoother_start).count();
 
     {
@@ -986,9 +986,9 @@ std::optional<OptimizeResult> FactorGraphCore::optimize() {
     }
 
   } else if (isam_) {
-    auto smoother_start = std::chrono::high_resolution_clock::now();
+    auto smoother_start = std::chrono::steady_clock::now();
     isam_->update(batch_graph, batch_values);
-    auto smoother_end = std::chrono::high_resolution_clock::now();
+    auto smoother_end = std::chrono::steady_clock::now();
     result.smoother_duration = std::chrono::duration<double>(smoother_end - smoother_start).count();
 
     {
@@ -1006,12 +1006,12 @@ std::optional<OptimizeResult> FactorGraphCore::optimize() {
     lm_graph_.push_back(batch_graph.begin(), batch_graph.end());
     lm_values_.insert(batch_values);
 
-    auto smoother_start = std::chrono::high_resolution_clock::now();
+    auto smoother_start = std::chrono::steady_clock::now();
     gtsam::LevenbergMarquardtParams lm_params;
     gtsam::LevenbergMarquardtOptimizer optimizer(lm_graph_, lm_values_, lm_params);
     gtsam::Values lm_result = optimizer.optimize();
     lm_values_ = lm_result;
-    auto smoother_end = std::chrono::high_resolution_clock::now();
+    auto smoother_end = std::chrono::steady_clock::now();
     result.smoother_duration = std::chrono::duration<double>(smoother_end - smoother_start).count();
 
     {
@@ -1035,7 +1035,7 @@ std::optional<OptimizeResult> FactorGraphCore::optimize() {
   }
 
   // --- Calculate Covariances ---
-  auto cov_start = std::chrono::high_resolution_clock::now();
+  auto cov_start = std::chrono::steady_clock::now();
   result.pose_cov = gtsam::Matrix::Identity(6, 6) * -1.0;
   if (params_.publish_pose_cov) {
     if (inc_smoother_) {
@@ -1063,7 +1063,7 @@ std::optional<OptimizeResult> FactorGraphCore::optimize() {
     }
   }
 
-  auto cov_end = std::chrono::high_resolution_clock::now();
+  auto cov_end = std::chrono::steady_clock::now();
   result.cov_duration = std::chrono::duration<double>(cov_end - cov_start).count();
 
   // --- Export Smoothed Path ---
@@ -1077,7 +1077,7 @@ std::optional<OptimizeResult> FactorGraphCore::optimize() {
     }
   }
 
-  auto total_end = std::chrono::high_resolution_clock::now();
+  auto total_end = std::chrono::steady_clock::now();
   result.total_duration = std::chrono::duration<double>(total_end - total_start).count();
 
   return result;

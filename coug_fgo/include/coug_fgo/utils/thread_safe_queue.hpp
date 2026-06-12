@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <deque>
 #include <mutex>
 #include <optional>
@@ -43,6 +44,7 @@ class ThreadSafeQueue {
     std::scoped_lock lock(mutex_);
     queue_.push_back(value);
     last_msg_time_ = value->timestamp;
+    last_arrival_ = std::chrono::steady_clock::now();
   }
 
   /**
@@ -86,6 +88,17 @@ class ThreadSafeQueue {
   }
 
   /**
+   * @brief Gets the wall-clock seconds since the last item arrived, or nullopt if none has.
+   */
+  std::optional<double> secondsSinceLastArrival() const {
+    std::scoped_lock lock(mutex_);
+    if (!last_arrival_.has_value()) {
+      return std::nullopt;
+    }
+    return std::chrono::duration<double>(std::chrono::steady_clock::now() - *last_arrival_).count();
+  }
+
+  /**
    * @brief Restores items to the front of the queue.
    * @param items The items to restore.
    */
@@ -98,6 +111,7 @@ class ThreadSafeQueue {
   mutable std::mutex mutex_;
   std::deque<T> queue_;
   std::optional<double> last_msg_time_;
+  std::optional<std::chrono::steady_clock::time_point> last_arrival_;
 };
 
 }  // namespace coug_fgo::utils

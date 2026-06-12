@@ -21,6 +21,7 @@
 
 #include "coug_fgo/factor_graph.hpp"
 
+#include <algorithm>
 #include <rclcpp_components/register_node_macro.hpp>
 
 #include "coug_fgo/utils/param_enums.hpp"
@@ -620,7 +621,13 @@ void FactorGraphNode::initializeGraph() {
   init_queues.ahrs = ahrs_queue_.drain();
   init_queues.dvl = dvl_queue_.drain();
   init_queues.wrench = wrench_queue_.drain();
-  if (!state_init_->update(get_clock()->now().seconds(), init_queues)) {
+
+  auto back_time = [](const auto& q) { return q.empty() ? 0.0 : q.back()->timestamp; };
+  double newest_stamp = std::max({back_time(init_queues.imu), back_time(init_queues.gps),
+                                  back_time(init_queues.depth), back_time(init_queues.mag),
+                                  back_time(init_queues.ahrs), back_time(init_queues.dvl),
+                                  back_time(init_queues.wrench)});
+  if (newest_stamp <= 0.0 || !state_init_->update(newest_stamp, init_queues)) {
     return;
   }
 
@@ -646,8 +653,9 @@ void FactorGraphNode::updateGraph() {
                                               ? dvl_queue_.getLastTime()
                                               : depth_queue_.getLastTime();
 
+    std::optional<double> newest_stamp = imu_queue_.getLastTime();
     if (!last_received.has_value() ||
-        (get_clock()->now().seconds() - *last_received) > params_.keyframe_timeout) {
+        (newest_stamp.has_value() && (*newest_stamp - *last_received) > params_.keyframe_timeout)) {
       const auto backup = parseKeyframeSource(params_.backup_keyframe_source);
       if (backup != KeyframeSource::kNone) {
         active_source = backup;
@@ -756,19 +764,18 @@ void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrap
   bool any_critical_offline = false;
   std::vector<std::string> offline_sensors;
 
-  auto check_queue = [&](const std::string& name, size_t size, std::optional<double> last_time,
+  auto check_queue = [&](const std::string& name, size_t size, std::optional<double> since_arrival,
                          bool enabled, bool is_critical, double timeout) {
     if (!enabled) {
       return;
     }
 
-    double time_since =
-        last_time.has_value() ? (this->get_clock()->now().seconds() - *last_time) : -1.0;
+    double time_since = since_arrival.value_or(-1.0);
 
     stat.add(name + " Queue Size", size);
     stat.add(name + " Time Since Last (s)", time_since);
 
-    if (time_since > timeout || (!last_time.has_value() && size == 0)) {
+    if (time_since > timeout || (!since_arrival.has_value() && size == 0)) {
       offline_sensors.push_back(name + " is offline.");
       if (is_critical) {
         any_critical_offline = true;
@@ -776,19 +783,20 @@ void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrap
     }
   };
 
-  check_queue("IMU", imu_queue_.size(), imu_queue_.getLastTime(), true, true,
+  check_queue("IMU", imu_queue_.size(), imu_queue_.secondsSinceLastArrival(), true, true,
               params_.imu.diagnostic_timeout);
-  check_queue("GPS", gps_queue_.size(), gps_queue_.getLastTime(), params_.gps.enable_gps, false,
-              params_.gps.diagnostic_timeout);
-  check_queue("Depth", depth_queue_.size(), depth_queue_.getLastTime(), params_.depth.enable_depth,
-              params_.depth.enable_depth, params_.depth.diagnostic_timeout);
-  check_queue("Mag", mag_queue_.size(), mag_queue_.getLastTime(), params_.mag.enable_mag, false,
-              params_.mag.diagnostic_timeout);
-  check_queue("AHRS", ahrs_queue_.size(), ahrs_queue_.getLastTime(), params_.ahrs.enable_ahrs,
-              false, params_.ahrs.diagnostic_timeout);
-  check_queue("DVL", dvl_queue_.size(), dvl_queue_.getLastTime(), params_.dvl.enable_dvl,
-              params_.dvl.enable_dvl, params_.dvl.diagnostic_timeout);
-  check_queue("Wrench", wrench_queue_.size(), wrench_queue_.getLastTime(),
+  check_queue("GPS", gps_queue_.size(), gps_queue_.secondsSinceLastArrival(),
+              params_.gps.enable_gps, false, params_.gps.diagnostic_timeout);
+  check_queue("Depth", depth_queue_.size(), depth_queue_.secondsSinceLastArrival(),
+              params_.depth.enable_depth, params_.depth.enable_depth,
+              params_.depth.diagnostic_timeout);
+  check_queue("Mag", mag_queue_.size(), mag_queue_.secondsSinceLastArrival(),
+              params_.mag.enable_mag, false, params_.mag.diagnostic_timeout);
+  check_queue("AHRS", ahrs_queue_.size(), ahrs_queue_.secondsSinceLastArrival(),
+              params_.ahrs.enable_ahrs, false, params_.ahrs.diagnostic_timeout);
+  check_queue("DVL", dvl_queue_.size(), dvl_queue_.secondsSinceLastArrival(),
+              params_.dvl.enable_dvl, params_.dvl.enable_dvl, params_.dvl.diagnostic_timeout);
+  check_queue("Wrench", wrench_queue_.size(), wrench_queue_.secondsSinceLastArrival(),
               params_.dynamics.enable_dynamics, false, params_.dynamics.diagnostic_timeout);
 
   if (!offline_sensors.empty()) {
