@@ -38,7 +38,7 @@ def visualization_setup(context, *args, **kwargs) -> list:
 
     if launch_rviz_str.lower() == "true":
         full_template_path = os.path.join(
-            pkg_share, "rviz", "rviz_config.rviz.template"
+            pkg_share, "config", "rviz_config.rviz.template"
         )
         with open(full_template_path, "r") as f:
             template_content = f.read()
@@ -57,7 +57,7 @@ def visualization_setup(context, *args, **kwargs) -> list:
             ]
 
             per_agent_template_path = os.path.join(
-                pkg_share, "rviz", "multi_rviz_config.rviz.template"
+                pkg_share, "config", "multi_rviz_config.rviz.template"
             )
             with open(per_agent_template_path, "r") as f:
                 per_agent_template = f.read()
@@ -93,9 +93,7 @@ def visualization_setup(context, *args, **kwargs) -> list:
         )
 
     if launch_pj_str.lower() == "true":
-        template_path = os.path.join(
-            pkg_share, "plotjuggler", "plotjuggler.xml.template"
-        )
+        template_path = os.path.join(pkg_share, "config", "plotjuggler.xml.template")
         with open(template_path, "r") as f:
             template_content = f.read()
 
