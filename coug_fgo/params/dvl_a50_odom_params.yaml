@@ -6,14 +6,20 @@ dvl_a50_odom_node:
   diagnostic_timeout_sec:
     type: double
     default_value: 0.5
+    validation:
+      gt<>: [0.0]
 
   # --- ROS Topics and Frames ---
   input_topic:
     type: string
     default_value: "dvl/position"
+    validation:
+      not_empty<>: []
   output_topic:
     type: string
     default_value: "odometry/dvl_ned"
+    validation:
+      not_empty<>: []
 
   use_parameter_frame:
     type: bool
@@ -21,9 +27,15 @@ dvl_a50_odom_node:
   parameter_frame:
     type: string
     default_value: "dvl_link"
+    validation:
+      not_empty<>: []
   odom_frame:
     type: string
     default_value: "odom"
+    validation:
+      not_empty<>: []
   base_frame:
     type: string
     default_value: "base_link"
+    validation:
+      not_empty<>: []

@@ -6,6 +6,8 @@ navsat_odom_node:
   diagnostic_timeout_sec:
     type: double
     default_value: 1.0
+    validation:
+      gt<>: [0.0]
 
   set_origin:
     type: bool
@@ -13,6 +15,8 @@ navsat_odom_node:
   origin_pub_rate_hz:
     type: double
     default_value: 1.0
+    validation:
+      gt<>: [0.0]
 
   use_parameter_origin:
     type: bool
@@ -20,23 +24,41 @@ navsat_odom_node:
   origin_latitude:
     type: double
     default_value: 40.33940
+    validation:
+      bounds<>: [-90.0, 90.0]
   origin_longitude:
     type: double
     default_value: -111.90721
+    validation:
+      bounds<>: [-180.0, 180.0]
   origin_altitude:
     type: double
     default_value: 1412.0
+    validation:
+      bounds<>: [-1000.0, 10000.0]
 
   # --- ROS Topics and Frames ---
   input_topic:
     type: string
     default_value: "gps/fix"
+    validation:
+      not_empty<>: []
   output_topic:
     type: string
     default_value: "odometry/gps"
+    validation:
+      not_empty<>: []
   origin_topic:
     type: string
     default_value: "/origin"
+    validation:
+      not_empty<>: []
+
+  map_frame:
+    type: string
+    default_value: "map"
+    validation:
+      not_empty<>: []
 
   use_parameter_child_frame:
     type: bool
@@ -44,6 +66,5 @@ navsat_odom_node:
   parameter_child_frame:
     type: string
     default_value: "gps_link"
-  map_frame:
-    type: string
-    default_value: "map"
+    validation:
+      not_empty<>: []

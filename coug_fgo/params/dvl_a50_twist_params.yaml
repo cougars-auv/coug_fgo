@@ -6,6 +6,8 @@ dvl_a50_twist_node:
   diagnostic_timeout_sec:
     type: double
     default_value: 0.5
+    validation:
+      gt<>: [0.0]
 
   simulate_dropout:
     type: bool
@@ -13,27 +15,39 @@ dvl_a50_twist_node:
   dropout_frequency_hz:
     type: double
     default_value: 0.033
+    validation:
+      gt_eq<>: [0.0]
   dropout_duration_sec:
     type: double
     default_value: 5.0
+    validation:
+      gt_eq<>: [0.0]
 
   fom_valid_threshold:
     type: double
     default_value: 0.02
+    validation:
+      gt<>: [0.0]
   use_fom_covariance:
     type: bool
     default_value: false
   fom_covariance_scale:
     type: double
     default_value: 4.0
+    validation:
+      gt<>: [0.0]
 
   # --- ROS Topics and Frames ---
   input_topic:
     type: string
     default_value: "dvl/data"
+    validation:
+      not_empty<>: []
   output_topic:
     type: string
     default_value: "dvl/twist"
+    validation:
+      not_empty<>: []
 
   use_parameter_frame:
     type: bool
@@ -41,3 +55,5 @@ dvl_a50_twist_node:
   parameter_frame:
     type: string
     default_value: "dvl_link"
+    validation:
+      not_empty<>: []

@@ -6,34 +6,58 @@ fluid_pressure_odom_node:
   diagnostic_timeout_sec:
     type: double
     default_value: 0.5
+    validation:
+      gt<>: [0.0]
 
   pressure_scale:
     type: double
     default_value: 1.0
+    validation:
+      gt<>: [0.0]
   atmospheric_pressure:
     type: double
     default_value: 101325.0
+    validation:
+      gt<>: [0.0]
   water_density:
     type: double
     default_value: 997.0
+    validation:
+      gt<>: [0.0]
   gravity:
     type: double
     default_value: 9.81
+    validation:
+      gt<>: [0.0]
 
   fallback_depth_noise_sigma:
     type: double
     default_value: 0.02
+    validation:
+      gt<>: [0.0]
   max_pressure_delta:
     type: double
     default_value: 0.0
+    validation:
+      gt_eq<>: [0.0]
 
   # --- ROS Topics and Frames ---
   input_topic:
     type: string
     default_value: "pressure"
+    validation:
+      not_empty<>: []
   output_topic:
     type: string
     default_value: "odometry/depth"
+    validation:
+      not_empty<>: []
+
+  map_frame:
+    type: string
+    default_value: "map"
+    validation:
+      not_empty<>: []
 
   use_parameter_child_frame:
     type: bool
@@ -41,6 +65,5 @@ fluid_pressure_odom_node:
   parameter_child_frame:
     type: string
     default_value: "depth_link"
-  map_frame:
-    type: string
-    default_value: "map"
+    validation:
+      not_empty<>: []

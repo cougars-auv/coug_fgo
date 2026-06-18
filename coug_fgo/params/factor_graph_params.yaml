@@ -38,25 +38,35 @@ factor_graph_node:
   max_update_rate_hz:
     type: double
     default_value: -1.0
+    validation:
+      gt_eq<>: [-1.0]
   max_opt_rate_hz:
     type: double
     default_value: -1.0
+    validation:
+      gt_eq<>: [-1.0]
   smoother_lag:
     type: double
     default_value: 10.0
+    validation:
+      gt<>: [0.0]
   relinearize_threshold:
     type: double
     default_value: 0.1
+    validation:
+      gt<>: [0.0]
   relinearize_skip:
     type: int
     default_value: 1
+    validation:
+      gt_eq<>: [1]
 
   # --- Keyframe Settings ---
   keyframe_source:
     type: string
     default_value: "DVL"
     validation:
-      one_of<>: [["DVL", "Depth", "Timer"]]
+      one_of<>: [["None", "DVL", "Depth", "Timer"]]
   backup_keyframe_source:
     type: string
     default_value: "None"
@@ -65,60 +75,96 @@ factor_graph_node:
   keyframe_timeout_sec:
     type: double
     default_value: 0.5
+    validation:
+      gt<>: [0.0]
   keyframe_timer_hz:
     type: double
     default_value: 10.0
+    validation:
+      gt<>: [0.0]
 
   # --- ROS Topics and Frames ---
   imu_topic:
     type: string
     default_value: "imu/data"
+    validation:
+      not_empty<>: []
   gps_odom_topic:
     type: string
     default_value: "odometry/gps"
+    validation:
+      not_empty<>: []
   depth_odom_topic:
     type: string
     default_value: "odometry/depth"
+    validation:
+      not_empty<>: []
   mag_topic:
     type: string
     default_value: "imu/mag"
+    validation:
+      not_empty<>: []
   ahrs_topic:
     type: string
     default_value: "imu/data"
+    validation:
+      not_empty<>: []
   dvl_topic:
     type: string
     default_value: "dvl/twist"
+    validation:
+      not_empty<>: []
   wrench_topic:
     type: string
     default_value: "cmd_wrench"
+    validation:
+      not_empty<>: []
   global_odom_topic:
     type: string
     default_value: "odometry/global"
+    validation:
+      not_empty<>: []
   smoothed_path_topic:
     type: string
     default_value: "smoothed_path"
+    validation:
+      not_empty<>: []
   velocity_topic:
     type: string
     default_value: "~/velocity"
+    validation:
+      not_empty<>: []
   imu_bias_topic:
     type: string
     default_value: "~/imu/bias"
+    validation:
+      not_empty<>: []
   graph_metrics_topic:
     type: string
     default_value: "~/metrics"
+    validation:
+      not_empty<>: []
 
   map_frame:
     type: string
     default_value: "map"
+    validation:
+      not_empty<>: []
   odom_frame:
     type: string
     default_value: "odom"
+    validation:
+      not_empty<>: []
   target_frame:
     type: string
     default_value: "dvl_link"
+    validation:
+      not_empty<>: []
   base_frame:
     type: string
     default_value: "base_link"
+    validation:
+      not_empty<>: []
 
   # --- Sensor Settings ---
   base:
@@ -129,9 +175,13 @@ factor_graph_node:
       position:
         type: double_array
         default_value: [0.0, 0.0, 0.0]
+        validation:
+          fixed_size<>: [3]
       orientation:
         type: double_array
         default_value: [0.0, 0.0, 0.0, 1.0]
+        validation:
+          fixed_size<>: [4]
 
   imu:
     use_parameter_frame:
@@ -140,6 +190,8 @@ factor_graph_node:
     parameter_frame:
       type: string
       default_value: "imu_link"
+      validation:
+        not_empty<>: []
     use_parameter_tf:
       type: bool
       default_value: false
@@ -147,12 +199,18 @@ factor_graph_node:
       position:
         type: double_array
         default_value: [0.0, 0.0, 0.0]
+        validation:
+          fixed_size<>: [3]
       orientation:
         type: double_array
         default_value: [0.0, 0.0, 0.0, 1.0]
+        validation:
+          fixed_size<>: [4]
     covariance_scalar:
       type: double
       default_value: 1.0
+      validation:
+        gt<>: [0.0]
     use_parameter_covariance:
       type: bool
       default_value: false
@@ -160,24 +218,42 @@ factor_graph_node:
       accel_noise_sigmas:
         type: double_array
         default_value: [0.0078, 0.0078, 0.0078]
+        validation:
+          fixed_size<>: [3]
+          lower_element_bounds<>: [0.0]
       gyro_noise_sigmas:
         type: double_array
         default_value: [0.0012, 0.0012, 0.0012]
+        validation:
+          fixed_size<>: [3]
+          lower_element_bounds<>: [0.0]
     accel_bias_rw_sigmas:
       type: double_array
       default_value: [0.000105, 0.000105, 0.000105]
+      validation:
+        fixed_size<>: [3]
+        lower_element_bounds<>: [0.0]
     gyro_bias_rw_sigmas:
       type: double_array
       default_value: [0.0000391, 0.0000391, 0.0000391]
+      validation:
+        fixed_size<>: [3]
+        lower_element_bounds<>: [0.0]
     integration_covariance:
       type: double
       default_value: 0.00001
+      validation:
+        gt<>: [0.0]
     gravity:
       type: double_array
       default_value: [0.0, 0.0, -9.8]
+      validation:
+        fixed_size<>: [3]
     diagnostic_timeout_sec:
       type: double
       default_value: 1.0
+      validation:
+        gt<>: [0.0]
 
   gps:
     enable_gps:
@@ -192,6 +268,8 @@ factor_graph_node:
     parameter_frame:
       type: string
       default_value: "gps_link"
+      validation:
+        not_empty<>: []
     use_parameter_tf:
       type: bool
       default_value: false
@@ -199,12 +277,18 @@ factor_graph_node:
       position:
         type: double_array
         default_value: [0.0, 0.0, 0.0]
+        validation:
+          fixed_size<>: [3]
       orientation:
         type: double_array
         default_value: [0.0, 0.0, 0.0, 1.0]
+        validation:
+          fixed_size<>: [4]
     covariance_scalar:
       type: double
       default_value: 1.0
+      validation:
+        gt<>: [0.0]
     use_parameter_covariance:
       type: bool
       default_value: false
@@ -212,9 +296,14 @@ factor_graph_node:
       position_noise_sigmas:
         type: double_array
         default_value: [0.015, 0.015]
+        validation:
+          fixed_size<>: [2]
+          lower_element_bounds<>: [0.0]
     diagnostic_timeout_sec:
       type: double
       default_value: 2.0
+      validation:
+        gt<>: [0.0]
     robust_kernel:
       type: string
       default_value: "None"
@@ -223,6 +312,8 @@ factor_graph_node:
     robust_k:
       type: double
       default_value: 1.345
+      validation:
+        gt<>: [0.0]
 
   depth:
     enable_depth:
@@ -237,6 +328,8 @@ factor_graph_node:
     parameter_frame:
       type: string
       default_value: "depth_link"
+      validation:
+        not_empty<>: []
     use_parameter_tf:
       type: bool
       default_value: false
@@ -244,12 +337,18 @@ factor_graph_node:
       position:
         type: double_array
         default_value: [0.0, 0.0, 0.0]
+        validation:
+          fixed_size<>: [3]
       orientation:
         type: double_array
         default_value: [0.0, 0.0, 0.0, 1.0]
+        validation:
+          fixed_size<>: [4]
     covariance_scalar:
       type: double
       default_value: 1.0
+      validation:
+        gt<>: [0.0]
     use_parameter_covariance:
       type: bool
       default_value: false
@@ -257,9 +356,13 @@ factor_graph_node:
       position_z_noise_sigma:
         type: double
         default_value: 0.02
+        validation:
+          gt_eq<>: [0.0]
     diagnostic_timeout_sec:
       type: double
       default_value: 1.0
+      validation:
+        gt<>: [0.0]
     robust_kernel:
       type: string
       default_value: "None"
@@ -268,6 +371,8 @@ factor_graph_node:
     robust_k:
       type: double
       default_value: 1.345
+      validation:
+        gt<>: [0.0]
 
   mag:
     enable_mag:
@@ -282,6 +387,8 @@ factor_graph_node:
     parameter_frame:
       type: string
       default_value: "mag_link"
+      validation:
+        not_empty<>: []
     use_parameter_tf:
       type: bool
       default_value: false
@@ -289,12 +396,18 @@ factor_graph_node:
       position:
         type: double_array
         default_value: [0.0, 0.0, 0.0]
+        validation:
+          fixed_size<>: [3]
       orientation:
         type: double_array
         default_value: [0.0, 0.0, 0.0, 1.0]
+        validation:
+          fixed_size<>: [4]
     covariance_scalar:
       type: double
       default_value: 1.0
+      validation:
+        gt<>: [0.0]
     use_parameter_covariance:
       type: bool
       default_value: false
@@ -302,12 +415,19 @@ factor_graph_node:
       magnetic_field_noise_sigmas:
         type: double_array
         default_value: [0.003, 0.003, 0.003]
+        validation:
+          fixed_size<>: [3]
+          lower_element_bounds<>: [0.0]
     reference_field:
       type: double_array
       default_value: [0.07857, 0.41316, -0.90726]
+      validation:
+        fixed_size<>: [3]
     diagnostic_timeout_sec:
       type: double
       default_value: 1.0
+      validation:
+        gt<>: [0.0]
     robust_kernel:
       type: string
       default_value: "None"
@@ -316,6 +436,8 @@ factor_graph_node:
     robust_k:
       type: double
       default_value: 1.345
+      validation:
+        gt<>: [0.0]
 
   ahrs:
     enable_ahrs:
@@ -330,6 +452,8 @@ factor_graph_node:
     parameter_frame:
       type: string
       default_value: "ahrs_link"
+      validation:
+        not_empty<>: []
     use_parameter_tf:
       type: bool
       default_value: false
@@ -337,12 +461,18 @@ factor_graph_node:
       position:
         type: double_array
         default_value: [0.0, 0.0, 0.0]
+        validation:
+          fixed_size<>: [3]
       orientation:
         type: double_array
         default_value: [0.0, 0.0, 0.0, 1.0]
+        validation:
+          fixed_size<>: [4]
     covariance_scalar:
       type: double
       default_value: 1.0
+      validation:
+        gt<>: [0.0]
     use_parameter_covariance:
       type: bool
       default_value: false
@@ -350,12 +480,19 @@ factor_graph_node:
       orientation_noise_sigmas:
         type: double_array
         default_value: [0.00349, 0.00349, 0.01745]
+        validation:
+          fixed_size<>: [3]
+          lower_element_bounds<>: [0.0]
     mag_declination_radians:
       type: double
       default_value: 0.0
+      validation:
+        bounds<>: [-3.14159, 3.14159]
     diagnostic_timeout_sec:
       type: double
       default_value: 1.0
+      validation:
+        gt<>: [0.0]
     robust_kernel:
       type: string
       default_value: "None"
@@ -364,6 +501,8 @@ factor_graph_node:
     robust_k:
       type: double
       default_value: 1.345
+      validation:
+        gt<>: [0.0]
 
   dvl:
     enable_dvl:
@@ -378,6 +517,8 @@ factor_graph_node:
     parameter_frame:
       type: string
       default_value: "dvl_link"
+      validation:
+        not_empty<>: []
     use_parameter_tf:
       type: bool
       default_value: false
@@ -385,12 +526,18 @@ factor_graph_node:
       position:
         type: double_array
         default_value: [0.0, 0.0, 0.0]
+        validation:
+          fixed_size<>: [3]
       orientation:
         type: double_array
         default_value: [0.0, 0.0, 0.0, 1.0]
+        validation:
+          fixed_size<>: [4]
     covariance_scalar:
       type: double
       default_value: 1.0
+      validation:
+        gt<>: [0.0]
     use_parameter_covariance:
       type: bool
       default_value: false
@@ -398,9 +545,14 @@ factor_graph_node:
       velocity_noise_sigmas:
         type: double_array
         default_value: [0.02, 0.02, 0.02]
+        validation:
+          fixed_size<>: [3]
+          lower_element_bounds<>: [0.0]
     diagnostic_timeout_sec:
       type: double
       default_value: 0.25
+      validation:
+        gt<>: [0.0]
     robust_kernel:
       type: string
       default_value: "None"
@@ -409,6 +561,8 @@ factor_graph_node:
     robust_k:
       type: double
       default_value: 1.345
+      validation:
+        gt<>: [0.0]
 
   const_vel:
     enable_const_vel:
@@ -420,9 +574,14 @@ factor_graph_node:
     covariance_scalar:
       type: double
       default_value: 1.0
+      validation:
+        gt<>: [0.0]
     prediction_noise_sigmas:
       type: double_array
       default_value: [0.001, 0.001, 0.001]
+      validation:
+        fixed_size<>: [3]
+        lower_element_bounds<>: [0.0]
 
   dynamics:
     enable_dynamics:
@@ -437,6 +596,8 @@ factor_graph_node:
     parameter_frame:
       type: string
       default_value: "com_link"
+      validation:
+        not_empty<>: []
     use_parameter_tf:
       type: bool
       default_value: false
@@ -444,27 +605,47 @@ factor_graph_node:
       position:
         type: double_array
         default_value: [0.0, 0.0, 0.0]
+        validation:
+          fixed_size<>: [3]
       orientation:
         type: double_array
         default_value: [0.0, 0.0, 0.0, 1.0]
+        validation:
+          fixed_size<>: [4]
     covariance_scalar:
       type: double
       default_value: 1.0
+      validation:
+        gt<>: [0.0]
     prediction_noise_sigmas:
       type: double_array
       default_value: [0.1, 0.1, 0.1]
+      validation:
+        fixed_size<>: [3]
+        lower_element_bounds<>: [0.0]
     mass:
       type: double_array
       default_value: [31.87, 60.46, 60.46]
+      validation:
+        fixed_size<>: [3]
+        lower_element_bounds<>: [0.0]
     linear_drag:
       type: double_array
       default_value: [1.59, 3.02, 3.02]
+      validation:
+        fixed_size<>: [3]
+        lower_element_bounds<>: [0.0]
     quad_drag:
       type: double_array
       default_value: [6.11, 196.13, 196.13]
+      validation:
+        fixed_size<>: [3]
+        lower_element_bounds<>: [0.0]
     diagnostic_timeout_sec:
       type: double
       default_value: 1.0
+      validation:
+        gt<>: [0.0]
     robust_kernel:
       type: string
       default_value: "None"
@@ -473,12 +654,16 @@ factor_graph_node:
     robust_k:
       type: double
       default_value: 1.345
+      validation:
+        gt<>: [0.0]
 
   # --- Prior Settings ---
   prior:
     initialization_duration_sec:
       type: double
       default_value: 5.0
+      validation:
+        gt<>: [0.0]
     use_parameter_priors:
       type: bool
       default_value: false
@@ -486,33 +671,58 @@ factor_graph_node:
       initial_position:
         type: double_array
         default_value: [0.0, 0.0, 0.0]
+        validation:
+          fixed_size<>: [3]
       initial_orientation:
         type: double_array
         default_value: [0.0, 0.0, 0.0]
+        validation:
+          fixed_size<>: [3]
       initial_velocity:
         type: double_array
         default_value: [0.0, 0.0, 0.0]
+        validation:
+          fixed_size<>: [3]
       initial_accel_bias:
         type: double_array
         default_value: [0.0, 0.0, 0.0]
+        validation:
+          fixed_size<>: [3]
       initial_gyro_bias:
         type: double_array
         default_value: [0.0, 0.0, 0.0]
+        validation:
+          fixed_size<>: [3]
       initial_position_sigmas:
         type: double_array
         default_value: [0.001, 0.001, 0.001]
+        validation:
+          fixed_size<>: [3]
+          lower_element_bounds<>: [0.0]
       initial_orientation_sigmas:
         type: double_array
         default_value: [0.001, 0.001, 0.001]
+        validation:
+          fixed_size<>: [3]
+          lower_element_bounds<>: [0.0]
       initial_velocity_sigmas:
         type: double_array
         default_value: [0.001, 0.001, 0.001]
+        validation:
+          fixed_size<>: [3]
+          lower_element_bounds<>: [0.0]
     initial_accel_bias_sigmas:
       type: double_array
       default_value: [0.01, 0.01, 0.01]
+      validation:
+        fixed_size<>: [3]
+        lower_element_bounds<>: [0.0]
     initial_gyro_bias_sigmas:
       type: double_array
       default_value: [0.001, 0.001, 0.001]
+      validation:
+        fixed_size<>: [3]
+        lower_element_bounds<>: [0.0]
 
   # --- Comparison Methods ---
   comparison:

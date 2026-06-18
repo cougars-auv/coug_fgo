@@ -2,6 +2,10 @@ odom_ned_to_enu_node:
   input_topic:
     type: string
     default_value: "odometry/dvl_ned"
+    validation:
+      not_empty<>: []
   output_topic:
     type: string
     default_value: "odometry/dvl"
+    validation:
+      not_empty<>: []

@@ -6,33 +6,55 @@ seatrac_x150_imu_node:
   diagnostic_timeout_sec:
     type: double
     default_value: 0.5
+    validation:
+      gt<>: [0.0]
 
   accel_noise_sigmas:
     type: double_array
     default_value: [0.0078, 0.0078, 0.0078]
+    validation:
+      fixed_size<>: [3]
+      lower_element_bounds<>: [0.0]
   gyro_noise_sigmas:
     type: double_array
     default_value: [0.0012, 0.0012, 0.0012]
+    validation:
+      fixed_size<>: [3]
+      lower_element_bounds<>: [0.0]
   orientation_noise_sigmas:
     type: double_array
     default_value: [0.00349, 0.00349, 0.01745]
+    validation:
+      fixed_size<>: [3]
+      lower_element_bounds<>: [0.0]
   magnetic_field_noise_sigmas:
     type: double_array
     default_value: [0.003, 0.003, 0.003]
+    validation:
+      fixed_size<>: [3]
+      lower_element_bounds<>: [0.0]
   mag_declination_radians:
     type: double
     default_value: 0.0
+    validation:
+      bounds<>: [-3.14159, 3.14159]
 
   # --- ROS Topics and Frames ---
   input_topic:
     type: string
     default_value: "modem_status"
+    validation:
+      not_empty<>: []
   imu_output_topic:
     type: string
     default_value: "seatrac/imu/data_ned"
+    validation:
+      not_empty<>: []
   mag_output_topic:
     type: string
     default_value: "seatrac/imu/mag"
+    validation:
+      not_empty<>: []
 
   use_parameter_frame:
     type: bool
@@ -40,3 +62,5 @@ seatrac_x150_imu_node:
   parameter_frame:
     type: string
     default_value: "modem_link"
+    validation:
+      not_empty<>: []

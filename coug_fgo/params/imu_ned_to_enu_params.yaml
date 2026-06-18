@@ -2,6 +2,10 @@ imu_ned_to_enu_node:
   input_topic:
     type: string
     default_value: "imu/data_ned"
+    validation:
+      not_empty<>: []
   output_topic:
     type: string
     default_value: "imu/data"
+    validation:
+      not_empty<>: []
