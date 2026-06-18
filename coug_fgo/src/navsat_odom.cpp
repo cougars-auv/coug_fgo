@@ -51,7 +51,7 @@ NavsatOdomNode::NavsatOdomNode(const rclcpp::NodeOptions& options)
     origin_pub_ = create_publisher<sensor_msgs::msg::NavSatFix>(params_.origin_topic,
                                                                 rclcpp::SystemDefaultsQoS());
     origin_timer_ = create_wall_timer(
-        std::chrono::milliseconds(static_cast<int>(1000.0 / params_.origin_pub_rate)), [this]() {
+        std::chrono::milliseconds(static_cast<int>(1000.0 / params_.origin_pub_rate_hz)), [this]() {
           if (origin_set_) {
             origin_pub_->publish(origin_navsat_);
           }
@@ -189,7 +189,7 @@ void NavsatOdomNode::checkNavSatFix(diagnostic_updater::DiagnosticStatusWrapper&
       (last_navsat_time_ > 0.0) ? (this->get_clock()->now().seconds() - last_navsat_time_) : -1.0;
   stat.add("Time Since Last (s)", time_since);
 
-  if (time_since > params_.diagnostic_timeout || last_navsat_time_ == 0.0) {
+  if (time_since > params_.diagnostic_timeout_sec || last_navsat_time_ == 0.0) {
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "GPS is offline.");
   } else if (last_fix_status_ == sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX) {
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "No GPS fix acquired.");

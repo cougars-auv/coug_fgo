@@ -100,7 +100,7 @@ void FluidPressureOdomNode::checkPressureStatus(diagnostic_updater::DiagnosticSt
   stat.add("Time Since Last (s)", time_since);
   stat.add("Last Depth (m)", last_depth_);
 
-  if (time_since > params_.diagnostic_timeout || last_pressure_time_ == 0.0) {
+  if (time_since > params_.diagnostic_timeout_sec || last_pressure_time_ == 0.0) {
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Pressure sensor is offline.");
   } else {
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Pressure data acquired.");

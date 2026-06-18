@@ -34,10 +34,10 @@ factor_graph_node:
     default_value: "IncrementalFixedLagSmoother"
     validation:
       one_of<>: [["IncrementalFixedLagSmoother", "ISAM2", "LevenbergMarquardt"]]
-  max_update_rate:
+  max_update_rate_hz:
     type: double
     default_value: -1.0
-  max_opt_rate:
+  max_opt_rate_hz:
     type: double
     default_value: -1.0
   smoother_lag:
@@ -61,7 +61,7 @@ factor_graph_node:
     default_value: "None"
     validation:
       one_of<>: [["None", "DVL", "Depth", "Timer"]]
-  keyframe_timeout:
+  keyframe_timeout_sec:
     type: double
     default_value: 0.5
   keyframe_timer_hz:
@@ -174,7 +174,7 @@ factor_graph_node:
     gravity:
       type: double_array
       default_value: [0.0, 0.0, -9.8]
-    diagnostic_timeout:
+    diagnostic_timeout_sec:
       type: double
       default_value: 1.0
 
@@ -211,7 +211,7 @@ factor_graph_node:
       position_noise_sigmas:
         type: double_array
         default_value: [0.015, 0.015]
-    diagnostic_timeout:
+    diagnostic_timeout_sec:
       type: double
       default_value: 2.0
     robust_kernel:
@@ -256,7 +256,7 @@ factor_graph_node:
       position_z_noise_sigma:
         type: double
         default_value: 0.02
-    diagnostic_timeout:
+    diagnostic_timeout_sec:
       type: double
       default_value: 1.0
     robust_kernel:
@@ -304,7 +304,7 @@ factor_graph_node:
     reference_field:
       type: double_array
       default_value: [0.07857, 0.41316, -0.90726]
-    diagnostic_timeout:
+    diagnostic_timeout_sec:
       type: double
       default_value: 1.0
     robust_kernel:
@@ -352,7 +352,7 @@ factor_graph_node:
     mag_declination_radians:
       type: double
       default_value: 0.0
-    diagnostic_timeout:
+    diagnostic_timeout_sec:
       type: double
       default_value: 1.0
     robust_kernel:
@@ -397,7 +397,7 @@ factor_graph_node:
       velocity_noise_sigmas:
         type: double_array
         default_value: [0.02, 0.02, 0.02]
-    diagnostic_timeout:
+    diagnostic_timeout_sec:
       type: double
       default_value: 0.25
     robust_kernel:
@@ -461,7 +461,7 @@ factor_graph_node:
     quad_drag:
       type: double_array
       default_value: [6.11, 196.13, 196.13]
-    diagnostic_timeout:
+    diagnostic_timeout_sec:
       type: double
       default_value: 1.0
     robust_kernel:
@@ -475,7 +475,7 @@ factor_graph_node:
 
   # --- Prior Settings ---
   prior:
-    initialization_duration:
+    initialization_duration_sec:
       type: double
       default_value: 5.0
     use_parameter_priors:

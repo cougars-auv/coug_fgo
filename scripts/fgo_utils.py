@@ -126,7 +126,7 @@ def _parse_config(
         kf_topic=kf_topic,
         kf_backup_source=backup_source,
         kf_backup_topic=backup_topic,
-        kf_timeout=params["keyframe_timeout"],
+        kf_timeout=params["keyframe_timeout_sec"],
         kf_period=1.0 / max(params["keyframe_timer_hz"], 0.1),
         base_pos=np.array(base_tf["position"]),
         base_rot=Rotation.from_quat(base_tf["orientation"]),

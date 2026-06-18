@@ -60,10 +60,10 @@ void DvlA50TwistNode::dvlCallback(const dvl_msgs::msg::DVL::SharedPtr msg) {
   last_dvl_time_ = this->get_clock()->now().seconds();
   last_velocity_valid_ = msg->velocity_valid;
 
-  if (params_.simulate_dropout && params_.dropout_frequency > 0.0) {
+  if (params_.simulate_dropout && params_.dropout_frequency_hz > 0.0) {
     double current_time = get_clock()->now().seconds();
-    double cycle_period = 1.0 / params_.dropout_frequency;
-    if (fmod(current_time, cycle_period) < params_.dropout_duration) {
+    double cycle_period = 1.0 / params_.dropout_frequency_hz;
+    if (fmod(current_time, cycle_period) < params_.dropout_duration_sec) {
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), (int)(cycle_period * 1000),
                            "Simulating DVL dropout...");
       return;
@@ -124,7 +124,7 @@ void DvlA50TwistNode::checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper
       (last_dvl_time_ > 0.0) ? (this->get_clock()->now().seconds() - last_dvl_time_) : -1.0;
   stat.add("Time Since Last (s)", time_since);
 
-  if (time_since > params_.diagnostic_timeout || last_dvl_time_ == 0.0) {
+  if (time_since > params_.diagnostic_timeout_sec || last_dvl_time_ == 0.0) {
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "DVL is offline.");
   } else if (!last_velocity_valid_) {
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "DVL velocity is invalid.");

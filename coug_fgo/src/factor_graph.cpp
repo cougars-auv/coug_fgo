@@ -502,9 +502,10 @@ void FactorGraphNode::processFrontend() {
       initializeGraph();
     } else {
       bool should_update = true;
-      if (params_.max_update_rate > 0.0) {
+      if (params_.max_update_rate_hz > 0.0) {
         rclcpp::Time now = get_clock()->now();
-        rclcpp::Duration min_period = rclcpp::Duration::from_seconds(1.0 / params_.max_update_rate);
+        rclcpp::Duration min_period =
+            rclcpp::Duration::from_seconds(1.0 / params_.max_update_rate_hz);
         if (now - last_update_time_ < min_period) {
           should_update = false;
         } else {
@@ -538,9 +539,9 @@ void FactorGraphNode::processBackend() {
       lock.unlock();
 
       bool should_optimize = true;
-      if (params_.max_opt_rate > 0.0) {
+      if (params_.max_opt_rate_hz > 0.0) {
         rclcpp::Time now = get_clock()->now();
-        rclcpp::Duration min_period = rclcpp::Duration::from_seconds(1.0 / params_.max_opt_rate);
+        rclcpp::Duration min_period = rclcpp::Duration::from_seconds(1.0 / params_.max_opt_rate_hz);
         if (now - last_opt_time_ < min_period) {
           should_optimize = false;
         } else {
@@ -655,7 +656,8 @@ void FactorGraphNode::updateGraph() {
 
     std::optional<double> newest_stamp = imu_queue_.getLastTime();
     if (!last_received.has_value() ||
-        (newest_stamp.has_value() && (*newest_stamp - *last_received) > params_.keyframe_timeout)) {
+        (newest_stamp.has_value() &&
+         (*newest_stamp - *last_received) > params_.keyframe_timeout_sec)) {
       const auto backup = parseKeyframeSource(params_.backup_keyframe_source);
       if (backup != KeyframeSource::kNone) {
         active_source = backup;
@@ -784,20 +786,20 @@ void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrap
   };
 
   check_queue("IMU", imu_queue_.size(), imu_queue_.secondsSinceLastArrival(), true, true,
-              params_.imu.diagnostic_timeout);
+              params_.imu.diagnostic_timeout_sec);
   check_queue("GPS", gps_queue_.size(), gps_queue_.secondsSinceLastArrival(),
-              params_.gps.enable_gps, false, params_.gps.diagnostic_timeout);
+              params_.gps.enable_gps, false, params_.gps.diagnostic_timeout_sec);
   check_queue("Depth", depth_queue_.size(), depth_queue_.secondsSinceLastArrival(),
               params_.depth.enable_depth, params_.depth.enable_depth,
-              params_.depth.diagnostic_timeout);
+              params_.depth.diagnostic_timeout_sec);
   check_queue("Mag", mag_queue_.size(), mag_queue_.secondsSinceLastArrival(),
-              params_.mag.enable_mag, false, params_.mag.diagnostic_timeout);
+              params_.mag.enable_mag, false, params_.mag.diagnostic_timeout_sec);
   check_queue("AHRS", ahrs_queue_.size(), ahrs_queue_.secondsSinceLastArrival(),
-              params_.ahrs.enable_ahrs, false, params_.ahrs.diagnostic_timeout);
+              params_.ahrs.enable_ahrs, false, params_.ahrs.diagnostic_timeout_sec);
   check_queue("DVL", dvl_queue_.size(), dvl_queue_.secondsSinceLastArrival(),
-              params_.dvl.enable_dvl, params_.dvl.enable_dvl, params_.dvl.diagnostic_timeout);
+              params_.dvl.enable_dvl, params_.dvl.enable_dvl, params_.dvl.diagnostic_timeout_sec);
   check_queue("Wrench", wrench_queue_.size(), wrench_queue_.secondsSinceLastArrival(),
-              params_.dynamics.enable_dynamics, false, params_.dynamics.diagnostic_timeout);
+              params_.dynamics.enable_dynamics, false, params_.dynamics.diagnostic_timeout_sec);
 
   if (!offline_sensors.empty()) {
     std::string msg = "";

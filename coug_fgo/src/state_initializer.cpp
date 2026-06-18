@@ -85,7 +85,7 @@ bool StateInitializer::update(double current_time, QueueBundle& queues) {
 
   incrementAverages(queues);
 
-  return (current_time - start_avg_time_) >= params_.prior.initialization_duration;
+  return (current_time - start_avg_time_) >= params_.prior.initialization_duration_sec;
 }
 
 void StateInitializer::compute(const TfBundle& tfs) {

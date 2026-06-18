@@ -11,7 +11,7 @@ seatrac_x150_imu_node:
   publish_diagnostics:
     type: bool
     default_value: false
-  diagnostic_timeout:
+  diagnostic_timeout_sec:
     type: double
     default_value: 0.5
 
