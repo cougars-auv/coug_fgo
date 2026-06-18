@@ -1,27 +1,11 @@
 fluid_pressure_odom_node:
-  input_topic:
-    type: string
-    default_value: "pressure"
-  output_topic:
-    type: string
-    default_value: "odometry/depth"
+  # --- Node Settings ---
   publish_diagnostics:
     type: bool
     default_value: false
   diagnostic_timeout_sec:
     type: double
     default_value: 0.5
-
-  map_frame:
-    type: string
-    default_value: "map"
-
-  use_parameter_child_frame:
-    type: bool
-    default_value: false
-  parameter_child_frame:
-    type: string
-    default_value: "depth_link"
 
   pressure_scale:
     type: double
@@ -42,3 +26,21 @@ fluid_pressure_odom_node:
   max_pressure_delta:
     type: double
     default_value: 0.0
+
+  # --- ROS Topics and Frames ---
+  input_topic:
+    type: string
+    default_value: "pressure"
+  output_topic:
+    type: string
+    default_value: "odometry/depth"
+
+  use_parameter_child_frame:
+    type: bool
+    default_value: false
+  parameter_child_frame:
+    type: string
+    default_value: "depth_link"
+  map_frame:
+    type: string
+    default_value: "map"

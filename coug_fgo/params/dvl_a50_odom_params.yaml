@@ -1,16 +1,19 @@
 dvl_a50_odom_node:
-  input_topic:
-    type: string
-    default_value: "dvl/position"
-  output_topic:
-    type: string
-    default_value: "odometry/dvl_ned"
+  # --- Node Settings ---
   publish_diagnostics:
     type: bool
     default_value: false
   diagnostic_timeout_sec:
     type: double
     default_value: 0.5
+
+  # --- ROS Topics and Frames ---
+  input_topic:
+    type: string
+    default_value: "dvl/position"
+  output_topic:
+    type: string
+    default_value: "odometry/dvl_ned"
 
   use_parameter_frame:
     type: bool

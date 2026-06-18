@@ -12,6 +12,13 @@ factor_graph_node:
   publish_imu_bias:
     type: bool
     default_value: false
+  publish_diagnostics:
+    type: bool
+    default_value: false
+  publish_graph_metrics:
+    type: bool
+    default_value: false
+
   publish_pose_cov:
     type: bool
     default_value: false
@@ -19,12 +26,6 @@ factor_graph_node:
     type: bool
     default_value: false
   publish_imu_bias_cov:
-    type: bool
-    default_value: false
-  publish_diagnostics:
-    type: bool
-    default_value: false
-  publish_graph_metrics:
     type: bool
     default_value: false
 
@@ -50,7 +51,7 @@ factor_graph_node:
     type: int
     default_value: 1
 
-   # --- Keyframe Settings ---
+  # --- Keyframe Settings ---
   keyframe_source:
     type: string
     default_value: "DVL"
@@ -96,15 +97,15 @@ factor_graph_node:
   smoothed_path_topic:
     type: string
     default_value: "smoothed_path"
-  graph_metrics_topic:
-    type: string
-    default_value: "~/metrics"
   velocity_topic:
     type: string
     default_value: "~/velocity"
   imu_bias_topic:
     type: string
     default_value: "~/imu/bias"
+  graph_metrics_topic:
+    type: string
+    default_value: "~/metrics"
 
   map_frame:
     type: string

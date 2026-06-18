@@ -1,23 +1,11 @@
 dvl_a50_twist_node:
-  input_topic:
-    type: string
-    default_value: "dvl/data"
-  output_topic:
-    type: string
-    default_value: "dvl/twist"
+  # --- Node Settings ---
   publish_diagnostics:
     type: bool
     default_value: false
   diagnostic_timeout_sec:
     type: double
     default_value: 0.5
-
-  use_parameter_frame:
-    type: bool
-    default_value: false
-  parameter_frame:
-    type: string
-    default_value: "dvl_link"
 
   simulate_dropout:
     type: bool
@@ -38,3 +26,18 @@ dvl_a50_twist_node:
   fom_covariance_scale:
     type: double
     default_value: 4.0
+
+  # --- ROS Topics and Frames ---
+  input_topic:
+    type: string
+    default_value: "dvl/data"
+  output_topic:
+    type: string
+    default_value: "dvl/twist"
+
+  use_parameter_frame:
+    type: bool
+    default_value: false
+  parameter_frame:
+    type: string
+    default_value: "dvl_link"
