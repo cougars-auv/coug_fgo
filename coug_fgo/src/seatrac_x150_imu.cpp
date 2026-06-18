@@ -110,6 +110,7 @@ sensor_msgs::msg::Imu SeatracX150ImuNode::convertToImu(
     imu_msg.linear_acceleration.y = -kAccScale * M_SQRT1_2 * (msg->acc_x + msg->acc_y);
     imu_msg.linear_acceleration.z = kAccScale * msg->acc_z;
 
+    // TODO: Figure out raw ADC scalar for gyroscope
     imu_msg.angular_velocity.x = kDegToRad * M_SQRT1_2 * (msg->gyro_y - msg->gyro_x);
     imu_msg.angular_velocity.y = kDegToRad * M_SQRT1_2 * (msg->gyro_x + msg->gyro_y);
     imu_msg.angular_velocity.z = -kDegToRad * msg->gyro_z;
