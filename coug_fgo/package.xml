@@ -21,9 +21,9 @@
   <depend>coug_interfaces</depend>
   <depend>diagnostic_updater</depend>
   <depend>dvl_msgs</depend>
-  <depend>eigen</depend>
+  <!-- <depend>eigen</depend> -->
   <depend>geometry_msgs</depend>
-  <depend>gtsam</depend>
+  <!-- <depend>gtsam</depend> -->
   <depend>libgeographiclib-dev</depend>
   <depend>nav_msgs</depend>
   <depend>pybind11_vendor</depend>
