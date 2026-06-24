@@ -26,6 +26,7 @@
   <depend>gtsam</depend>
   <depend>libgeographiclib-dev</depend>
   <depend>nav_msgs</depend>
+  <depend>pybind11_vendor</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
   <depend>seatrac_interfaces</depend>
