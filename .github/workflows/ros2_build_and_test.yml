@@ -26,7 +26,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  DOCKER_IMAGE: snelsondurrant/cougars:base
+  DOCKER_IMAGE: frostlab/cougars:base-latest
   UPSTREAM_REPO: cougars-auv/cougars-dev
 
 jobs:
