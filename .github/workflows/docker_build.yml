@@ -22,6 +22,9 @@ on:
       - "**/package.xml"
   workflow_dispatch:
 
+env:
+  UPSTREAM_REPO: cougars-auv/cougars-dev
+
 jobs:
   trigger-upstream:
     runs-on: ubuntu-24.04
@@ -29,7 +32,7 @@ jobs:
       - uses: peter-evans/repository-dispatch@v4
         with:
           token: ${{ secrets.GH_TOKEN }}
-          repository: cougars-auv/cougars-dev
+          repository: ${{ env.UPSTREAM_REPO }}
           event-type: docker_dispatch
           client-payload: "{\"repo\": \"${{ github.repository }}\", \"sha\": \"${{
             github.sha }}\"}"
