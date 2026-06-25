@@ -44,7 +44,7 @@ fluid_pressure_odom_node:
   # --- ROS Topics and Frames ---
   input_topic:
     type: string
-    default_value: "pressure"
+    default_value: "pressure/data"
     validation:
       not_empty<>: []
   output_topic:
