@@ -17,6 +17,25 @@
 
 - **Submit a PR:** Open a pull request, ensure required tests pass, and merge once approved. Upon merge to `main`, GitHub Actions will automatically build and push updated images to Docker Hub with any new dependencies.
 
+## 📦 Releasing
+
+We adhere to the **Semantic Versioning (SemVer 2.0.0)** standard to release new versions of this repository:
+> Given a version number **`MAJOR.MINOR.PATCH`**, increment the:
+> - **MAJOR** version when you make incompatible API changes
+> - **MINOR** version when you add functionality in a backward compatible manner
+> - **PATCH** version when you make backward compatible bug fixes
+
+- **Tag and Push:** Create and push a version tag (e.g., `v1.2.3`) on your release commit:
+
+  ```bash
+  git tag v1.2.3
+  git push origin v1.2.3
+  ```
+
+  Pushing the tag automatically opens a draft GitHub Release with auto-generated notes.
+
+- **Publish a GitHub Release:** Review the draft release in GitHub and click **Publish**.
+
 ## 📚 Citations
 
 Please cite our relevant publications if you find this repository useful for your research:
