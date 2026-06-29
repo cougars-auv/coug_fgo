@@ -106,8 +106,8 @@ void FactorGraphNode::setupRosInterfaces() {
           tf_out = tf_buffer_->lookupTransform(params_.target_frame, child, tf2::TimePointZero);
         }
       } catch (const tf2::TransformException& ex) {
-        RCLCPP_ERROR(get_logger(), "Failed to lookup %s to target transform: %s",
-                     sensor_name.c_str(), ex.what());
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Could not transform %s to %s: %s",
+                             params_.target_frame.c_str(), child.c_str(), ex.what());
       }
     }
   };
@@ -434,8 +434,8 @@ void FactorGraphNode::broadcastGlobalTf(const gtsam::Pose3& current_pose,
     tf_msg.transform.rotation = toQuatMsg(map_T_odom.rotation());
     tf_broadcaster_->sendTransform(tf_msg);
   } catch (const tf2::TransformException& ex) {
-    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 5000, "Global TF lookup failed: %s",
-                          ex.what());
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Could not transform %s to %s: %s",
+                         params_.odom_frame.c_str(), params_.base_frame.c_str(), ex.what());
   }
 }
 
@@ -641,8 +641,8 @@ void FactorGraphNode::initializeGraph() {
           target_T_base_tf_ = tf_buffer_->lookupTransform(params_.target_frame, params_.base_frame,
                                                           tf2::TimePointZero);
         } catch (const tf2::TransformException& ex) {
-          RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
-                               "Failed to lookup base to target transform: %s", ex.what());
+          RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Could not transform %s to %s: %s",
+                               params_.target_frame.c_str(), params_.base_frame.c_str(), ex.what());
           return;
         }
       }
