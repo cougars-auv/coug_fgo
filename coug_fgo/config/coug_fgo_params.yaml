@@ -5,7 +5,7 @@
     publish_smoothed_path: false # Publish the full smoothed path for visualization.
     publish_velocity: false # Publish the estimated velocity (at the target frame in the map frame).
     publish_imu_bias: false # Publish the estimated IMU biases (accel + gyro).
-    publish_diagnostics: false # Publish diagnostic information.
+    publish_diagnostics: true # Publish diagnostic information.
     publish_graph_metrics: false # Publish high-frequency timing and graph metadata.
 
     # These are computationally expensive to calculate, so disable if not needed.
@@ -23,7 +23,7 @@
     solver_type: "IncrementalFixedLagSmoother"
     max_update_rate_hz: -1.0 # [Hz] Maximum keyframe rate. -1.0 for no limit.
     max_opt_rate_hz: -1.0 # [Hz] Maximum optimization rate. -1.0 for no limit.
-    smoother_lag: 10.0 # The time window (in seconds) of past states to smooth over.
+    smoother_lag: 20.0 # The time window (in seconds) of past states to smooth over.
     relinearize_threshold: 0.1 # Lower values are more accurate but slower.
     relinearize_skip: 1 # Number of updates to skip between relinearizations.
 
@@ -36,7 +36,7 @@
     # - "None": Disable the keyframe trigger block.
 
     keyframe_source: "DVL"
-    backup_keyframe_source: "None" # Fallback source if the primary source drops out.
+    backup_keyframe_source: "Depth" # Fallback source if the primary source drops out.
     keyframe_timeout_sec: 0.5 # [s] Time before determining the primary source has dropped out.
     keyframe_timer_hz: 10.0 # [Hz] Period of the periodic timer (if "Timer" is used).
 
@@ -202,7 +202,7 @@
 
       # If true, forces the initial state to be set by the values below.
       # The parameter priors should be set at the base frame with respect to the map frame.
-      use_parameter_priors: false
+      use_parameter_priors: true
       parameter_priors:
         initial_position: [0.0, 0.0, 0.0] # [m]
         initial_orientation: [0.0, 0.0, 0.0] # [rad]
