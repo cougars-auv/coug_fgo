@@ -326,7 +326,7 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions& options)
   frontend_thread_ = std::thread(&FactorGraphNode::processFrontend, this);
   backend_thread_ = std::thread(&FactorGraphNode::processBackend, this);
 
-  RCLCPP_INFO(get_logger(), "Startup complete! Waiting for sensor messages...");
+  RCLCPP_INFO(get_logger(), "Startup complete! Waiting for sensor data...");
 }
 
 FactorGraphNode::~FactorGraphNode() {

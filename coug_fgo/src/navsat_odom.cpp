@@ -89,7 +89,7 @@ NavsatOdomNode::NavsatOdomNode(const rclcpp::NodeOptions& options)
     diagnostic_updater_.add(fix_task, this, &NavsatOdomNode::checkNavSatFix);
   }
 
-  RCLCPP_INFO(get_logger(), "Startup complete! Waiting for fix...");
+  RCLCPP_INFO(get_logger(), "Startup complete! Waiting for GPS origin...");
 }
 
 void NavsatOdomNode::setOrigin(const sensor_msgs::msg::NavSatFix& msg) {
@@ -104,7 +104,7 @@ void NavsatOdomNode::setOrigin(const sensor_msgs::msg::NavSatFix& msg) {
 void NavsatOdomNode::originCallback(const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
   if (!origin_set_ && msg->status.status >= sensor_msgs::msg::NavSatStatus::STATUS_FIX) {
     setOrigin(*msg);
-    RCLCPP_INFO(get_logger(), "GPS Origin Received: Lat %.6f, Lon %.6f, Alt %.2f",
+    RCLCPP_INFO(get_logger(), "GPS origin received: Lat %.6f, Lon %.6f, Alt %.2f",
                 origin_navsat_.latitude, origin_navsat_.longitude, origin_navsat_.altitude);
   }
 }
@@ -125,7 +125,7 @@ void NavsatOdomNode::navsatCallback(const sensor_msgs::msg::NavSatFix::SharedPtr
       return;
     }
     setOrigin(*msg);
-    RCLCPP_INFO(get_logger(), "GPS Origin Set: Lat %.6f, Lon %.6f, Alt %.2f",
+    RCLCPP_INFO(get_logger(), "GPS origin set: Lat %.6f, Lon %.6f, Alt %.2f",
                 origin_navsat_.latitude, origin_navsat_.longitude, origin_navsat_.altitude);
     return;
   }

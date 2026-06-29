@@ -58,7 +58,7 @@ SeatracX150ImuNode::SeatracX150ImuNode(const rclcpp::NodeOptions& options)
     diagnostic_updater_.add(prefix + "Modem Status", this, &SeatracX150ImuNode::checkModemStatus);
   }
 
-  RCLCPP_INFO(get_logger(), "Startup complete! Waiting for ModemStatus data...");
+  RCLCPP_INFO(get_logger(), "Startup complete! Waiting for modem status updates...");
 }
 
 void SeatracX150ImuNode::modemStatusCallback(
