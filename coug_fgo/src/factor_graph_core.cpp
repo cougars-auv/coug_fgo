@@ -407,17 +407,13 @@ void FactorGraphCore::addDepthFactor(
 
   const auto& depth_msg = depth_msgs.back();
 
-  gtsam::SharedNoiseModel depth_noise;
   const double depth_var = depth_msg->pose_covariance(2, 2);
-  if (params_.depth.use_parameter_covariance || !std::isfinite(depth_var) || depth_var <= 0.0) {
-    double depth_sigma = params_.depth.parameter_covariance.position_z_noise_sigma *
-                         std::sqrt(params_.depth.covariance_scalar);
-    depth_noise = gtsam::noiseModel::Isotropic::Sigma(1, depth_sigma);
-  } else {
-    gtsam::Matrix11 depth_cov = gtsam::Matrix11::Zero();
-    depth_cov << depth_var * params_.depth.covariance_scalar;
-    depth_noise = gtsam::noiseModel::Gaussian::Covariance(depth_cov);
-  }
+  const double depth_sigma =
+      (params_.depth.use_parameter_covariance || !std::isfinite(depth_var) || depth_var <= 0.0)
+          ? params_.depth.parameter_covariance.position_z_noise_sigma *
+                std::sqrt(params_.depth.covariance_scalar)
+          : std::sqrt(depth_var * params_.depth.covariance_scalar);
+  gtsam::SharedNoiseModel depth_noise = gtsam::noiseModel::Isotropic::Sigma(1, depth_sigma);
 
   depth_noise = applyRobustKernel(depth_noise, params_.depth.robust_kernel, params_.depth.robust_k);
 

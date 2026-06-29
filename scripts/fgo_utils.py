@@ -116,6 +116,18 @@ def _parse_config(
         else params[source_to_topic_key[backup_source]]
     )
 
+    source_to_sensor = {"DVL": "dvl", "Depth": "depth"}
+    for label, source in (
+        ("keyframe_source", kf_source),
+        ("backup_keyframe_source", backup_source),
+    ):
+        sensor = source_to_sensor.get(source)
+        if sensor is not None and sensor not in required_sensors:
+            raise ValueError(
+                f"{label} '{source}' references a disabled sensor! "
+                "Enable the sensor or change the keyframe source."
+            )
+
     base_tf = params["base"]["parameter_tf"]
 
     return FGOConfig(

@@ -42,6 +42,8 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/magnetic_field.hpp>
+#include <shared_mutex>
+#include <std_srvs/srv/trigger.hpp>
 #include <string>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <thread>
@@ -72,6 +74,11 @@ class FactorGraphNode : public rclcpp::Node {
   ~FactorGraphNode() override;
 
  protected:
+  /**
+   * @brief Creates publishers, subscribers, TF interfaces, and diagnostics.
+   */
+  void setupRosInterfaces();
+
   // --- Main Logic ---
   /**
    * @brief Initializes the factor graph using averaged sensor data or parameters.
@@ -89,6 +96,14 @@ class FactorGraphNode : public rclcpp::Node {
   void optimizeGraph();
 
   /**
+   * @brief Resets the factor graph and state estimator to re-initialize from scratch.
+   * @param request The service request to trigger the reset.
+   * @param response The service response indicating success or failure.
+   */
+  void resetGraph(const std_srvs::srv::Trigger::Request::SharedPtr request,
+                  std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+
+  /**
    * @brief The background loop run by the dedicated frontend thread.
    */
   void processFrontend();
@@ -97,12 +112,6 @@ class FactorGraphNode : public rclcpp::Node {
    * @brief The background loop run by the dedicated backend thread.
    */
   void processBackend();
-
-  // --- Setup ---
-  /**
-   * @brief Creates publishers, subscribers, TF interfaces, and diagnostics.
-   */
-  void setupRosInterfaces();
 
   // --- Publishing ---
   /**
@@ -210,11 +219,13 @@ class FactorGraphNode : public rclcpp::Node {
   std::condition_variable backend_cv_;
   std::mutex frontend_trigger_mutex_;
   std::mutex backend_trigger_mutex_;
+  std::shared_mutex reset_mutex_;
   bool frontend_trigger_{false};
   bool backend_trigger_{false};
   std::atomic<bool> is_running_{true};
 
   rclcpp::CallbackGroup::SharedPtr sensor_cb_group_;
+  rclcpp::CallbackGroup::SharedPtr reset_cb_group_;
 
   // --- Transformations ---
   mutable std::mutex tf_mutex_;
@@ -244,6 +255,8 @@ class FactorGraphNode : public rclcpp::Node {
   rclcpp::Subscription<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr dvl_sub_;
   rclcpp::Subscription<geometry_msgs::msg::WrenchStamped>::SharedPtr wrench_sub_;
   rclcpp::TimerBase::SharedPtr keyframe_timer_;
+
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reset_srv_;
 
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};

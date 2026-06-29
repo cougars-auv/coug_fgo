@@ -40,43 +40,49 @@ namespace coug_fgo {
 StateInitializer::StateInitializer(const factor_graph_node::Params& params) : params_(params) {}
 
 bool StateInitializer::update(double current_time, QueueBundle& queues) {
+  const bool gps_req = params_.gps.enable_gps || params_.gps.enable_gps_init_only;
+  const bool depth_req = params_.depth.enable_depth || params_.depth.enable_depth_init_only;
+  const bool mag_req = params_.mag.enable_mag || params_.mag.enable_mag_init_only;
+  const bool ahrs_req = params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only ||
+                        params_.comparison.enable_loose_dvl_preintegration;
+  const bool dvl_req = params_.dvl.enable_dvl || params_.dvl.enable_dvl_init_only;
+
   if (params_.prior.use_parameter_priors) {
     if (queues.imu.empty()) {
       return false;
     }
     initial_imu_ = queues.imu.back();
-    if (params_.gps.enable_gps || params_.gps.enable_gps_init_only) {
-      if (queues.gps.empty()) {
-        return false;
-      }
-      initial_gps_ = queues.gps.back();
-    }
-    if (params_.depth.enable_depth || params_.depth.enable_depth_init_only) {
+
+    const KeyframeSource kf = parseKeyframeSource(params_.keyframe_source);
+    const KeyframeSource backup_kf = parseKeyframeSource(params_.backup_keyframe_source);
+
+    if (depth_req && (kf == KeyframeSource::kDepth || backup_kf == KeyframeSource::kDepth)) {
       if (queues.depth.empty()) {
         return false;
       }
       initial_depth_ = queues.depth.back();
     }
-    if (params_.mag.enable_mag || params_.mag.enable_mag_init_only) {
-      if (queues.mag.empty()) {
-        return false;
-      }
-      initial_mag_ = queues.mag.back();
-    }
-    if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only ||
-        params_.comparison.enable_loose_dvl_preintegration) {
-      if (queues.ahrs.empty()) {
-        return false;
-      }
-      initial_ahrs_ = queues.ahrs.back();
-    }
-    if (params_.dvl.enable_dvl || params_.dvl.enable_dvl_init_only) {
+
+    if (dvl_req && (params_.comparison.enable_loose_dvl_preintegration ||
+                    params_.comparison.enable_tight_dvl_preintegration ||
+                    kf == KeyframeSource::kDvl || backup_kf == KeyframeSource::kDvl)) {
       if (queues.dvl.empty()) {
         return false;
       }
       initial_dvl_ = queues.dvl.back();
     }
+
     return true;
+  }
+
+  const bool all_present = (imu_count_ > 0 || !queues.imu.empty()) &&
+                           (!gps_req || gps_count_ > 0 || !queues.gps.empty()) &&
+                           (!depth_req || depth_count_ > 0 || !queues.depth.empty()) &&
+                           (!mag_req || mag_count_ > 0 || !queues.mag.empty()) &&
+                           (!ahrs_req || ahrs_count_ > 0 || !queues.ahrs.empty()) &&
+                           (!dvl_req || dvl_count_ > 0 || !queues.dvl.empty());
+  if (!all_present) {
+    return false;
   }
 
   if (start_avg_time_ == 0.0) {

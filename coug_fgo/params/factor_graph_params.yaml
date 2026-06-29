@@ -144,6 +144,11 @@ factor_graph_node:
     default_value: "~/metrics"
     validation:
       not_empty<>: []
+  reset_service:
+    type: string
+    default_value: "~/reset"
+    validation:
+      not_empty<>: []
 
   map_frame:
     type: string

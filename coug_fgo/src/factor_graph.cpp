@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <rclcpp_components/register_node_macro.hpp>
+#include <stdexcept>
 
 #include "coug_fgo/utils/param_enums.hpp"
 #include "coug_fgo/utils/ros_conversions.hpp"
@@ -65,6 +66,14 @@ void FactorGraphNode::setupRosInterfaces() {
     graph_metrics_pub_ = create_publisher<coug_interfaces::msg::GraphMetrics>(
         params_.graph_metrics_topic, rclcpp::SystemDefaultsQoS());
   }
+
+  // --- ROS Services ---
+  reset_cb_group_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  reset_srv_ = create_service<std_srvs::srv::Trigger>(
+      params_.reset_service,
+      [this](const std_srvs::srv::Trigger::Request::SharedPtr req,
+             std::shared_ptr<std_srvs::srv::Trigger::Response> res) { resetGraph(req, res); },
+      rclcpp::ServicesQoS(), reset_cb_group_);
 
   // --- ROS Callback Groups ---
   sensor_cb_group_ = create_callback_group(rclcpp::CallbackGroupType::Reentrant);
@@ -320,6 +329,25 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions& options)
       std::make_shared<factor_graph_node::ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
 
+  // Ensure the keyframe sources are valid
+  auto source_enabled = [this](KeyframeSource source) {
+    switch (source) {
+      case KeyframeSource::kDvl:
+        return params_.dvl.enable_dvl || params_.dvl.enable_dvl_init_only;
+      case KeyframeSource::kDepth:
+        return params_.depth.enable_depth || params_.depth.enable_depth_init_only;
+      default:
+        return true;
+    }
+  };
+  if (!source_enabled(parseKeyframeSource(params_.keyframe_source)) ||
+      !source_enabled(parseKeyframeSource(params_.backup_keyframe_source))) {
+    RCLCPP_FATAL(get_logger(),
+                 "Keyframe source '%s' or backup '%s' references a disabled sensor! Shutting down.",
+                 params_.keyframe_source.c_str(), params_.backup_keyframe_source.c_str());
+    throw std::runtime_error("Invalid keyframe source configuration.");
+  }
+
   setupRosInterfaces();
   core_ = std::make_unique<FactorGraphCore>(params_);
   state_init_ = std::make_unique<StateInitializer>(params_);
@@ -497,29 +525,32 @@ void FactorGraphNode::processFrontend() {
     }
 
     lock.unlock();
+    {
+      std::shared_lock reset_lock(reset_mutex_);
 
-    if (!is_initialized_.load()) {
-      initializeGraph();
-    } else {
-      bool should_update = true;
-      if (params_.max_update_rate_hz > 0.0) {
-        rclcpp::Time now = get_clock()->now();
-        rclcpp::Duration min_period =
-            rclcpp::Duration::from_seconds(1.0 / params_.max_update_rate_hz);
-        if (now - last_update_time_ < min_period) {
-          should_update = false;
-        } else {
-          last_update_time_ = now;
+      if (!is_initialized_.load()) {
+        initializeGraph();
+      } else {
+        bool should_update = true;
+        if (params_.max_update_rate_hz > 0.0) {
+          rclcpp::Time now = get_clock()->now();
+          rclcpp::Duration min_period =
+              rclcpp::Duration::from_seconds(1.0 / params_.max_update_rate_hz);
+          if (now - last_update_time_ < min_period) {
+            should_update = false;
+          } else {
+            last_update_time_ = now;
+          }
         }
-      }
 
-      if (should_update) {
-        updateGraph();
-        {
-          std::scoped_lock lock(backend_trigger_mutex_);
-          backend_trigger_ = true;
+        if (should_update) {
+          updateGraph();
+          {
+            std::scoped_lock lock(backend_trigger_mutex_);
+            backend_trigger_ = true;
+          }
+          backend_cv_.notify_one();
         }
-        backend_cv_.notify_one();
       }
     }
   }
@@ -537,6 +568,11 @@ void FactorGraphNode::processBackend() {
 
     if (is_initialized_.load()) {
       lock.unlock();
+
+      std::shared_lock reset_lock(reset_mutex_);
+      if (!is_initialized_.load()) {
+        continue;
+      }
 
       bool should_optimize = true;
       if (params_.max_opt_rate_hz > 0.0) {
@@ -576,7 +612,7 @@ void FactorGraphNode::initializeGraph() {
   }
 
   if (!(imu_ok && gps_ok && depth_ok && mag_ok && ahrs_ok && dvl_ok)) {
-    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "Waiting for sensor TFs: %s%s%s%s%s%s",
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "Waiting for sensors: %s%s%s%s%s%s",
                          !imu_ok ? "[IMU] " : "",
                          (!gps_ok && params_.gps.enable_gps) ? "[GPS] " : "",
                          (!mag_ok && params_.mag.enable_mag) ? "[Mag] " : "",
@@ -836,6 +872,42 @@ void FactorGraphNode::checkProcessingOverflow(diagnostic_updater::DiagnosticStat
   stat.add("New Factors", new_factors_.load());
   stat.add("Total Factors", total_factors_.load());
   stat.add("Total Variables", total_variables_.load());
+}
+
+void FactorGraphNode::resetGraph(const std_srvs::srv::Trigger::Request::SharedPtr,
+                                 std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+  RCLCPP_INFO(get_logger(), "Reset requested...");
+
+  std::unique_lock reset_lock(reset_mutex_);
+
+  // Discard data and reset estimator state
+  imu_queue_.drain();
+  gps_queue_.drain();
+  depth_queue_.drain();
+  mag_queue_.drain();
+  ahrs_queue_.drain();
+  dvl_queue_.drain();
+  wrench_queue_.drain();
+
+  core_ = std::make_unique<FactorGraphCore>(params_);
+  state_init_ = std::make_unique<StateInitializer>(params_);
+
+  is_initialized_.store(false);
+  last_target_time_.reset();
+  last_update_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
+  last_opt_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
+
+  last_total_duration_.store(0.0);
+  last_smoother_duration_.store(0.0);
+  last_cov_duration_.store(0.0);
+  processing_overflow_.store(false);
+  new_factors_.store(0);
+  total_factors_.store(0);
+  total_variables_.store(0);
+
+  RCLCPP_INFO(get_logger(), "Graph reset successfully. Waiting for sensor data...");
+  response->success = true;
+  response->message = "Factor graph reset successfully.";
 }
 
 }  // namespace coug_fgo
