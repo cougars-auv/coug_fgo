@@ -876,7 +876,7 @@ void FactorGraphNode::checkProcessingOverflow(diagnostic_updater::DiagnosticStat
 
 void FactorGraphNode::resetGraph(const std_srvs::srv::Trigger::Request::SharedPtr,
                                  std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
-  RCLCPP_INFO(get_logger(), "Reset requested...");
+  RCLCPP_WARN(get_logger(), "Reset requested!");
 
   std::unique_lock reset_lock(reset_mutex_);
 
