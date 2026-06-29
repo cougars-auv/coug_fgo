@@ -60,6 +60,7 @@ void FluidPressureOdomNode::pressureCallback(const sensor_msgs::msg::FluidPressu
 
   double pressure = msg->fluid_pressure * params_.pressure_scale;
 
+  // TODO: Add a more sophisticated filter
   if (params_.max_pressure_delta > 0.0 && last_pressure_ >= 0.0 &&
       std::abs(pressure - last_pressure_) > params_.max_pressure_delta) {
     RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Rejected pressure spike.");
