@@ -26,10 +26,22 @@
 
 namespace coug_fgo::utils {
 
+/**
+ * @enum SolverType
+ * @brief Supported optimization solvers.
+ */
 enum class SolverType { kIncrementalFixedLagSmoother, kIsam2, kLevenbergMarquardt };
 
+/**
+ * @enum RobustKernel
+ * @brief Robust cost kernels for noise models.
+ */
 enum class RobustKernel { kNone, kHuber, kTukey };
 
+/**
+ * @enum KeyframeSource
+ * @brief Available keyframe trigger sources.
+ */
 enum class KeyframeSource { kNone, kDvl, kDepth, kTimer };
 
 /**
