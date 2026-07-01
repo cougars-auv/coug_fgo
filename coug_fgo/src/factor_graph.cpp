@@ -28,18 +28,18 @@
 #include "coug_fgo/utils/param_enums.hpp"
 #include "coug_fgo/utils/ros_conversions.hpp"
 
-using coug_fgo::utils::KeyframeSource;
-using coug_fgo::utils::parseKeyframeSource;
-using coug_fgo::utils::parseSolverType;
-using coug_fgo::utils::SolverType;
-using coug_fgo::utils::toCovariance36Msg;
-using coug_fgo::utils::toGtsam;
-using coug_fgo::utils::toPoseCovarianceMsg;
-using coug_fgo::utils::toPoseMsg;
-using coug_fgo::utils::toQuatMsg;
-using coug_fgo::utils::toVectorMsg;
-
 namespace coug_fgo {
+
+using utils::KeyframeSource;
+using utils::parseKeyframeSource;
+using utils::parseSolverType;
+using utils::SolverType;
+using utils::toCovariance36Msg;
+using utils::toGtsam;
+using utils::toPoseCovarianceMsg;
+using utils::toPoseMsg;
+using utils::toQuatMsg;
+using utils::toVectorMsg;
 
 void FactorGraphNode::setupRosInterfaces() {
   // --- ROS TF Interfaces ---

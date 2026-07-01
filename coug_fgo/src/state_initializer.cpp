@@ -25,17 +25,17 @@
 
 #include "coug_fgo/utils/param_enums.hpp"
 
-using coug_fgo::utils::AhrsData;
-using coug_fgo::utils::ImuData;
-using coug_fgo::utils::KeyframeSource;
-using coug_fgo::utils::MagneticFieldData;
-using coug_fgo::utils::OdometryData;
-using coug_fgo::utils::parseKeyframeSource;
-using coug_fgo::utils::QueueBundle;
-using coug_fgo::utils::TfBundle;
-using coug_fgo::utils::TwistData;
-
 namespace coug_fgo {
+
+using utils::AhrsData;
+using utils::ImuData;
+using utils::KeyframeSource;
+using utils::MagneticFieldData;
+using utils::OdometryData;
+using utils::parseKeyframeSource;
+using utils::QueueBundle;
+using utils::TfBundle;
+using utils::TwistData;
 
 StateInitializer::StateInitializer(const factor_graph_node::Params& params) : params_(params) {}
 

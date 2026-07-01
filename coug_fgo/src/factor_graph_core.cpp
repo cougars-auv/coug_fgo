@@ -52,13 +52,6 @@ using coug_fgo::factors::DvlTightPreintFactorArm;
 using coug_fgo::factors::Gps2dFactorArm;
 using coug_fgo::factors::MagFactorArm;
 
-using coug_fgo::utils::DvlLoosePreintegrator;
-using coug_fgo::utils::DvlTightPreintegrator;
-using coug_fgo::utils::parseRobustKernel;
-using coug_fgo::utils::parseSolverType;
-using coug_fgo::utils::RobustKernel;
-using coug_fgo::utils::SolverType;
-
 using gtsam::symbol_shorthand::B;  // Bias (ax,ay,az,gx,gy,gz)
 using gtsam::symbol_shorthand::V;  // Velocity (x,y,z)
 using gtsam::symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
@@ -69,6 +62,13 @@ bool isInvalidCovDiag(const Eigen::MatrixBase<Derived>& m) {
 }
 
 namespace coug_fgo {
+
+using utils::DvlLoosePreintegrator;
+using utils::DvlTightPreintegrator;
+using utils::parseRobustKernel;
+using utils::parseSolverType;
+using utils::RobustKernel;
+using utils::SolverType;
 
 FactorGraphCore::FactorGraphCore(const factor_graph_node::Params& params) : params_(params) {}
 
