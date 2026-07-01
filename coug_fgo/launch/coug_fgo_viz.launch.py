@@ -66,20 +66,15 @@ def visualization_setup(context, *args, **kwargs) -> list:
                 per_agent = yaml.safe_load(per_agent_template.replace("AUV_NS", ns))
                 base["Visualization Manager"]["Displays"].extend(per_agent["displays"])
 
-            temp_config = tempfile.NamedTemporaryFile(
-                mode="w", delete=False, suffix=".rviz"
-            )
-            yaml.safe_dump(base, temp_config, sort_keys=False)
-            temp_config.close()
+            config_content = yaml.safe_dump(base, sort_keys=False)
         else:
             config_content = template_content.replace("AUV_NS", auv_ns_str)
 
-            temp_config = tempfile.NamedTemporaryFile(
-                mode="w", delete=False, suffix=".rviz"
-            )
-            temp_config.write(config_content)
-            temp_config.close()
-
+        temp_config = tempfile.NamedTemporaryFile(
+            mode="w", delete=False, suffix=".rviz"
+        )
+        temp_config.write(config_content)
+        temp_config.close()
         rviz_config_file = temp_config.name
 
         nodes_to_launch.append(
