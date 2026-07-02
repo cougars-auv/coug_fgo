@@ -48,22 +48,32 @@ class DvlTightPreintegrator {
     measured_translation_ = gtsam::Vector3::Zero();
     covariance_ = gtsam::Matrix3::Zero();
     d_translation_d_bias_ = gtsam::Matrix3::Zero();
+    cross_cov_rot_trans_ = gtsam::Matrix3::Zero();
+    prev_delta_R_ik_ = gtsam::Rot3();
   }
 
   /**
-   * @brief Integrates a new DVL velocity measurement.
+   * @brief Integrates a new DVL velocity measurement with joint covariance propagation (Forster et
+   * al., TRO 2017)
+   *
    * @param measured_vel The velocity measurement in the DVL sensor frame.
    * @param delta_R_ik Relative target-frame rotation from interval start (i) to measurement (k).
    * @param target_R_dvl Static extrinsic rotation from the DVL to the target frame.
    * @param dt The time delta since the last measurement.
    * @param measured_cov The measurement noise covariance.
-   * @param rot_cov_k Current rotation covariance from the IMU preintegrator at step k.
-   * @param J_bg_k Jacobian of delta_R_ik w.r.t. the gyro bias (from IMU preintegrator).
+   * @param rot_cov_k Right-perturbation covariance of delta_R_ik from the IMU preintegrator.
+   * @param J_bg_k Jacobian of delta_R_ik w.r.t. the gyro bias, in the manifold convention
+   * delta_R_ik(b + db) ~= delta_R_ik(b) * Exp(J_bg_k * db).
    */
   void integrateMeasurement(const gtsam::Vector3& measured_vel, const gtsam::Rot3& delta_R_ik,
                             const gtsam::Rot3& target_R_dvl, double dt,
                             const gtsam::Matrix3& measured_cov, const gtsam::Matrix3& rot_cov_k,
                             const gtsam::Matrix3& J_bg_k) {
+    // Transport the rotation error frame from the previous step to this one:
+    // delta_phi_k = delta_R_{k-1,k}^T * delta_phi_{k-1} + (new gyro noise)
+    gtsam::Matrix3 A = (prev_delta_R_ik_.inverse() * delta_R_ik).matrix().transpose();
+    cross_cov_rot_trans_ = A * cross_cov_rot_trans_;
+
     // Calculate velocity in the target frame at time k
     gtsam::Vector3 vel_in_target = target_R_dvl.rotate(measured_vel);
 
@@ -78,12 +88,16 @@ class DvlTightPreintegrator {
     // J_rot maps Gyro rotation noise to translation noise
     gtsam::Matrix3 J_rot = -delta_R_ik.matrix() * gtsam::skewSymmetric(vel_in_target) * dt;
 
-    // Propagate combined DVL and Gyroscope uncertainty
-    covariance_ +=
-        (J_vel * measured_cov * J_vel.transpose()) + (J_rot * rot_cov_k * J_rot.transpose());
+    // Joint propagation: delta_p_new = delta_p + J_rot * delta_phi + J_vel * delta_v
+    covariance_ += (J_vel * measured_cov * J_vel.transpose()) +
+                   (J_rot * rot_cov_k * J_rot.transpose()) + (J_rot * cross_cov_rot_trans_) +
+                   (J_rot * cross_cov_rot_trans_).transpose();
+    cross_cov_rot_trans_ += rot_cov_k * J_rot.transpose();
 
     // Accumulate first-order Jacobian w.r.t Gyro Bias
     d_translation_d_bias_ += J_rot * J_bg_k;
+
+    prev_delta_R_ik_ = delta_R_ik;
   }
 
   /**
@@ -108,6 +122,8 @@ class DvlTightPreintegrator {
   gtsam::Vector3 measured_translation_;
   gtsam::Matrix3 covariance_;
   gtsam::Matrix3 d_translation_d_bias_;
+  gtsam::Matrix3 cross_cov_rot_trans_;
+  gtsam::Rot3 prev_delta_R_ik_;
 };
 
 }  // namespace coug_fgo::utils

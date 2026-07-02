@@ -745,6 +745,14 @@ void FactorGraphCore::addDvlTightPreintFactor(
     }
   };
 
+  auto extractImuRotation = [&](gtsam::Rot3& delta_R_ik, gtsam::Matrix3& rot_cov_k,
+                                gtsam::Matrix3& J_bg_k) {
+    delta_R_ik = temp_imu_preint->deltaRij();
+    gtsam::Matrix3 Jr = gtsam::Rot3::ExpmapDerivative(gtsam::Vector3(temp_imu_preint->theta()));
+    rot_cov_k = Jr * temp_imu_preint->preintMeasCov().block<3, 3>(0, 0) * Jr.transpose();
+    J_bg_k = Jr * temp_imu_preint->preintegrated_H_biasOmega().topRows<3>();
+  };
+
   for (const auto& dvl_msg : dvl_msgs) {
     double current_dvl_time = dvl_msg->timestamp;
     if (current_dvl_time <= last_dvl_time) {
@@ -756,12 +764,10 @@ void FactorGraphCore::addDvlTightPreintFactor(
       stepImuPreintegrator(current_dvl_time);
 
       // Extract preintegrated IMU relative rotation and Jacobians
-      gtsam::Rot3 delta_R_ik = temp_imu_preint->deltaRij();
-      gtsam::Matrix3 rot_cov_k = temp_imu_preint->preintMeasCov().block<3, 3>(0, 0);
-
-      gtsam::Matrix96 H_bias;
-      temp_imu_preint->biasCorrectedDelta(prev_imu_bias_, H_bias);
-      gtsam::Matrix3 J_bg_k = H_bias.block<3, 3>(0, 3);
+      gtsam::Rot3 delta_R_ik;
+      gtsam::Matrix3 rot_cov_k;
+      gtsam::Matrix3 J_bg_k;
+      extractImuRotation(delta_R_ik, rot_cov_k, J_bg_k);
 
       dvl_tight_preintegrator_->integrateMeasurement(last_dvl_velocity_, delta_R_ik, target_R_dvl,
                                                      dt, last_dvl_covariance_, rot_cov_k, J_bg_k);
@@ -790,12 +796,10 @@ void FactorGraphCore::addDvlTightPreintFactor(
       stepImuPreintegrator(target_time);
 
       // Extract preintegrated IMU relative rotation and Jacobians
-      gtsam::Rot3 delta_R_ik = temp_imu_preint->deltaRij();
-      gtsam::Matrix3 rot_cov_k = temp_imu_preint->preintMeasCov().block<3, 3>(0, 0);
-
-      gtsam::Matrix96 H_bias;
-      temp_imu_preint->biasCorrectedDelta(prev_imu_bias_, H_bias);
-      gtsam::Matrix3 J_bg_k = H_bias.block<3, 3>(0, 3);
+      gtsam::Rot3 delta_R_ik;
+      gtsam::Matrix3 rot_cov_k;
+      gtsam::Matrix3 J_bg_k;
+      extractImuRotation(delta_R_ik, rot_cov_k, J_bg_k);
 
       dvl_tight_preintegrator_->integrateMeasurement(last_dvl_velocity_, delta_R_ik, target_R_dvl,
                                                      dt, last_dvl_covariance_, rot_cov_k, J_bg_k);
