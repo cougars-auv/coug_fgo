@@ -502,7 +502,7 @@ for a, b in [(0, 2), (2, 4)]:
         4.5,
         fixed=True,
         offset=[13, -8],
-        plot_params=style_factor_gps,
+        plot_params=style_factor_dynamics,
     )
     pgm_multiagent.add_edge("anchor0", f"constraint{a}{b}")
     pgm_multiagent.add_edge("anchor1", f"constraint{a}{b}")
