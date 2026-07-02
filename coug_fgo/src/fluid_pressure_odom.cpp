@@ -60,12 +60,17 @@ void FluidPressureOdomNode::pressureCallback(const sensor_msgs::msg::FluidPressu
 
   double pressure = msg->fluid_pressure * params_.pressure_scale;
 
-  // TODO: Add a more sophisticated filter
   if (params_.max_pressure_delta > 0.0 && last_pressure_ >= 0.0 &&
       std::abs(pressure - last_pressure_) > params_.max_pressure_delta) {
-    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Rejected pressure spike.");
-    return;
+    rejected_count_++;
+    if (rejected_count_ <= params_.max_consecutive_rejections) {
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Rejected pressure spike.");
+      return;
+    }
+    RCLCPP_WARN(get_logger(), "Accepting pressure step after %d consecutive rejections.",
+                rejected_count_);
   }
+  rejected_count_ = 0;
   last_pressure_ = pressure;
 
   nav_msgs::msg::Odometry odom_msg;

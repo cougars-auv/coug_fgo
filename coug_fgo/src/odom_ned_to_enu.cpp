@@ -78,7 +78,7 @@ nav_msgs::msg::Odometry OdomNedToEnuNode::convertToEnu(
     static const Eigen::Matrix3d M = (Eigen::Matrix3d() << 0, 1, 0, 1, 0, 0, 0, 0, -1).finished();
     Eigen::Matrix<double, 6, 6> T = Eigen::Matrix<double, 6, 6>::Zero();
     T.block<3, 3>(0, 0) = M;
-    T.block<3, 3>(3, 3) = M;
+    T.block<3, 3>(3, 3) = Eigen::Matrix3d::Identity();
     Eigen::Map<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> cov(out.pose.covariance.data());
     cov = (T * cov * T.transpose()).eval();
   }

@@ -40,6 +40,11 @@ fluid_pressure_odom_node:
     default_value: 0.0
     validation:
       gt_eq<>: [0.0]
+  max_consecutive_rejections:
+    type: int
+    default_value: 5
+    validation:
+      gt_eq<>: [1]
 
   # --- ROS Topics and Frames ---
   input_topic:

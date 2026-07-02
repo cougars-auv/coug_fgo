@@ -43,14 +43,14 @@ class AhrsFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
    * @param pose_key GTSAM key for the AUV pose.
    * @param measured_orientation The measured orientation of the sensor in the map frame.
    * @param target_T_sensor The static transformation from target to sensor.
-   * @param mag_declination Magnetic declination to add to the measurement [rad].
+   * @param mag_declination East-positive magnetic declination (NOAA convention) [rad].
    * @param noise_model The noise model for the measurement.
    */
   AhrsFactorArm(gtsam::Key pose_key, const gtsam::Rot3& measured_orientation,
                 const gtsam::Pose3& target_T_sensor, double mag_declination,
                 const gtsam::SharedNoiseModel& noise_model)
       : NoiseModelFactor1<gtsam::Pose3>(noise_model, pose_key),
-        measured_orientation_(gtsam::Rot3::Yaw(mag_declination) * measured_orientation),
+        measured_orientation_(gtsam::Rot3::Yaw(-mag_declination) * measured_orientation),
         target_R_sensor_(target_T_sensor.rotation()) {}
 
   /**

@@ -152,6 +152,7 @@
       use_parameter_covariance: false
       parameter_covariance:
         orientation_noise_sigmas: [0.00349, 0.00349, 0.01745] # [rad] AHRS orientation uncertainty sigmas [roll, pitch, yaw].
+      # East-positive declination (NOAA convention).
       # https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml#declination
       mag_declination_radians: 0.0
       diagnostic_timeout_sec: 1.0 # [s]
@@ -269,6 +270,7 @@
 
       fallback_depth_noise_sigma: 0.02 # [m]
       max_pressure_delta: 0.0 # [Pa]
+      max_consecutive_rejections: 5
 
       # --- ROS Topics and Frames ---
       input_topic: "pressure/data"
@@ -307,6 +309,7 @@
       gyro_noise_sigmas: [0.0012, 0.0012, 0.0012] # [rad/s] Gyroscope measurement noise sigmas.
       orientation_noise_sigmas: [0.00349, 0.00349, 0.01745] # [rad] Orientation uncertainty sigmas [roll, pitch, yaw].
       magnetic_field_noise_sigmas: [0.003, 0.003, 0.003] # [normalized] Magnetic field uncertainty sigmas.
+      # East-positive declination (NOAA convention).
       # https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml#declination
       mag_declination_radians: 0.0
 

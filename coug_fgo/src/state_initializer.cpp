@@ -232,7 +232,7 @@ gtsam::Rot3 StateInitializer::computeInitialOrientation(const TfBundle& tfs) {
     gtsam::Rot3 target_R_ahrs = tfs.target_T_ahrs.rotation();
     gtsam::Rot3 map_R_ahrs = initial_ahrs_->orientation;
     gtsam::Rot3 map_R_target_measured = map_R_ahrs * target_R_ahrs.inverse();
-    yaw = map_R_target_measured.yaw() + params_.ahrs.mag_declination_radians;
+    yaw = map_R_target_measured.yaw() - params_.ahrs.mag_declination_radians;
   } else if (params_.mag.enable_mag || params_.mag.enable_mag_init_only) {
     // Account for magnetometer rotation
     gtsam::Rot3 target_R_mag = tfs.target_T_mag.rotation();

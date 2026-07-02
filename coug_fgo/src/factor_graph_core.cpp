@@ -299,21 +299,22 @@ void FactorGraphCore::addPriorFactors(const StateInitializer& state_init,
                 : std::sqrt(mag_var * params_.mag.covariance_scalar);
         prior_pose_sigmas(2) = mag_sigma_norm / h_mag;
       }
-      const bool use_param_imu_gyro =
+      const bool use_param_imu_accel =
           params_.imu.use_parameter_covariance ||
-          isInvalidCovDiag(state_init.getInitialImu()->angular_velocity_covariance);
-      prior_pose_sigmas(0) =
-          use_param_imu_gyro
-              ? params_.imu.parameter_covariance.gyro_noise_sigmas[0] *
-                    std::sqrt(params_.imu.covariance_scalar)
-              : std::sqrt(state_init.getInitialImu()->angular_velocity_covariance(0, 0) *
-                          params_.imu.covariance_scalar);
-      prior_pose_sigmas(1) =
-          use_param_imu_gyro
-              ? params_.imu.parameter_covariance.gyro_noise_sigmas[1] *
-                    std::sqrt(params_.imu.covariance_scalar)
-              : std::sqrt(state_init.getInitialImu()->angular_velocity_covariance(1, 1) *
-                          params_.imu.covariance_scalar);
+          isInvalidCovDiag(state_init.getInitialImu()->linear_acceleration_covariance);
+      const double g_norm =
+          std::max(Eigen::Map<const Eigen::Vector3d>(params_.imu.gravity.data()).norm(), 1e-6);
+      auto accel_var = [&](int axis) {
+        return use_param_imu_accel
+                   ? params_.imu.parameter_covariance.accel_noise_sigmas[axis] *
+                         params_.imu.parameter_covariance.accel_noise_sigmas[axis] *
+                         params_.imu.covariance_scalar
+                   : state_init.getInitialImu()->linear_acceleration_covariance(axis, axis) *
+                         params_.imu.covariance_scalar;
+      };
+      const auto& bias_sig = params_.prior.initial_accel_bias_sigmas;
+      prior_pose_sigmas(0) = std::sqrt(accel_var(1) + bias_sig[1] * bias_sig[1]) / g_norm;
+      prior_pose_sigmas(1) = std::sqrt(accel_var(0) + bias_sig[0] * bias_sig[0]) / g_norm;
     }
   }
 
