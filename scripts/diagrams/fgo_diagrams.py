@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# %%
 import daft
 import copy
 from pathlib import Path
@@ -42,7 +41,6 @@ style_factor_dvl = {"facecolor": COLOR_FACTOR_DVL, "edgecolor": "black"}
 style_factor_imu = {"facecolor": COLOR_FACTOR_IMU, "edgecolor": "black"}
 style_factor_dynamics = {"facecolor": COLOR_FACTOR_DYNAMICS, "edgecolor": "black"}
 
-# %%
 pgm = daft.PGM(directed=False)
 
 col_spacing = 1.5
@@ -77,7 +75,7 @@ pgm.add_node(
     plot_params=style_prior,
 )
 
-for i in range(4):
+for i in range(5):
     x_pos = start_x + (i * col_spacing)
 
     pgm.add_node(f"x{i}", f"$\\mathbf{{x}}_{{{i}}}$", x_pos, 3, plot_params=style_var)
@@ -88,7 +86,7 @@ pgm.add_edge("px", "x0")
 pgm.add_edge("pv", "v0")
 pgm.add_edge("pb", "b0")
 
-for i in range(4):
+for i in range(5):
     x_pos = start_x + (i * col_spacing)
 
     pgm.add_node(
@@ -113,46 +111,45 @@ for i in range(4):
     )
     pgm.add_edge(f"x{i}", f"heading{i}")
 
-    if i < 3:
-        mid_x = x_pos + (col_spacing / 2)
+for i in range(4):
+    x_pos = start_x + (i * col_spacing)
+    mid_x = x_pos + (col_spacing / 2)
 
-        pgm.add_node(
-            f"imu{i}",
-            f"$f^\\mathcal{{I}}_{{{i}{i + 1}}}$",
-            mid_x,
-            2,
-            fixed=True,
-            offset=[0, -25],
-            plot_params=style_factor_imu,
-        )
-        pgm.add_edge(f"x{i}", f"imu{i}")
-        pgm.add_edge(f"v{i}", f"imu{i}")
-        pgm.add_edge(f"b{i}", f"imu{i}")
-        pgm.add_edge(f"imu{i}", f"x{i + 1}")
-        pgm.add_edge(f"imu{i}", f"v{i + 1}")
-        pgm.add_edge(f"imu{i}", f"b{i + 1}")
+    pgm.add_node(
+        f"imu{i}",
+        f"$f^\\mathcal{{I}}_{{{i}{i + 1}}}$",
+        mid_x,
+        2,
+        fixed=True,
+        offset=[0, -25],
+        plot_params=style_factor_imu,
+    )
+    pgm.add_edge(f"x{i}", f"imu{i}")
+    pgm.add_edge(f"v{i}", f"imu{i}")
+    pgm.add_edge(f"b{i}", f"imu{i}")
+    pgm.add_edge(f"imu{i}", f"x{i + 1}")
+    pgm.add_edge(f"imu{i}", f"v{i + 1}")
+    pgm.add_edge(f"imu{i}", f"b{i + 1}")
 
-x_pos_gps = start_x + (2 * col_spacing)
+x_pos_gps = start_x + (3 * col_spacing)
 pgm.add_node(
     "gps",
-    r"$f^{{xy}}_2$",
+    r"$f^{{xy}}_3$",
     x_pos_gps,
     3.6,
     fixed=True,
     offset=[0, 3],
     plot_params=style_factor_gps,
 )
-pgm.add_edge("x2", "gps")
+pgm.add_edge("x3", "gps")
 
-# %%
 pgm_preint_loose = copy.deepcopy(pgm)
 pgm_preint_tight = copy.deepcopy(pgm)
 pgm_dynamics = copy.deepcopy(pgm)
 pgm_const_vel = copy.deepcopy(pgm)
 
-# %%
 # Binary DVL Factors
-for i in range(4):
+for i in range(5):
     x_pos = start_x + (i * col_spacing)
 
     pgm.add_node(
@@ -167,29 +164,28 @@ for i in range(4):
     pgm.add_edge(f"x{i}", f"dvl{i}")
     pgm.add_edge(f"v{i}", f"dvl{i}")
 
+pgm_multiagent = copy.deepcopy(pgm)
+
 pgm.render()
 pgm.figure.savefig(OUTPUT_DIR / "fgo_dvl_binary.pdf", bbox_inches="tight")
 pgm.figure.savefig(OUTPUT_DIR / "fgo_dvl_binary.png", bbox_inches="tight", dpi=300)
 
-# %%
 # Loose Preintegrated DVL Factors
 for i in range(4):
     x_pos = start_x + (i * col_spacing)
+    mid_x = x_pos + (col_spacing / 2)
 
-    if i < 3:
-        mid_x = x_pos + (col_spacing / 2)
-
-        pgm_preint_loose.add_node(
-            f"dvlb{i}",
-            f"$f^\\mathcal{{D}}_{{{i}{i + 1}}}$",
-            mid_x,
-            3,
-            fixed=True,
-            plot_params=style_factor_dvl,
-            offset=[0, 3],
-        )
-        pgm_preint_loose.add_edge(f"x{i}", f"dvlb{i}")
-        pgm_preint_loose.add_edge(f"dvlb{i}", f"x{i + 1}")
+    pgm_preint_loose.add_node(
+        f"dvlb{i}",
+        f"$f^\\mathcal{{D}}_{{{i}{i + 1}}}$",
+        mid_x,
+        3,
+        fixed=True,
+        plot_params=style_factor_dvl,
+        offset=[0, 3],
+    )
+    pgm_preint_loose.add_edge(f"x{i}", f"dvlb{i}")
+    pgm_preint_loose.add_edge(f"dvlb{i}", f"x{i + 1}")
 
 pgm_preint_loose.render()
 pgm_preint_loose.figure.savefig(
@@ -199,26 +195,23 @@ pgm_preint_loose.figure.savefig(
     OUTPUT_DIR / "fgo_dvl_preint_loose.png", bbox_inches="tight", dpi=300
 )
 
-# %%
 # Tight Preintegrated DVL Factors
 for i in range(4):
     x_pos = start_x + (i * col_spacing)
+    mid_x = x_pos + (col_spacing / 2)
 
-    if i < 3:
-        mid_x = x_pos + (col_spacing / 2)
-
-        pgm_preint_tight.add_node(
-            f"dvlb{i}",
-            f"$f^\\mathcal{{D}}_{{{i}{i + 1}}}$",
-            mid_x,
-            2.5,
-            fixed=True,
-            plot_params=style_factor_dvl,
-            offset=[0, 5],
-        )
-        pgm_preint_tight.add_edge(f"x{i}", f"dvlb{i}")
-        pgm_preint_tight.add_edge(f"dvlb{i}", f"x{i + 1}")
-        pgm_preint_tight.add_edge(f"b{i}", f"dvlb{i}")
+    pgm_preint_tight.add_node(
+        f"dvlb{i}",
+        f"$f^\\mathcal{{D}}_{{{i}{i + 1}}}$",
+        mid_x,
+        2.5,
+        fixed=True,
+        plot_params=style_factor_dvl,
+        offset=[0, 5],
+    )
+    pgm_preint_tight.add_edge(f"x{i}", f"dvlb{i}")
+    pgm_preint_tight.add_edge(f"dvlb{i}", f"x{i + 1}")
+    pgm_preint_tight.add_edge(f"b{i}", f"dvlb{i}")
 
 pgm_preint_tight.render()
 pgm_preint_tight.figure.savefig(
@@ -228,9 +221,8 @@ pgm_preint_tight.figure.savefig(
     OUTPUT_DIR / "fgo_dvl_preint_tight.png", bbox_inches="tight", dpi=300
 )
 
-# %%
 # Dynamic Model Factors
-for i in range(2):
+for i in [0, 1, 4]:
     x_pos = start_x + (i * col_spacing)
 
     pgm_dynamics.add_node(
@@ -247,23 +239,21 @@ for i in range(2):
 
 for i in range(4):
     x_pos = start_x + (i * col_spacing)
+    mid_x = x_pos + (col_spacing / 2)
 
-    if i < 3:
-        mid_x = x_pos + (col_spacing / 2)
-
-        pgm_dynamics.add_node(
-            f"dynamics{i}",
-            f"$f^\\mathcal{{M}}_{{{i}{i + 1}}}$",
-            mid_x,
-            2.5,
-            fixed=True,
-            plot_params=style_factor_dynamics,
-            offset=[0, 5],
-        )
-        pgm_dynamics.add_edge(f"x{i}", f"dynamics{i}")
-        pgm_dynamics.add_edge(f"dynamics{i}", f"x{i + 1}")
-        pgm_dynamics.add_edge(f"v{i}", f"dynamics{i}")
-        pgm_dynamics.add_edge(f"v{i + 1}", f"dynamics{i}")
+    pgm_dynamics.add_node(
+        f"dynamics{i}",
+        f"$f^\\mathcal{{M}}_{{{i}{i + 1}}}$",
+        mid_x,
+        2.5,
+        fixed=True,
+        plot_params=style_factor_dynamics,
+        offset=[0, 5],
+    )
+    pgm_dynamics.add_edge(f"x{i}", f"dynamics{i}")
+    pgm_dynamics.add_edge(f"dynamics{i}", f"x{i + 1}")
+    pgm_dynamics.add_edge(f"v{i}", f"dynamics{i}")
+    pgm_dynamics.add_edge(f"v{i + 1}", f"dynamics{i}")
 
 pgm_dynamics.render()
 pgm_dynamics.figure.savefig(OUTPUT_DIR / "fgo_dynamics.pdf", bbox_inches="tight")
@@ -271,9 +261,8 @@ pgm_dynamics.figure.savefig(
     OUTPUT_DIR / "fgo_dynamics.png", bbox_inches="tight", dpi=300
 )
 
-# %%
 # Constant Velocity Factors
-for i in range(2):
+for i in [0, 1, 4]:
     x_pos = start_x + (i * col_spacing)
 
     pgm_const_vel.add_node(
@@ -288,26 +277,75 @@ for i in range(2):
     pgm_const_vel.add_edge(f"x{i}", f"dvl{i}")
     pgm_const_vel.add_edge(f"v{i}", f"dvl{i}")
 
-for i in range(4):
+for i in range(1, 3):
     x_pos = start_x + (i * col_spacing)
+    mid_x = x_pos + (col_spacing / 2)
 
-    if i < 3 and i >= 1:
-        mid_x = x_pos + (col_spacing / 2)
-
-        pgm_const_vel.add_node(
-            f"const_vel{i}",
-            f"$f^{{\\dot{{v}}}}_{{{i}{i + 1}}}$",
-            mid_x,
-            2.5,
-            fixed=True,
-            plot_params=style_factor_dynamics,
-            offset=[0, 5],
-        )
-        pgm_const_vel.add_edge(f"v{i}", f"const_vel{i}")
-        pgm_const_vel.add_edge(f"v{i + 1}", f"const_vel{i}")
+    pgm_const_vel.add_node(
+        f"const_vel{i}",
+        f"$f^{{\\dot{{v}}}}_{{{i}{i + 1}}}$",
+        mid_x,
+        2.5,
+        fixed=True,
+        plot_params=style_factor_dynamics,
+        offset=[0, 5],
+    )
+    pgm_const_vel.add_edge(f"v{i}", f"const_vel{i}")
+    pgm_const_vel.add_edge(f"v{i + 1}", f"const_vel{i}")
 
 pgm_const_vel.render()
 pgm_const_vel.figure.savefig(OUTPUT_DIR / "fgo_const_vel.pdf", bbox_inches="tight")
 pgm_const_vel.figure.savefig(
     OUTPUT_DIR / "fgo_const_vel.png", bbox_inches="tight", dpi=300
+)
+
+# Multiagent Factors
+pgm_multiagent.add_node(
+    "px1",
+    "$f^0_\\mathbf{{x}}$",
+    start_x - prior_dist,
+    6,
+    fixed=True,
+    offset=[0, 3],
+    plot_params=style_prior,
+)
+
+for i in [0, 2, 4]:
+    x_pos = start_x + (i * col_spacing)
+
+    pgm_multiagent.add_node(
+        f"x1{i}", f"$\\mathbf{{x}}_{{{i}}}$", x_pos, 6, plot_params=style_var
+    )
+
+pgm_multiagent.add_edge("px1", "x10")
+
+for i in [0, 2, 4]:
+    x_pos = start_x + (i * col_spacing)
+
+    pgm_multiagent.add_node(
+        f"depth1{i}",
+        f"$f^z_{i}$",
+        x_pos - 0.4,
+        6.4,
+        fixed=True,
+        plot_params=style_factor_depth,
+        offset=[0, 3],
+    )
+    pgm_multiagent.add_edge(f"x1{i}", f"depth1{i}")
+
+    pgm_multiagent.add_node(
+        f"heading1{i}",
+        f"$f^\\psi_{i}$",
+        x_pos + 0.4,
+        6.4,
+        fixed=True,
+        plot_params=style_factor_heading,
+        offset=[0, 3],
+    )
+    pgm_multiagent.add_edge(f"x1{i}", f"heading1{i}")
+
+pgm_multiagent.render()
+pgm_multiagent.figure.savefig(OUTPUT_DIR / "fgo_multiagent.pdf", bbox_inches="tight")
+pgm_multiagent.figure.savefig(
+    OUTPUT_DIR / "fgo_multiagent.png", bbox_inches="tight", dpi=300
 )
