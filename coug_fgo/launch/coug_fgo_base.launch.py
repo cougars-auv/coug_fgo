@@ -49,7 +49,6 @@ def launch_setup(context, *args, **kwargs) -> list:
             package="coug_fgo",
             executable="navsat_odom",
             name="navsat_odom_node",
-            namespace="base_station",
             parameters=[
                 fleet_params,
                 auv_params,

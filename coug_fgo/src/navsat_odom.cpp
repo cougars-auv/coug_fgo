@@ -192,7 +192,7 @@ void NavsatOdomNode::checkNavSatFix(diagnostic_updater::DiagnosticStatusWrapper&
   if (time_since > params_.diagnostic_timeout_sec || last_navsat_time_ == 0.0) {
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "GPS is offline.");
   } else if (last_fix_status_ == sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX) {
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "No GPS fix acquired.");
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "Waiting for GPS fix.");
   } else {
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "GPS fix acquired.");
   }
