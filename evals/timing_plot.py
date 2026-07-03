@@ -39,34 +39,28 @@ NAME_MAPPING = {
 }
 
 
-def load_timing_data(bag_dir: str, agent_name: str) -> pd.DataFrame:
+def load_data(bag_dir: Path, agent_name: str) -> pd.DataFrame:
     timing_data = []
-    bag_path = Path(bag_dir)
-
     try:
-        with AnyReader([bag_path]) as reader:
+        with AnyReader([bag_dir]) as reader:
             available_topics = {c.topic: c for c in reader.connections}
-            topics_to_read = []
-            topic_to_algo = {}
-
-            for node_name, algo in NAME_MAPPING.items():
-                target_topic = f"/{agent_name}/{node_name}/metrics"
-                if target_topic in available_topics:
-                    topics_to_read.append(available_topics[target_topic])
-                    topic_to_algo[target_topic] = algo
-
+            topics_to_read = [
+                available_topics[f"/{agent_name}/{node}/metrics"]
+                for node in NAME_MAPPING
+                if f"/{agent_name}/{node}/metrics" in available_topics
+            ]
             if not topics_to_read:
                 return pd.DataFrame()
 
-            for connection, timestamp, rawdata in reader.messages(
-                connections=topics_to_read
-            ):
+            topic_to_algo = {
+                f"/{agent_name}/{node}/metrics": algo
+                for node, algo in NAME_MAPPING.items()
+            }
+            for connection, _, rawdata in reader.messages(connections=topics_to_read):
                 msg = reader.deserialize(rawdata, connection.msgtype)
-                algo = topic_to_algo[connection.topic]
-
                 timing_data.append(
                     {
-                        "Algorithm": algo,
+                        "Algorithm": topic_to_algo[connection.topic],
                         "Total": msg.total_duration,
                         "Smoother": msg.smoother_duration,
                         "Covariance": msg.cov_duration,
@@ -78,8 +72,8 @@ def load_timing_data(bag_dir: str, agent_name: str) -> pd.DataFrame:
     return pd.DataFrame(timing_data)
 
 
-def plot_timing(bag_dir: str, output_dir: str, agent_name: str) -> None:
-    df = load_timing_data(bag_dir, agent_name)
+def generate_plots(bag_dir: Path, output_dir: Path, agent_name: str) -> None:
+    df = load_data(bag_dir, agent_name)
 
     if df.empty:
         return
@@ -120,7 +114,7 @@ def plot_timing(bag_dir: str, output_dir: str, agent_name: str) -> None:
         ax.set(title="", xlabel="", ylabel="Duration (s)")
         ax.legend(title=None)
 
-        save_path = Path(output_dir) / f"{agent_name}_timing_{plot_type}.png"
+        save_path = output_dir / f"{agent_name}_timing_{plot_type}.png"
         fig.savefig(save_path, dpi=300, bbox_inches="tight")
         plt.close(fig)
 
@@ -137,9 +131,8 @@ def main() -> None:
 
     for evo_dir in target_dir.rglob("evo"):
         bag_dir = evo_dir.parent
-        for agent_dir in evo_dir.iterdir():
-            if agent_dir.is_dir():
-                plot_timing(str(bag_dir), str(bag_dir), agent_dir.name)
+        for agent_dir in filter(Path.is_dir, evo_dir.iterdir()):
+            generate_plots(bag_dir, bag_dir, agent_dir.name)
 
     print(f"Plots saved to bag directories in {target_dir}")
 

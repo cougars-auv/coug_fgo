@@ -83,27 +83,27 @@ def add_start_end_markers(
         ax.scatter(end[0], end[1], marker=end_symbol, color=color, zorder=10, s=size)
 
 
-def load_trajectories(
-    evo_agent_dir: str,
+def load_data(
+    evo_agent_dir: Path,
 ) -> tuple[dict[str, PoseTrajectory3D], PoseTrajectory3D | None]:
-    est_trajs, gt_traj = {}, None
-    odom_dir = Path(evo_agent_dir) / "odometry"
+    odom_dir = evo_agent_dir / "odometry"
     if not odom_dir.is_dir():
-        return est_trajs, gt_traj
+        return {}, None
 
     gt_files = sorted(odom_dir.glob("*.tum"))
-    if gt_files:
-        gt_traj = file_interface.read_tum_trajectory_file(str(gt_files[0]))
+    gt_traj = (
+        file_interface.read_tum_trajectory_file(str(gt_files[0])) if gt_files else None
+    )
 
+    est_trajs = {}
     for sub in sorted(odom_dir.iterdir()):
-        algo_label = NAME_MAPPING.get(sub.name)
-        if not sub.is_dir() or algo_label not in ALGORITHMS:
-            continue
-        tum_files = sorted(sub.glob("*.tum"))
-        if tum_files:
-            est_trajs[algo_label] = file_interface.read_tum_trajectory_file(
-                str(tum_files[0])
-            )
+        algo = NAME_MAPPING.get(sub.name)
+        if (
+            sub.is_dir()
+            and algo in ALGORITHMS
+            and (tum_files := sorted(sub.glob("*.tum")))
+        ):
+            est_trajs[algo] = file_interface.read_tum_trajectory_file(str(tum_files[0]))
 
     return est_trajs, gt_traj
 
@@ -137,14 +137,14 @@ def positions_with_gaps(traj: PoseTrajectory3D) -> np.ndarray:
     return np.insert(pos, gap_idx, np.nan, axis=0) if len(gap_idx) else pos
 
 
-def plot_auv(
-    evo_agent_dir: str,
-    output_dir: str,
+def generate_plots(
+    evo_agent_dir: Path,
+    output_dir: Path,
     auv_name: str,
     do_align: bool = False,
     do_align_origin: bool = False,
 ) -> None:
-    est_trajs, gt_traj = load_trajectories(evo_agent_dir)
+    est_trajs, gt_traj = load_data(evo_agent_dir)
 
     if not est_trajs and gt_traj is None:
         return
@@ -180,7 +180,7 @@ def plot_auv(
     legend = plt.legend(frameon=True)
     legend.set_zorder(100)
 
-    save_path = Path(output_dir) / f"{auv_name}_trajectories.png"
+    save_path = output_dir / f"{auv_name}_trajectories.png"
     fig.savefig(save_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
@@ -200,15 +200,14 @@ def main() -> None:
 
     for evo_dir in target_dir.rglob("evo"):
         bag_dir = evo_dir.parent
-        for agent_dir in evo_dir.iterdir():
-            if agent_dir.is_dir():
-                plot_auv(
-                    str(agent_dir),
-                    str(bag_dir),
-                    agent_dir.name,
-                    do_align=do_align,
-                    do_align_origin=do_align_origin,
-                )
+        for agent_dir in filter(Path.is_dir, evo_dir.iterdir()):
+            generate_plots(
+                agent_dir,
+                bag_dir,
+                agent_dir.name,
+                do_align=do_align,
+                do_align_origin=do_align_origin,
+            )
 
     print(f"Plots saved to bag directories in {target_dir}")
 

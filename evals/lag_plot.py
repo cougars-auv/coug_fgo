@@ -58,41 +58,42 @@ def get_smoother_lag(bag_dir: Path, agent_name: str) -> float | None:
     return float(params["smoother_lag"])
 
 
-def load_lag_data(target_dir: Path) -> pd.DataFrame:
+def read_bag_durations(bag_dir: Path, agent_name: str) -> list[float]:
+    topic = f"/{agent_name}/{FGO_TOPIC}"
+    try:
+        with AnyReader([bag_dir]) as reader:
+            connections = [c for c in reader.connections if c.topic == topic]
+            if not connections:
+                return []
+            return [
+                float(reader.deserialize(rawdata, c.msgtype).total_duration)  # type: ignore[union-attr]
+                for c, _, rawdata in reader.messages(connections=connections)
+            ]
+    except Exception as e:
+        print(f"Error reading bag {bag_dir}: {e}")
+        return []
+
+
+def load_data(target_dir: Path) -> pd.DataFrame:
     timing_data = []
 
     for evo_dir in target_dir.rglob("evo"):
         bag_dir = evo_dir.parent
-        for agent_dir in evo_dir.iterdir():
-            if not agent_dir.is_dir():
-                continue
-            agent_name = agent_dir.name
-            lag = get_smoother_lag(bag_dir, agent_name)
+        for agent_dir in filter(Path.is_dir, evo_dir.iterdir()):
+            lag = get_smoother_lag(bag_dir, agent_dir.name)
             if lag is None:
-                print(f"No smoother_lag found in {bag_dir} for {agent_name}, skipping.")
+                print(
+                    f"No smoother_lag found in {bag_dir} for {agent_dir.name}, skipping."
+                )
                 continue
 
-            try:
-                with AnyReader([bag_dir]) as reader:
-                    connections = [
-                        c
-                        for c in reader.connections
-                        if c.topic == f"/{agent_name}/{FGO_TOPIC}"
-                    ]
-                    if not connections:
-                        continue
-                    for connection, _, rawdata in reader.messages(
-                        connections=connections
-                    ):
-                        msg = reader.deserialize(rawdata, connection.msgtype)
-                        timing_data.append(
-                            {
-                                "Smoother Lag (s)": lag,
-                                "Duration (s)": msg.total_duration,  # type: ignore[union-attr]
-                            }
-                        )
-            except Exception as e:
-                print(f"Error reading bag {bag_dir}: {e}")
+            for duration in read_bag_durations(bag_dir, agent_dir.name):
+                timing_data.append(
+                    {
+                        "Smoother Lag (s)": lag,
+                        "Duration (s)": duration,
+                    }
+                )
 
     return pd.DataFrame(timing_data)
 
@@ -143,7 +144,7 @@ def main() -> None:
         print(f"Error: {target_dir} does not exist.")
         return
 
-    generate_plots(load_lag_data(target_dir), target_dir)
+    generate_plots(load_data(target_dir), target_dir)
     print(f"Plots saved to {target_dir}")
 
 
