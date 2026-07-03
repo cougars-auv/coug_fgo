@@ -38,19 +38,19 @@ def get_smoother_lag(bag_dir: Path, agent_name: str) -> float | None:
     params: dict = {}
     found_any = False
     for path in config_paths:
-        if not path.exists():
-            continue
         try:
             with open(path) as f:
                 config = yaml.safe_load(f)
-            params.update(config.get("/**", {}).get("ros__parameters", {}))
-            params.update(
-                config.get(f"/{agent_name}", {})
-                .get("**", {})
-                .get("ros__parameters", {})
-            )
+            try:
+                params.update(config["/**"]["ros__parameters"])
+            except (KeyError, TypeError):
+                pass
+            try:
+                params.update(config[f"/{agent_name}"]["**"]["ros__parameters"])
+            except (KeyError, TypeError):
+                pass
             found_any = True
-        except Exception:
+        except (OSError, yaml.YAMLError):
             continue
 
     if not found_any or "smoother_lag" not in params:

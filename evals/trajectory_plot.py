@@ -30,7 +30,7 @@ plt.style.use(["science", "ieee"])
 
 ALGORITHMS = [
     "DVL",
-    "AQS",
+    "SBG",
     "TM",
     # "EKF",
     # "UKF",
@@ -49,7 +49,7 @@ COLORS = {
     "UKF": "#937860",
     "EKF": "#DA8BC3",
     "TM": "#8C8C8C",
-    "AQS": "#CCB974",
+    "SBG": "#CCB974",
     "DVL": "#64B5CD",
     "GT": "#000000",
 }
@@ -62,7 +62,7 @@ NAME_MAPPING = {
     "global_ukf": "UKF",
     "global_ekf": "EKF",
     "global_tm": "TM",
-    "global_aqs": "AQS",
+    "sbg": "SBG",
     "dvl": "DVL",
 }
 

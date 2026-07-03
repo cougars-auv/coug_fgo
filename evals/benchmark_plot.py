@@ -34,7 +34,7 @@ ALGORITHMS = [
     # "UKF",
     # "EKF",
     "TM",
-    "AQS",
+    "SBG",
     "DVL",
 ]
 COLORS = {
@@ -46,7 +46,7 @@ COLORS = {
     "UKF": "#937860",
     "EKF": "#DA8BC3",
     "TM": "#8C8C8C",
-    "AQS": "#CCB974",
+    "SBG": "#CCB974",
     "DVL": "#64B5CD",
 }
 NAME_MAPPING = {
@@ -58,7 +58,7 @@ NAME_MAPPING = {
     "global_ukf": "UKF",
     "global_ekf": "EKF",
     "global_tm": "TM",
-    "global_aqs": "AQS",
+    "sbg": "SBG",
     "dvl": "DVL",
 }
 
