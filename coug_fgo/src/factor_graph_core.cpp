@@ -640,9 +640,22 @@ void FactorGraphCore::addDvlLoosePreintFactor(
   gtsam::Rot3 ahrs_R_target = target_R_ahrs.inverse();
   gtsam::Rot3 target_R_dvl = tfs_.target_T_dvl.rotation();
 
+  // Propagate AHRS orientation uncertainty into the preintegrated translation covariance
+  gtsam::Matrix3 ahrs_cov;
+  if (params_.ahrs.use_parameter_covariance ||
+      isInvalidCovDiag(ahrs_msgs.back()->orientation_covariance)) {
+    const auto& sig = params_.ahrs.parameter_covariance.orientation_noise_sigmas;
+    ahrs_cov = (Eigen::Map<const Eigen::Vector3d>(sig.data()).array().square() *
+                params_.ahrs.covariance_scalar)
+                   .matrix()
+                   .asDiagonal();
+  } else {
+    ahrs_cov = ahrs_msgs.back()->orientation_covariance * params_.ahrs.covariance_scalar;
+  }
+
   gtsam::Rot3 map_R_ahrs_prev = getInterpolatedOrientation(ahrs_msgs, prev_time_);
   gtsam::Rot3 map_R_target_prev = map_R_ahrs_prev * ahrs_R_target;
-  dvl_loose_preintegrator_->reset(map_R_target_prev);
+  dvl_loose_preintegrator_->reset(map_R_target_prev, target_R_ahrs, target_R_dvl, ahrs_cov);
 
   for (const auto& dvl_msg : dvl_msgs) {
     double current_dvl_time = dvl_msg->timestamp;
@@ -652,12 +665,13 @@ void FactorGraphCore::addDvlLoosePreintFactor(
 
     double dt = current_dvl_time - last_dvl_time;
     if (dt > 1e-9) {
-      // Integrate DVL measurement alongside interpolated AHRS attitude
-      gtsam::Rot3 map_R_ahrs_cur = getInterpolatedOrientation(ahrs_msgs, current_dvl_time);
-      gtsam::Rot3 map_R_target_cur = map_R_ahrs_cur * ahrs_R_target;
-      gtsam::Rot3 map_R_dvl_cur = map_R_target_cur * target_R_dvl;
+      // Integrate DVL measurement alongside the midpoint-interpolated AHRS attitude
+      double mid_time = 0.5 * (last_dvl_time + current_dvl_time);
+      gtsam::Rot3 map_R_ahrs_mid = getInterpolatedOrientation(ahrs_msgs, mid_time);
+      gtsam::Rot3 map_R_target_mid = map_R_ahrs_mid * ahrs_R_target;
+      gtsam::Rot3 map_R_dvl_mid = map_R_target_mid * target_R_dvl;
 
-      dvl_loose_preintegrator_->integrateMeasurement(last_dvl_velocity_, map_R_dvl_cur, dt,
+      dvl_loose_preintegrator_->integrateMeasurement(last_dvl_velocity_, map_R_dvl_mid, dt,
                                                      last_dvl_covariance_);
 
       last_dvl_velocity_ = dvl_msg->linear_velocity;
@@ -681,10 +695,11 @@ void FactorGraphCore::addDvlLoosePreintFactor(
   if (last_dvl_time < target_time) {
     double dt = (target_time - last_dvl_time);
     if (dt > 1e-6) {
-      gtsam::Rot3 cur_ahrs_att = getInterpolatedOrientation(ahrs_msgs, target_time);
-      gtsam::Rot3 cur_target_att = cur_ahrs_att * ahrs_R_target;
-      gtsam::Rot3 cur_dvl_att = cur_target_att * target_R_dvl;
-      dvl_loose_preintegrator_->integrateMeasurement(last_dvl_velocity_, cur_dvl_att, dt,
+      double mid_time = 0.5 * (last_dvl_time + target_time);
+      gtsam::Rot3 mid_ahrs_att = getInterpolatedOrientation(ahrs_msgs, mid_time);
+      gtsam::Rot3 mid_target_att = mid_ahrs_att * ahrs_R_target;
+      gtsam::Rot3 mid_dvl_att = mid_target_att * target_R_dvl;
+      dvl_loose_preintegrator_->integrateMeasurement(last_dvl_velocity_, mid_dvl_att, dt,
                                                      last_dvl_covariance_);
     }
     last_dvl_time = target_time;
@@ -761,7 +776,7 @@ void FactorGraphCore::addDvlTightPreintFactor(
 
     double dt = current_dvl_time - last_dvl_time;
     if (dt > 1e-9) {
-      stepImuPreintegrator(current_dvl_time);
+      stepImuPreintegrator(0.5 * (last_dvl_time + current_dvl_time));
 
       // Extract preintegrated IMU relative rotation and Jacobians
       gtsam::Rot3 delta_R_ik;
@@ -793,7 +808,7 @@ void FactorGraphCore::addDvlTightPreintFactor(
   if (last_dvl_time < target_time) {
     double dt = (target_time - last_dvl_time);
     if (dt > 1e-6) {
-      stepImuPreintegrator(target_time);
+      stepImuPreintegrator(0.5 * (last_dvl_time + target_time));
 
       // Extract preintegrated IMU relative rotation and Jacobians
       gtsam::Rot3 delta_R_ik;
@@ -897,7 +912,12 @@ std::optional<utils::QueueBundle> FactorGraphCore::update(double target_time,
     addDropoutFactors(new_graph);
   } else {
     if (params_.comparison.enable_loose_dvl_preintegration) {
-      addDvlLoosePreintFactor(new_graph, queues.dvl, queues.ahrs, target_time);
+      if (queues.ahrs.empty()) {
+        addDropoutFactors(new_graph);
+        last_dvl_velocity_ = queues.dvl.back()->linear_velocity;
+      } else {
+        addDvlLoosePreintFactor(new_graph, queues.dvl, queues.ahrs, target_time);
+      }
     } else if (params_.comparison.enable_tight_dvl_preintegration) {
       addDvlTightPreintFactor(new_graph, queues.dvl, queues.imu, target_time, held_imu_acc,
                               held_imu_gyr);
