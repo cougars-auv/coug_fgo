@@ -149,7 +149,7 @@ def generate_launch_description() -> LaunchDescription:
                     auv_params,
                     {
                         "use_sim_time": use_sim_time,
-                        "odom_frame": "map",
+                        "odom_frame": odom_frame,
                         "base_frame": base_link_frame,
                         "parameter_frame": dvl_link_frame,
                     },
@@ -221,6 +221,18 @@ def generate_launch_description() -> LaunchDescription:
                 ],
             ),
             Node(
+                package="coug_fgo",
+                executable="odom_to_tf",
+                name="odom_to_tf_node",
+                parameters=[
+                    fleet_params,
+                    auv_params,
+                    {
+                        "use_sim_time": use_sim_time,
+                    },
+                ],
+            ),
+            Node(
                 package="topic_tools",
                 executable="relay",
                 name="gps_to_truth_relay",
@@ -231,23 +243,6 @@ def generate_launch_description() -> LaunchDescription:
                         "use_sim_time": use_sim_time,
                     },
                 ],
-            ),
-            # https://docs.ros.org/en/melodic/api/robot_localization/html/state_estimation_nodes.html
-            Node(
-                package="robot_localization",
-                executable="ekf_node",
-                name="ekf_filter_node_odom",
-                parameters=[
-                    fleet_params,
-                    auv_params,
-                    {
-                        "use_sim_time": use_sim_time,
-                        "odom_frame": odom_frame,
-                        "base_link_frame": base_link_frame,
-                        "world_frame": odom_frame,
-                    },
-                ],
-                remappings=[("odometry/filtered", "odometry/local")],
             ),
             # https://docs.ros.org/en/melodic/api/robot_localization/html/state_estimation_nodes.html
             Node(
