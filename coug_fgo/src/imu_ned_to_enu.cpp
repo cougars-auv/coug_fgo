@@ -21,11 +21,8 @@
 
 #include "coug_fgo/imu_ned_to_enu.hpp"
 
-#include <tf2/LinearMath/Quaternion.h>
-
 #include <cmath>
 #include <rclcpp_components/register_node_macro.hpp>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 namespace coug_fgo {
 
@@ -53,15 +50,14 @@ void ImuNedToEnuNode::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg) {
 }
 
 sensor_msgs::msg::Imu ImuNedToEnuNode::convertToEnu(const sensor_msgs::msg::Imu::SharedPtr msg) {
-  static const tf2::Quaternion q_enu_ned(M_SQRT1_2, M_SQRT1_2, 0.0, 0.0);
-
   sensor_msgs::msg::Imu out = *msg;
 
-  tf2::Quaternion q_ned_b;
-  tf2::fromMsg(msg->orientation, q_ned_b);
-  tf2::Quaternion q_enu_b = q_enu_ned * q_ned_b;
-  q_enu_b.normalize();
-  out.orientation = tf2::toMsg(q_enu_b);
+  const auto& q = msg->orientation;
+  static constexpr double s = M_SQRT1_2;
+  out.orientation.w = -s * (q.x + q.y);
+  out.orientation.x = s * (q.w + q.z);
+  out.orientation.y = s * (q.w - q.z);
+  out.orientation.z = s * (q.y - q.x);
 
   return out;
 }

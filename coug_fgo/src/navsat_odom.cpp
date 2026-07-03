@@ -21,11 +21,8 @@
 
 #include "coug_fgo/navsat_odom.hpp"
 
-#include <tf2/LinearMath/Quaternion.h>
-
 #include <chrono>
 #include <rclcpp_components/register_node_macro.hpp>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 namespace coug_fgo {
 
@@ -148,20 +145,14 @@ void NavsatOdomNode::navsatCallback(const sensor_msgs::msg::NavSatFix::SharedPtr
   odom_msg.pose.pose.position.y = north;
   odom_msg.pose.pose.position.z = up;
 
-  tf2::Quaternion q;
-  q.setRPY(0, 0, 0);
-  odom_msg.pose.pose.orientation = tf2::toMsg(q);
+  odom_msg.pose.pose.orientation.w = 1.0;
 
   const auto& cov = msg->position_covariance;
-  odom_msg.pose.covariance[0] = cov[0];
-  odom_msg.pose.covariance[1] = cov[1];
-  odom_msg.pose.covariance[2] = cov[2];
-  odom_msg.pose.covariance[6] = cov[3];
-  odom_msg.pose.covariance[7] = cov[4];
-  odom_msg.pose.covariance[8] = cov[5];
-  odom_msg.pose.covariance[12] = cov[6];
-  odom_msg.pose.covariance[13] = cov[7];
-  odom_msg.pose.covariance[14] = cov[8];
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      odom_msg.pose.covariance[i * 6 + j] = cov[i * 3 + j];
+    }
+  }
 
   odom_msg.pose.covariance[21] = 1e9;
   odom_msg.pose.covariance[28] = 1e9;

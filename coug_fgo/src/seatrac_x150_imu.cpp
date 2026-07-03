@@ -84,13 +84,13 @@ sensor_msgs::msg::Imu SeatracX150ImuNode::convertToImu(
 
   // Convert to quaternion
   if (msg->includes_local_attitude) {
-    double roll_rad = (msg->attitude_roll / 10.0) * M_PI / 180.0;
-    double pitch_rad = (msg->attitude_pitch / 10.0) * M_PI / 180.0;
-    double yaw_rad = (msg->attitude_yaw / 10.0) * M_PI / 180.0 + params_.mag_declination_radians;
+    static constexpr double kSeatracToRad = M_PI / 1800.0;
+    double roll_rad = msg->attitude_roll * kSeatracToRad;
+    double pitch_rad = msg->attitude_pitch * kSeatracToRad;
+    double yaw_rad = msg->attitude_yaw * kSeatracToRad + params_.mag_declination_radians;
 
     tf2::Quaternion q_ned_b;
     q_ned_b.setRPY(roll_rad, pitch_rad, yaw_rad);
-    q_ned_b.normalize();
     imu_msg.orientation = tf2::toMsg(q_ned_b);
 
     auto& s = params_.orientation_noise_sigmas;

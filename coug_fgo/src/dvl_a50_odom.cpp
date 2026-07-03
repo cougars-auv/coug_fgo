@@ -61,7 +61,8 @@ DvlA50OdomNode::DvlA50OdomNode(const rclcpp::NodeOptions& options)
 }
 
 void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
-  last_dvl_time_ = this->get_clock()->now().seconds();
+  const auto stamp = this->get_clock()->now();
+  last_dvl_time_ = stamp.seconds();
 
   std::string current_dvl_frame =
       params_.use_parameter_frame ? params_.parameter_frame : msg->header.frame_id;
@@ -90,8 +91,9 @@ void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
   odom_T_dvl_tf.transform.translation.y = msg->position.y;
   odom_T_dvl_tf.transform.translation.z = msg->position.z;
 
+  static constexpr double kDegToRad = M_PI / 180.0;
   tf2::Quaternion q;
-  q.setRPY(msg->roll * M_PI / 180.0, msg->pitch * M_PI / 180.0, msg->yaw * M_PI / 180.0);
+  q.setRPY(msg->roll * kDegToRad, msg->pitch * kDegToRad, msg->yaw * kDegToRad);
   odom_T_dvl_tf.transform.rotation = tf2::toMsg(q);
 
   geometry_msgs::msg::Pose p_base_in_odom;
@@ -106,7 +108,7 @@ void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
   // uint64_t sec = static_cast<uint64_t>(msg->time);
   // uint64_t nanosec = static_cast<uint64_t>((msg->time - sec) * 1e9);
   // odom.header.stamp = rclcpp::Time(sec, nanosec, RCL_ROS_TIME);
-  odom.header.stamp = this->get_clock()->now();
+  odom.header.stamp = stamp;
 
   odom.pose.pose = p_base_in_odom;
 

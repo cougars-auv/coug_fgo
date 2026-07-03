@@ -87,6 +87,7 @@ void FluidPressureOdomNode::pressureCallback(const sensor_msgs::msg::FluidPressu
   double pressure_to_depth = 1.0 / (params_.water_density * params_.gravity);
   double gauge_pressure = pressure - params_.atmospheric_pressure;
   odom_msg.pose.pose.position.z = -gauge_pressure * pressure_to_depth;
+  odom_msg.pose.pose.orientation.w = 1.0;
 
   // var_depth = var_pressure / (rho*g)^2
   double var_pressure = msg->variance * params_.pressure_scale * params_.pressure_scale;

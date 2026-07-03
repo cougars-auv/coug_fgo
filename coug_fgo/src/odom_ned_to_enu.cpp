@@ -21,12 +21,8 @@
 
 #include "coug_fgo/odom_ned_to_enu.hpp"
 
-#include <tf2/LinearMath/Quaternion.h>
-#include <tf2/LinearMath/Vector3.h>
-
 #include <Eigen/Core>
 #include <rclcpp_components/register_node_macro.hpp>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 namespace coug_fgo {
 
@@ -55,30 +51,29 @@ void OdomNedToEnuNode::odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg
 
 nav_msgs::msg::Odometry OdomNedToEnuNode::convertToEnu(
     const nav_msgs::msg::Odometry::SharedPtr msg) {
-  static const tf2::Quaternion q_enu_ned(M_SQRT1_2, M_SQRT1_2, 0.0, 0.0);
-
   nav_msgs::msg::Odometry out = *msg;
 
   // Rotate position vector from NED to ENU
-  tf2::Vector3 pos_ned(msg->pose.pose.position.x, msg->pose.pose.position.y,
-                       msg->pose.pose.position.z);
-  tf2::Vector3 pos_enu = tf2::quatRotate(q_enu_ned, pos_ned);
-  out.pose.pose.position.x = pos_enu.x();
-  out.pose.pose.position.y = pos_enu.y();
-  out.pose.pose.position.z = pos_enu.z();
+  out.pose.pose.position.x = msg->pose.pose.position.y;
+  out.pose.pose.position.y = msg->pose.pose.position.x;
+  out.pose.pose.position.z = -msg->pose.pose.position.z;
 
   // Rotate orientation from NED to ENU
-  tf2::Quaternion q_ned_b;
-  tf2::fromMsg(msg->pose.pose.orientation, q_ned_b);
-  tf2::Quaternion q_enu_b = q_enu_ned * q_ned_b;
-  q_enu_b.normalize();
-  out.pose.pose.orientation = tf2::toMsg(q_enu_b);
+  const auto& q = msg->pose.pose.orientation;
+  static constexpr double s = M_SQRT1_2;
+  out.pose.pose.orientation.w = -s * (q.x + q.y);
+  out.pose.pose.orientation.x = s * (q.w + q.z);
+  out.pose.pose.orientation.y = s * (q.w - q.z);
+  out.pose.pose.orientation.z = s * (q.y - q.x);
 
   if (out.pose.covariance[0] >= 0.0) {
-    static const Eigen::Matrix3d M = (Eigen::Matrix3d() << 0, 1, 0, 1, 0, 0, 0, 0, -1).finished();
-    Eigen::Matrix<double, 6, 6> T = Eigen::Matrix<double, 6, 6>::Zero();
-    T.block<3, 3>(0, 0) = M;
-    T.block<3, 3>(3, 3) = Eigen::Matrix3d::Identity();
+    static const Eigen::Matrix<double, 6, 6> T = []() {
+      static const Eigen::Matrix3d M = (Eigen::Matrix3d() << 0, 1, 0, 1, 0, 0, 0, 0, -1).finished();
+      Eigen::Matrix<double, 6, 6> t = Eigen::Matrix<double, 6, 6>::Zero();
+      t.block<3, 3>(0, 0) = M;
+      t.block<3, 3>(3, 3) = Eigen::Matrix3d::Identity();
+      return t;
+    }();
     Eigen::Map<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> cov(out.pose.covariance.data());
     cov = (T * cov * T.transpose()).eval();
   }

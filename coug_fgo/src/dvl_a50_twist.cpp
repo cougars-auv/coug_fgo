@@ -57,13 +57,13 @@ DvlA50TwistNode::DvlA50TwistNode(const rclcpp::NodeOptions& options)
 }
 
 void DvlA50TwistNode::dvlCallback(const dvl_msgs::msg::DVL::SharedPtr msg) {
-  last_dvl_time_ = this->get_clock()->now().seconds();
+  const auto now = this->get_clock()->now();
+  last_dvl_time_ = now.seconds();
   last_velocity_valid_ = msg->velocity_valid;
 
   if (params_.simulate_dropout && params_.dropout_frequency_hz > 0.0) {
-    double current_time = get_clock()->now().seconds();
     double cycle_period = 1.0 / params_.dropout_frequency_hz;
-    if (fmod(current_time, cycle_period) < params_.dropout_duration_sec) {
+    if (fmod(last_dvl_time_, cycle_period) < params_.dropout_duration_sec) {
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), (int)(cycle_period * 1000),
                            "Simulating DVL dropout...");
       return;
@@ -102,17 +102,11 @@ geometry_msgs::msg::TwistWithCovarianceStamped DvlA50TwistNode::convertToTwist(
     twist_msg.twist.covariance[7] = cov_val;
     twist_msg.twist.covariance[14] = cov_val;
   } else {
-    twist_msg.twist.covariance[0] = msg->covariance[0];
-    twist_msg.twist.covariance[1] = msg->covariance[1];
-    twist_msg.twist.covariance[2] = msg->covariance[2];
-
-    twist_msg.twist.covariance[6] = msg->covariance[3];
-    twist_msg.twist.covariance[7] = msg->covariance[4];
-    twist_msg.twist.covariance[8] = msg->covariance[5];
-
-    twist_msg.twist.covariance[12] = msg->covariance[6];
-    twist_msg.twist.covariance[13] = msg->covariance[7];
-    twist_msg.twist.covariance[14] = msg->covariance[8];
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 3; ++j) {
+        twist_msg.twist.covariance[i * 6 + j] = msg->covariance[i * 3 + j];
+      }
+    }
   }
   return twist_msg;
 }
