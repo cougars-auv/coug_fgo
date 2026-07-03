@@ -533,15 +533,16 @@ void FactorGraphCore::addAuvDynamicsFactor(
 
   const auto& wrench_msg = last_wrench_msg_;
 
+  double dt = (target_time - prev_time_);
+
+  double sqrt_dt = std::sqrt(std::max(dt, 0.001));
   gtsam::Vector3 dynamics_sigmas =
       Eigen::Map<const Eigen::Vector3d>(params_.dynamics.prediction_noise_sigmas.data()) *
-      std::sqrt(params_.dynamics.covariance_scalar);
+      std::sqrt(params_.dynamics.covariance_scalar) * sqrt_dt;
   gtsam::SharedNoiseModel dynamics_noise = gtsam::noiseModel::Diagonal::Sigmas(dynamics_sigmas);
 
   dynamics_noise =
       applyRobustKernel(dynamics_noise, params_.dynamics.robust_kernel, params_.dynamics.robust_k);
-
-  double dt = (target_time - prev_time_);
 
   graph.emplace_shared<coug_fgo::factors::AuvDynamicsFactorArm>(
       X(prev_step_), V(prev_step_), X(current_step_), V(current_step_), dt, wrench_msg->force,
