@@ -419,7 +419,7 @@ pgm_multiagent.add_node(
     "px1",
     "$p^1_\\mathbf{{x}}$",
     start_x - prior_dist,
-    5.6,
+    5.7,
     fixed=True,
     offset=[0, 3],
     plot_params=style_prior,
@@ -428,7 +428,7 @@ pgm_multiagent.add_node(
 for i in [0, 2, 4]:
     col_x = start_x + (i * col_spacing)
     pgm_multiagent.add_node(
-        f"x1_{i}", f"$\\mathbf{{x}}^1_{{{i}}}$", col_x, 5.6, plot_params=style_var
+        f"x1_{i}", f"$\\mathbf{{x}}^1_{{{i}}}$", col_x, 5.7, plot_params=style_var
     )
 
 pgm_multiagent.add_edge("px1", "x1_0")
@@ -440,7 +440,7 @@ for i in [0, 2, 4]:
         f"depth1_{i}",
         f"$z^1_{i}$",
         col_x - 0.4,
-        6.0,
+        6.1,
         fixed=True,
         plot_params=style_factor_depth,
         offset=[0, 3],
@@ -451,7 +451,7 @@ for i in [0, 2, 4]:
         f"heading1_{i}",
         f"$\\psi^1_{i}$",
         col_x + 0.4,
-        6.0,
+        6.1,
         fixed=True,
         plot_params=style_factor_heading,
         offset=[0, 3],
@@ -464,7 +464,7 @@ for a, b in [(0, 2), (2, 4)]:
         f"odom1_{a}{b}",
         f"$u^1_{{{a}{b}}}$",
         mid_x,
-        5.6,
+        5.7,
         fixed=True,
         offset=[0, -20],
         plot_params=style_factor_imu,
@@ -473,12 +473,11 @@ for a, b in [(0, 2), (2, 4)]:
     pgm_multiagent.add_edge(f"odom1_{a}{b}", f"x1_{b}")
 
 # Anchor nodes
-anchor_x = start_x + (1.5 * col_spacing)
-for agent, row in [(1, 4.85), (0, 4.15)]:
+for agent, row in [(1, 5), (0, 4)]:
     pgm_multiagent.add_node(
         f"panchor{agent}",
         f"$p^{agent}_\\mathbf{{\\Delta}}$",
-        anchor_x - prior_dist,
+        start_x - prior_dist,
         row,
         fixed=True,
         offset=[0, 3],
@@ -487,7 +486,7 @@ for agent, row in [(1, 4.85), (0, 4.15)]:
     pgm_multiagent.add_node(
         f"anchor{agent}",
         f"$\\mathbf{{\\Delta}}^{agent}$",
-        anchor_x,
+        start_x,
         row,
         plot_params=style_var,
     )
@@ -508,16 +507,6 @@ for i in [2, 4]:
     pgm_multiagent.add_edge("anchor1", f"constraint{i}")
     pgm_multiagent.add_edge(f"x{i}", f"constraint{i}")
     pgm_multiagent.add_edge(f"x1_{i}", f"constraint{i}")
-
-# Shade the sliding window
-win_top = 6.0 + win_pad - 0.2
-pgm_multiagent.add_plate(
-    [win_left, win_bottom, win_width, win_top - win_bottom],
-    label="sliding window",
-    position="bottom right",
-    rect_params={"fc": "#E8E8E8", "ec": "none"},
-    fontsize=10,
-)
 
 pgm_multiagent.render()
 pgm_multiagent.figure.savefig(OUTPUT_DIR / "fgo_multiagent.pdf", bbox_inches="tight")
