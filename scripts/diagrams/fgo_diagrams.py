@@ -494,20 +494,20 @@ for agent, row in [(1, 4.85), (0, 4.15)]:
     pgm_multiagent.add_edge(f"panchor{agent}", f"anchor{agent}")
 
 # Inter-agent constraint factors
-for a, b in [(0, 2), (2, 4)]:
+for i in [2, 4]:
     pgm_multiagent.add_node(
-        f"constraint{a}{b}",
-        f"$c_{{{a}{b}}}$",
-        start_x + b * col_spacing,
+        f"constraint{i}",
+        f"$c_{i}$",
+        start_x + i * col_spacing,
         4.5,
         fixed=True,
         offset=[13, -8],
         plot_params=style_factor_dynamics,
     )
-    pgm_multiagent.add_edge("anchor0", f"constraint{a}{b}")
-    pgm_multiagent.add_edge("anchor1", f"constraint{a}{b}")
-    pgm_multiagent.add_edge(f"x{b}", f"constraint{a}{b}")
-    pgm_multiagent.add_edge(f"x1_{b}", f"constraint{a}{b}")
+    pgm_multiagent.add_edge("anchor0", f"constraint{i}")
+    pgm_multiagent.add_edge("anchor1", f"constraint{i}")
+    pgm_multiagent.add_edge(f"x{i}", f"constraint{i}")
+    pgm_multiagent.add_edge(f"x1_{i}", f"constraint{i}")
 
 # Shade the sliding window
 win_top = 6.0 + win_pad - 0.2
