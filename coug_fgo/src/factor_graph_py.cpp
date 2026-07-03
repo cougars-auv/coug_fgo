@@ -24,10 +24,42 @@
 #include <gtsam/inference/Symbol.h>
 
 #include <rclcpp/rclcpp.hpp>
+#include <stdexcept>
+
+#include "coug_fgo/utils/param_enums.hpp"
 
 using gtsam::symbol_shorthand::B;  // Bias (ax,ay,az,gx,gy,gz)
 using gtsam::symbol_shorthand::V;  // Velocity (x,y,z)
 using gtsam::symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
+
+namespace coug_fgo {
+
+namespace {
+
+/**
+ * @brief Ensures the keyframe sources are valid (mirrors the FactorGraphNode constructor check).
+ * @param params The loaded parameters.
+ * @throws std::invalid_argument If a keyframe source references a disabled sensor.
+ */
+void checkKeyframeSources(const factor_graph_node::Params& params) {
+  auto source_enabled = [&params](utils::KeyframeSource source) {
+    switch (source) {
+      case utils::KeyframeSource::kDvl:
+        return params.dvl.enable_dvl || params.dvl.enable_dvl_init_only;
+      case utils::KeyframeSource::kDepth:
+        return params.depth.enable_depth || params.depth.enable_depth_init_only;
+      default:
+        return true;
+    }
+  };
+  if (!source_enabled(utils::parseKeyframeSource(params.keyframe_source)) ||
+      !source_enabled(utils::parseKeyframeSource(params.backup_keyframe_source))) {
+    throw std::invalid_argument("Keyframe source '" + params.keyframe_source + "' or backup '" +
+                                params.backup_keyframe_source + "' references a disabled sensor!");
+  }
+}
+
+}  // namespace
 
 FactorGraphPy::FactorGraphPy(const std::vector<std::string>& config_paths)
     : FactorGraphPy(config_paths, "") {}
@@ -51,6 +83,7 @@ FactorGraphPy::FactorGraphPy(const std::vector<std::string>& config_paths, const
       dummy_node->get_node_parameters_interface());
 
   params_ = param_listener->get_params();
+  checkKeyframeSources(params_);
   tfs_ = extract_tfs(params_);
 
   state_init_ = std::make_unique<coug_fgo::StateInitializer>(params_);
@@ -131,11 +164,11 @@ void FactorGraphPy::add_mag(double timestamp, const Eigen::Vector3d& mag_field,
   queues_.mag.push_back(msg);
 }
 
-void FactorGraphPy::add_wrench(double timestamp, const Eigen::VectorXd& force_torque) {
+void FactorGraphPy::add_wrench(double timestamp, const Eigen::Matrix<double, 6, 1>& force_torque) {
   auto msg = std::make_shared<coug_fgo::utils::WrenchData>();
   msg->timestamp = timestamp;
-  msg->force = gtsam::Vector3(force_torque(0), force_torque(1), force_torque(2));
-  msg->torque = gtsam::Vector3(force_torque(3), force_torque(4), force_torque(5));
+  msg->force = force_torque.head<3>();
+  msg->torque = force_torque.tail<3>();
   queues_.wrench.push_back(msg);
 }
 
@@ -235,6 +268,36 @@ pybind11::dict FactorGraphPy::optimize_graph() {
   return result;
 }
 
+pybind11::dict FactorGraphPy::get_config() const {
+  pybind11::dict cfg;
+  cfg["imu_topic"] = params_.imu_topic;
+  cfg["gps_odom_topic"] = params_.gps_odom_topic;
+  cfg["depth_odom_topic"] = params_.depth_odom_topic;
+  cfg["mag_topic"] = params_.mag_topic;
+  cfg["ahrs_topic"] = params_.ahrs_topic;
+  cfg["dvl_topic"] = params_.dvl_topic;
+  cfg["wrench_topic"] = params_.wrench_topic;
+
+  // Mirrors the subscription predicates in FactorGraphNode::setupRosInterfaces()
+  pybind11::dict enabled;
+  enabled["gps"] = params_.gps.enable_gps || params_.gps.enable_gps_init_only;
+  enabled["depth"] = params_.depth.enable_depth || params_.depth.enable_depth_init_only;
+  enabled["mag"] = params_.mag.enable_mag || params_.mag.enable_mag_init_only;
+  enabled["ahrs"] = params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only ||
+                    params_.comparison.enable_loose_dvl_preintegration;
+  enabled["dvl"] = params_.dvl.enable_dvl || params_.dvl.enable_dvl_init_only;
+  cfg["sensor_enabled"] = enabled;
+
+  cfg["keyframe_source"] = params_.keyframe_source;
+  cfg["backup_keyframe_source"] = params_.backup_keyframe_source;
+  cfg["keyframe_timeout_sec"] = params_.keyframe_timeout_sec;
+  cfg["keyframe_timer_hz"] = params_.keyframe_timer_hz;
+  cfg["solver_type"] = params_.solver_type;
+  cfg["base_tf_position"] = params_.base.parameter_tf.position;
+  cfg["base_tf_orientation"] = params_.base.parameter_tf.orientation;
+  return cfg;
+}
+
 coug_fgo::utils::TfBundle FactorGraphPy::extract_tfs(const factor_graph_node::Params& p) {
   coug_fgo::utils::TfBundle tfs;
 
@@ -257,6 +320,10 @@ coug_fgo::utils::TfBundle FactorGraphPy::extract_tfs(const factor_graph_node::Pa
 
   return tfs;
 }
+
+}  // namespace coug_fgo
+
+using coug_fgo::FactorGraphPy;
 
 PYBIND11_MODULE(pybind11fgo, m) {
   m.doc() = "Python bindings for the FactorGraphCore.";
@@ -281,5 +348,6 @@ PYBIND11_MODULE(pybind11fgo, m) {
            pybind11::arg("force_torque"))
       .def("initialize_graph", &FactorGraphPy::initialize_graph, pybind11::arg("current_time"))
       .def("update_graph", &FactorGraphPy::update_graph, pybind11::arg("target_time"))
-      .def("optimize_graph", &FactorGraphPy::optimize_graph);
+      .def("optimize_graph", &FactorGraphPy::optimize_graph)
+      .def("get_config", &FactorGraphPy::get_config);
 }

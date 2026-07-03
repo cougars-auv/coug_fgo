@@ -32,6 +32,7 @@ namespace coug_fgo::utils {
 /**
  * @class ThreadSafeQueue
  * @brief Utility class for thread-safe queue operations.
+ * @tparam T Pointer-like message type exposing a `timestamp` member (e.g. a shared_ptr).
  */
 template <typename T>
 class ThreadSafeQueue {
@@ -79,8 +80,8 @@ class ThreadSafeQueue {
   }
 
   /**
-   * @brief Gets the timestamp of the last item added to the queue.
-   * @return The timestamp as a double (seconds), or nullopt if no item has been pushed.
+   * @brief Gets the timestamp of the last item added to the queue (persists across drains).
+   * @return The timestamp as a double (seconds), or nullopt if no item has ever been pushed.
    */
   std::optional<double> getLastTime() const {
     std::scoped_lock lock(mutex_);

@@ -134,7 +134,7 @@ inline geometry_msgs::msg::Pose toPoseMsg(const gtsam::Pose3& gtsam_obj) {
 /**
  * @brief Converts a GTSAM Matrix33 to a 36-element covariance array (upper-left block).
  * @param cov The input GTSAM Matrix33.
- * @return The resulting std::array<double, 36>.
+ * @return The resulting std::array<double, 36>, with the remaining entries zeroed.
  */
 inline std::array<double, 36> toCovariance36Msg(const gtsam::Matrix33& cov) {
   std::array<double, 36> msg;

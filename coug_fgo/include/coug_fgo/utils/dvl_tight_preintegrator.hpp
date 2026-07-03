@@ -14,8 +14,7 @@
 
 /**
  * @file dvl_tight_preintegrator.hpp
- * @brief Utility for preintegrating tightly-coupled DVL velocity measurements into relative
- * translation.
+ * @brief Utility for preintegrating tightly-coupled DVL velocities into relative translation.
  * @author Nelson Durrant
  * @date May 2026
  */
@@ -24,15 +23,13 @@
 
 #include <gtsam/base/Matrix.h>
 #include <gtsam/base/Vector.h>
-#include <gtsam/geometry/Pose3.h>
 #include <gtsam/geometry/Rot3.h>
 
 namespace coug_fgo::utils {
 
 /**
  * @class DvlTightPreintegrator
- * @brief Utility for preintegrating tightly-coupled DVL velocity measurements into relative
- * translation.
+ * @brief Utility for preintegrating tightly-coupled DVL velocities into relative translation.
  */
 class DvlTightPreintegrator {
  public:
@@ -53,17 +50,14 @@ class DvlTightPreintegrator {
   }
 
   /**
-   * @brief Integrates a new DVL velocity measurement with joint covariance propagation (Forster et
-   * al., TRO 2017)
-   *
+   * @brief Integrates a DVL measurement with joint covariance propagation
    * @param measured_vel The velocity measurement in the DVL sensor frame.
    * @param delta_R_ik Relative target-frame rotation from interval start (i) to measurement (k).
    * @param target_R_dvl Static extrinsic rotation from the DVL to the target frame.
    * @param dt The time delta since the last measurement.
    * @param measured_cov The measurement noise covariance.
    * @param rot_cov_k Right-perturbation covariance of delta_R_ik from the IMU preintegrator.
-   * @param J_bg_k Jacobian of delta_R_ik w.r.t. the gyro bias, in the manifold convention
-   * delta_R_ik(b + db) ~= delta_R_ik(b) * Exp(J_bg_k * db).
+   * @param J_bg_k Gyro-bias Jacobian of delta_R_ik: delta_R(b+db) ~= delta_R(b)*Exp(J_bg_k*db).
    */
   void integrateMeasurement(const gtsam::Vector3& measured_vel, const gtsam::Rot3& delta_R_ik,
                             const gtsam::Rot3& target_R_dvl, double dt,

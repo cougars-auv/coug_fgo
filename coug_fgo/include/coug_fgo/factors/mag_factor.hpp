@@ -14,7 +14,7 @@
 
 /**
  * @file mag_factor.hpp
- * @brief GTSAM factor for magnetometer measurements with a lever arm.
+ * @brief GTSAM factor for magnetometer measurements with extrinsic rotation compensation.
  * @author Nelson Durrant
  * @date May 2026
  */
@@ -32,7 +32,7 @@ namespace coug_fgo::factors {
 
 /**
  * @class MagFactorArm
- * @brief GTSAM factor for magnetometer measurements with a lever arm.
+ * @brief GTSAM factor for magnetometer measurements with extrinsic rotation compensation.
  */
 class MagFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
   gtsam::Point3 measured_field_;

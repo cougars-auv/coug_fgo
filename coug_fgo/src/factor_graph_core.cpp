@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <vector>
 
 #include "coug_fgo/factors/ahrs_factor.hpp"
 #include "coug_fgo/factors/auv_dynamics_factor.hpp"
@@ -39,7 +40,6 @@
 #include "coug_fgo/factors/dvl_tight_preint_factor.hpp"
 #include "coug_fgo/factors/gps_factor.hpp"
 #include "coug_fgo/factors/mag_factor.hpp"
-#include "coug_fgo/utils/dvl_tight_preintegrator.hpp"
 #include "coug_fgo/utils/param_enums.hpp"
 
 using coug_fgo::factors::AhrsFactorArm;
@@ -56,11 +56,6 @@ using gtsam::symbol_shorthand::B;  // Bias (ax,ay,az,gx,gy,gz)
 using gtsam::symbol_shorthand::V;  // Velocity (x,y,z)
 using gtsam::symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
 
-template <typename Derived>
-bool isInvalidCovDiag(const Eigen::MatrixBase<Derived>& m) {
-  return !m.allFinite() || (m.diagonal().array() <= 0.0).any();
-}
-
 namespace coug_fgo {
 
 using utils::DvlLoosePreintegrator;
@@ -70,10 +65,69 @@ using utils::parseSolverType;
 using utils::RobustKernel;
 using utils::SolverType;
 
-FactorGraphCore::FactorGraphCore(const factor_graph_node::Params& params) : params_(params) {}
+namespace {
 
-static gtsam::SharedNoiseModel applyRobustKernel(const gtsam::SharedNoiseModel& noise,
-                                                 const std::string& kernel, double k) {
+/**
+ * @brief Checks a covariance matrix for non-finite or non-positive diagonal entries.
+ * @param m The covariance matrix to check.
+ * @return True if the covariance is unusable as a noise model.
+ */
+template <typename Derived>
+bool isInvalidCovDiag(const Eigen::MatrixBase<Derived>& m) {
+  return !m.allFinite() || (m.diagonal().array() <= 0.0).any();
+}
+
+/**
+ * @brief Builds a diagonal covariance matrix from a vector of standard deviations.
+ * @param sigmas Per-axis standard deviations (at least N entries).
+ * @return The N x N diagonal matrix with sigmas^2 on the diagonal.
+ */
+template <int N = 3>
+Eigen::Matrix<double, N, N> sigmasSquaredDiag(const std::vector<double>& sigmas) {
+  return Eigen::Matrix<double, N, N>(Eigen::Map<const Eigen::Matrix<double, N, 1>>(sigmas.data())
+                                         .array()
+                                         .square()
+                                         .matrix()
+                                         .asDiagonal());
+}
+
+/**
+ * @brief Resolves a sensor covariance from parameters or a message.
+ * @param use_param Prefer the parameter-derived covariance regardless of message validity.
+ * @param sigmas Parameter standard deviations (at least N entries).
+ * @param scalar Covariance scaling factor (applied to either source).
+ * @param msg_cov The covariance reported by the sensor message.
+ * @return sigmasSquaredDiag(sigmas)*scalar if use_param or invalid msg_cov, else msg_cov*scalar.
+ */
+template <int N>
+Eigen::Matrix<double, N, N> resolveCov(bool use_param, const std::vector<double>& sigmas,
+                                       double scalar, const Eigen::Matrix<double, N, N>& msg_cov) {
+  if (use_param || isInvalidCovDiag(msg_cov)) {
+    return sigmasSquaredDiag<N>(sigmas) * scalar;
+  }
+  return msg_cov * scalar;
+}
+
+/**
+ * @brief Scalar-variance version of resolveCov.
+ * @return sigma^2 * scalar if use_param is set or msg_var is unusable, otherwise msg_var * scalar.
+ */
+double resolveVar(bool use_param, double sigma, double scalar, double msg_var) {
+  if (use_param || !std::isfinite(msg_var) || msg_var <= 0.0) {
+    return sigma * sigma * scalar;
+  }
+  return msg_var * scalar;
+}
+
+/**
+ * @brief Wraps a noise model in the configured robust M-estimator kernel.
+ * @param noise The base noise model.
+ * @param kernel The robust kernel name ("None", "Huber", or "Tukey").
+ * @param k The kernel tuning constant.
+ * @return The wrapped noise model, or the base model if no kernel is configured.
+ */
+gtsam::SharedNoiseModel applyRobustKernel(const gtsam::SharedNoiseModel& noise,
+                                          const std::string& kernel, double k) {
   switch (parseRobustKernel(kernel)) {
     case RobustKernel::kHuber:
       return gtsam::noiseModel::Robust::Create(gtsam::noiseModel::mEstimator::Huber::Create(k),
@@ -86,6 +140,47 @@ static gtsam::SharedNoiseModel applyRobustKernel(const gtsam::SharedNoiseModel& 
   }
   return noise;
 }
+
+/**
+ * @brief Interpolates AHRS-derived orientation at a target timestamp via SLERP.
+ * @param ahrs_msgs Time-sorted AHRS structs bracketing the target time.
+ * @param target_time The desired interpolation timestamp.
+ * @return The interpolated rotation as a GTSAM Rot3.
+ */
+gtsam::Rot3 getInterpolatedOrientation(
+    const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs, double target_time) {
+  auto it_after = std::lower_bound(ahrs_msgs.begin(), ahrs_msgs.end(), target_time,
+                                   [](const auto& msg, double t) { return msg->timestamp < t; });
+
+  if (it_after == ahrs_msgs.begin()) {
+    return ahrs_msgs.front()->orientation;
+  }
+
+  // If past the last message, extrapolate into the future
+  if (it_after == ahrs_msgs.end()) {
+    if (ahrs_msgs.size() < 2) {
+      return ahrs_msgs.back()->orientation;
+    }
+    it_after--;
+  }
+
+  double t1 = (*(it_after - 1))->timestamp;
+  double t2 = (*it_after)->timestamp;
+  double denominator = t2 - t1;
+
+  if (std::abs(denominator) < 1e-9) {
+    return (*(it_after - 1))->orientation;
+  }
+
+  double alpha = (target_time - t1) / denominator;
+
+  // Use Slerp for quaternion interpolation (handles alpha > 1.0 for extrapolation)
+  return (*(it_after - 1))->orientation.slerp(alpha, (*it_after)->orientation);
+}
+
+}  // namespace
+
+FactorGraphCore::FactorGraphCore(const factor_graph_node::Params& params) : params_(params) {}
 
 void FactorGraphCore::initialize(const StateInitializer& state_init, const utils::TfBundle& tfs) {
   tfs_ = tfs;
@@ -104,7 +199,7 @@ void FactorGraphCore::initialize(const StateInitializer& state_init, const utils
   addPriorFactors(state_init, initial_graph, initial_values);
 
   if (params_.publish_smoothed_path) {
-    time_to_key_[static_cast<int64_t>(state_init.getTime() * 1e9)] = X(0);
+    time_to_key_[static_cast<int64_t>(prev_time_ * 1e9)] = X(0);
   }
 
   // --- Initialize Preintegrators ---
@@ -112,38 +207,25 @@ void FactorGraphCore::initialize(const StateInitializer& state_init, const utils
       configureImuPreintegration(state_init), prev_imu_bias_);
 
   if (params_.comparison.enable_loose_dvl_preintegration) {
-    dvl_loose_preintegrator_ = std::make_unique<utils::DvlLoosePreintegrator>();
+    dvl_loose_preintegrator_ = std::make_unique<DvlLoosePreintegrator>();
     dvl_loose_preintegrator_->reset(prev_pose_.rotation());
-
-    last_dvl_velocity_ = params_.dvl.enable_dvl ? state_init.getInitialDvl()->linear_velocity
-                                                : gtsam::Vector3::Zero();
-    if (params_.dvl.use_parameter_covariance || !params_.dvl.enable_dvl ||
-        isInvalidCovDiag(state_init.getInitialDvl()->twist_covariance.topLeftCorner<3, 3>())) {
-      const auto& sig = params_.dvl.parameter_covariance.velocity_noise_sigmas;
-      last_dvl_covariance_ = (Eigen::Map<const Eigen::Vector3d>(sig.data()).array().square() *
-                              params_.dvl.covariance_scalar)
-                                 .matrix()
-                                 .asDiagonal();
-    } else {
-      last_dvl_covariance_ = state_init.getInitialDvl()->twist_covariance.block<3, 3>(0, 0) *
-                             params_.dvl.covariance_scalar;
-    }
   } else if (params_.comparison.enable_tight_dvl_preintegration) {
-    dvl_tight_preintegrator_ = std::make_unique<utils::DvlTightPreintegrator>();
+    dvl_tight_preintegrator_ = std::make_unique<DvlTightPreintegrator>();
     dvl_tight_preintegrator_->reset();
+  }
 
-    last_dvl_velocity_ = params_.dvl.enable_dvl ? state_init.getInitialDvl()->linear_velocity
-                                                : gtsam::Vector3::Zero();
-    if (params_.dvl.use_parameter_covariance || !params_.dvl.enable_dvl ||
-        isInvalidCovDiag(state_init.getInitialDvl()->twist_covariance.topLeftCorner<3, 3>())) {
-      const auto& sig = params_.dvl.parameter_covariance.velocity_noise_sigmas;
-      last_dvl_covariance_ = (Eigen::Map<const Eigen::Vector3d>(sig.data()).array().square() *
-                              params_.dvl.covariance_scalar)
-                                 .matrix()
-                                 .asDiagonal();
+  if (dvl_loose_preintegrator_ || dvl_tight_preintegrator_) {
+    if (params_.dvl.enable_dvl) {
+      last_dvl_velocity_ = state_init.getInitialDvl()->linear_velocity;
+      last_dvl_covariance_ = resolveCov<3>(
+          params_.dvl.use_parameter_covariance,
+          params_.dvl.parameter_covariance.velocity_noise_sigmas, params_.dvl.covariance_scalar,
+          state_init.getInitialDvl()->twist_covariance.topLeftCorner<3, 3>());
     } else {
-      last_dvl_covariance_ = state_init.getInitialDvl()->twist_covariance.block<3, 3>(0, 0) *
-                             params_.dvl.covariance_scalar;
+      last_dvl_velocity_ = gtsam::Vector3::Zero();
+      last_dvl_covariance_ =
+          sigmasSquaredDiag(params_.dvl.parameter_covariance.velocity_noise_sigmas) *
+          params_.dvl.covariance_scalar;
     }
   }
 
@@ -175,49 +257,20 @@ void FactorGraphCore::initialize(const StateInitializer& state_init, const utils
 }
 
 std::shared_ptr<gtsam::PreintegratedCombinedMeasurements::Params>
-FactorGraphCore::configureImuPreintegration(const StateInitializer& state_init) {
+FactorGraphCore::configureImuPreintegration(const StateInitializer& state_init) const {
   auto imu_params = gtsam::PreintegratedCombinedMeasurements::Params::MakeSharedU();
   imu_params->n_gravity =
       gtsam::Vector3(params_.imu.gravity[0], params_.imu.gravity[1], params_.imu.gravity[2]);
   imu_params->body_P_sensor = tfs_.target_T_imu;
 
-  if (params_.imu.use_parameter_covariance ||
-      isInvalidCovDiag(state_init.getInitialImu()->linear_acceleration_covariance)) {
-    const auto& sig = params_.imu.parameter_covariance.accel_noise_sigmas;
-    imu_params->accelerometerCovariance =
-        (Eigen::Map<const Eigen::Vector3d>(sig.data()).array().square() *
-         params_.imu.covariance_scalar)
-            .matrix()
-            .asDiagonal();
-  } else {
-    imu_params->accelerometerCovariance =
-        state_init.getInitialImu()->linear_acceleration_covariance * params_.imu.covariance_scalar;
-  }
-
-  if (params_.imu.use_parameter_covariance ||
-      isInvalidCovDiag(state_init.getInitialImu()->angular_velocity_covariance)) {
-    const auto& sig = params_.imu.parameter_covariance.gyro_noise_sigmas;
-    imu_params->gyroscopeCovariance =
-        (Eigen::Map<const Eigen::Vector3d>(sig.data()).array().square() *
-         params_.imu.covariance_scalar)
-            .matrix()
-            .asDiagonal();
-  } else {
-    imu_params->gyroscopeCovariance =
-        state_init.getInitialImu()->angular_velocity_covariance * params_.imu.covariance_scalar;
-  }
-  imu_params->biasAccCovariance =
-      Eigen::Map<const Eigen::Vector3d>(params_.imu.accel_bias_rw_sigmas.data())
-          .array()
-          .square()
-          .matrix()
-          .asDiagonal();
-  imu_params->biasOmegaCovariance =
-      Eigen::Map<const Eigen::Vector3d>(params_.imu.gyro_bias_rw_sigmas.data())
-          .array()
-          .square()
-          .matrix()
-          .asDiagonal();
+  imu_params->accelerometerCovariance = resolveCov<3>(
+      params_.imu.use_parameter_covariance, params_.imu.parameter_covariance.accel_noise_sigmas,
+      params_.imu.covariance_scalar, state_init.getInitialImu()->linear_acceleration_covariance);
+  imu_params->gyroscopeCovariance = resolveCov<3>(
+      params_.imu.use_parameter_covariance, params_.imu.parameter_covariance.gyro_noise_sigmas,
+      params_.imu.covariance_scalar, state_init.getInitialImu()->angular_velocity_covariance);
+  imu_params->biasAccCovariance = sigmasSquaredDiag(params_.imu.accel_bias_rw_sigmas);
+  imu_params->biasOmegaCovariance = sigmasSquaredDiag(params_.imu.gyro_bias_rw_sigmas);
   imu_params->biasAccOmegaInt = gtsam::Matrix66::Zero();
   imu_params->integrationCovariance =
       gtsam::Matrix33::Identity() * params_.imu.integration_covariance;
@@ -240,81 +293,55 @@ void FactorGraphCore::addPriorFactors(const StateInitializer& state_init,
   if (!params_.prior.use_parameter_priors) {
     // Add initial position prior
     if (params_.gps.enable_gps) {
-      const bool use_param_gps =
-          params_.gps.use_parameter_covariance ||
-          isInvalidCovDiag(state_init.getInitialGps()->pose_covariance.topLeftCorner<2, 2>());
-      prior_pose_sigmas(3) = use_param_gps
-                                 ? params_.gps.parameter_covariance.position_noise_sigmas[0] *
-                                       std::sqrt(params_.gps.covariance_scalar)
-                                 : std::sqrt(state_init.getInitialGps()->pose_covariance(0, 0) *
-                                             params_.gps.covariance_scalar);
-      prior_pose_sigmas(4) = use_param_gps
-                                 ? params_.gps.parameter_covariance.position_noise_sigmas[1] *
-                                       std::sqrt(params_.gps.covariance_scalar)
-                                 : std::sqrt(state_init.getInitialGps()->pose_covariance(1, 1) *
-                                             params_.gps.covariance_scalar);
+      const gtsam::Matrix2 gps_cov = resolveCov<2>(
+          params_.gps.use_parameter_covariance,
+          params_.gps.parameter_covariance.position_noise_sigmas, params_.gps.covariance_scalar,
+          state_init.getInitialGps()->pose_covariance.topLeftCorner<2, 2>());
+      prior_pose_sigmas(3) = std::sqrt(gps_cov(0, 0));
+      prior_pose_sigmas(4) = std::sqrt(gps_cov(1, 1));
     } else {
       prior_pose_sigmas(3) = params_.prior.parameter_priors.initial_position_sigmas[0];
       prior_pose_sigmas(4) = params_.prior.parameter_priors.initial_position_sigmas[1];
     }
 
     if (params_.depth.enable_depth) {
-      const double depth_var = state_init.getInitialDepth()->pose_covariance(2, 2);
-      prior_pose_sigmas(5) =
-          (params_.depth.use_parameter_covariance || !std::isfinite(depth_var) || depth_var <= 0.0)
-              ? params_.depth.parameter_covariance.position_z_noise_sigma *
-                    std::sqrt(params_.depth.covariance_scalar)
-              : std::sqrt(depth_var * params_.depth.covariance_scalar);
+      prior_pose_sigmas(5) = std::sqrt(resolveVar(
+          params_.depth.use_parameter_covariance,
+          params_.depth.parameter_covariance.position_z_noise_sigma,
+          params_.depth.covariance_scalar, state_init.getInitialDepth()->pose_covariance(2, 2)));
     } else {
       prior_pose_sigmas(5) = params_.prior.parameter_priors.initial_position_sigmas[2];
     }
 
     // Add initial orientation prior
     if (params_.ahrs.enable_ahrs) {
-      if (params_.ahrs.use_parameter_covariance ||
-          isInvalidCovDiag(state_init.getInitialAhrs()->orientation_covariance)) {
-        prior_pose_sigmas(0) = params_.ahrs.parameter_covariance.orientation_noise_sigmas[0] *
-                               std::sqrt(params_.ahrs.covariance_scalar);
-        prior_pose_sigmas(1) = params_.ahrs.parameter_covariance.orientation_noise_sigmas[1] *
-                               std::sqrt(params_.ahrs.covariance_scalar);
-        prior_pose_sigmas(2) = params_.ahrs.parameter_covariance.orientation_noise_sigmas[2] *
-                               std::sqrt(params_.ahrs.covariance_scalar);
-      } else {
-        prior_pose_sigmas(0) = std::sqrt(state_init.getInitialAhrs()->orientation_covariance(0, 0) *
-                                         params_.ahrs.covariance_scalar);
-        prior_pose_sigmas(1) = std::sqrt(state_init.getInitialAhrs()->orientation_covariance(1, 1) *
-                                         params_.ahrs.covariance_scalar);
-        prior_pose_sigmas(2) = std::sqrt(state_init.getInitialAhrs()->orientation_covariance(2, 2) *
-                                         params_.ahrs.covariance_scalar);
-      }
+      const gtsam::Matrix3 ahrs_cov = resolveCov<3>(
+          params_.ahrs.use_parameter_covariance,
+          params_.ahrs.parameter_covariance.orientation_noise_sigmas,
+          params_.ahrs.covariance_scalar, state_init.getInitialAhrs()->orientation_covariance);
+      prior_pose_sigmas(0) = std::sqrt(ahrs_cov(0, 0));
+      prior_pose_sigmas(1) = std::sqrt(ahrs_cov(1, 1));
+      prior_pose_sigmas(2) = std::sqrt(ahrs_cov(2, 2));
     } else {
       if (params_.mag.enable_mag) {
         double h_mag = std::sqrt(params_.mag.reference_field[0] * params_.mag.reference_field[0] +
                                  params_.mag.reference_field[1] * params_.mag.reference_field[1]);
-        const double mag_var = state_init.getInitialMag()->magnetic_field_covariance(0, 0);
         double mag_sigma_norm =
-            (params_.mag.use_parameter_covariance || !std::isfinite(mag_var) || mag_var <= 0.0)
-                ? params_.mag.parameter_covariance.magnetic_field_noise_sigmas[0] *
-                      std::sqrt(params_.mag.covariance_scalar)
-                : std::sqrt(mag_var * params_.mag.covariance_scalar);
+            std::sqrt(resolveVar(params_.mag.use_parameter_covariance,
+                                 params_.mag.parameter_covariance.magnetic_field_noise_sigmas[0],
+                                 params_.mag.covariance_scalar,
+                                 state_init.getInitialMag()->magnetic_field_covariance(0, 0)));
         prior_pose_sigmas(2) = mag_sigma_norm / h_mag;
       }
-      const bool use_param_imu_accel =
-          params_.imu.use_parameter_covariance ||
-          isInvalidCovDiag(state_init.getInitialImu()->linear_acceleration_covariance);
+      const gtsam::Matrix3 accel_cov = resolveCov<3>(
+          params_.imu.use_parameter_covariance, params_.imu.parameter_covariance.accel_noise_sigmas,
+          params_.imu.covariance_scalar,
+          state_init.getInitialImu()->linear_acceleration_covariance);
       const double g_norm =
           std::max(Eigen::Map<const Eigen::Vector3d>(params_.imu.gravity.data()).norm(), 1e-6);
-      auto accel_var = [&](int axis) {
-        return use_param_imu_accel
-                   ? params_.imu.parameter_covariance.accel_noise_sigmas[axis] *
-                         params_.imu.parameter_covariance.accel_noise_sigmas[axis] *
-                         params_.imu.covariance_scalar
-                   : state_init.getInitialImu()->linear_acceleration_covariance(axis, axis) *
-                         params_.imu.covariance_scalar;
-      };
       const auto& bias_sig = params_.prior.initial_accel_bias_sigmas;
-      prior_pose_sigmas(0) = std::sqrt(accel_var(1) + bias_sig[1] * bias_sig[1]) / g_norm;
-      prior_pose_sigmas(1) = std::sqrt(accel_var(0) + bias_sig[0] * bias_sig[0]) / g_norm;
+      prior_pose_sigmas(0) = std::sqrt(accel_cov(1, 1) + bias_sig[1] * bias_sig[1]) / g_norm;
+      prior_pose_sigmas(1) = std::sqrt(accel_cov(0, 0) + bias_sig[0] * bias_sig[0]) / g_norm;
     }
   }
 
@@ -324,33 +351,19 @@ void FactorGraphCore::addPriorFactors(const StateInitializer& state_init,
 
   // Add initial velocity prior
   gtsam::SharedNoiseModel prior_vel_noise;
-  if (params_.prior.use_parameter_priors) {
-    auto& sigmas = params_.prior.parameter_priors.initial_velocity_sigmas;
+  if (!params_.prior.use_parameter_priors && params_.dvl.enable_dvl) {
+    // Rotate DVL covariance into the map frame
+    gtsam::Matrix33 dvl_cov = resolveCov<3>(
+        params_.dvl.use_parameter_covariance,
+        params_.dvl.parameter_covariance.velocity_noise_sigmas, params_.dvl.covariance_scalar,
+        state_init.getInitialDvl()->twist_covariance.topLeftCorner<3, 3>());
+    gtsam::Matrix33 map_R_dvl = (prev_pose_.rotation() * tfs_.target_T_dvl.rotation()).matrix();
+    prior_vel_noise =
+        gtsam::noiseModel::Gaussian::Covariance(map_R_dvl * dvl_cov * map_R_dvl.transpose());
+  } else {
+    const auto& sigmas = params_.prior.parameter_priors.initial_velocity_sigmas;
     prior_vel_noise =
         gtsam::noiseModel::Diagonal::Sigmas(Eigen::Map<const Eigen::Vector3d>(sigmas.data()));
-  } else {
-    if (params_.dvl.enable_dvl) {
-      // Rotate DVL covariance into the map frame
-      gtsam::Matrix33 dvl_cov;
-      if (params_.dvl.use_parameter_covariance ||
-          isInvalidCovDiag(state_init.getInitialDvl()->twist_covariance.topLeftCorner<3, 3>())) {
-        const auto& sig = params_.dvl.parameter_covariance.velocity_noise_sigmas;
-        dvl_cov = (Eigen::Map<const Eigen::Vector3d>(sig.data()).array().square() *
-                   params_.dvl.covariance_scalar)
-                      .matrix()
-                      .asDiagonal();
-      } else {
-        dvl_cov = state_init.getInitialDvl()->twist_covariance.block<3, 3>(0, 0) *
-                  params_.dvl.covariance_scalar;
-      }
-      gtsam::Matrix33 map_R_dvl = (prev_pose_.rotation() * tfs_.target_T_dvl.rotation()).matrix();
-      prior_vel_noise =
-          gtsam::noiseModel::Gaussian::Covariance(map_R_dvl * dvl_cov * map_R_dvl.transpose());
-    } else {
-      auto& sigmas = params_.prior.parameter_priors.initial_velocity_sigmas;
-      prior_vel_noise =
-          gtsam::noiseModel::Diagonal::Sigmas(Eigen::Map<const Eigen::Vector3d>(sigmas.data()));
-    }
   }
 
   graph.emplace_shared<gtsam::PriorFactor<gtsam::Vector3>>(V(0), prev_vel_, prior_vel_noise);
@@ -380,18 +393,9 @@ void FactorGraphCore::addGpsFactor(
 
   const auto& gps_msg = gps_msgs.back();
 
-  gtsam::SharedNoiseModel gps_noise;
-  if (params_.gps.use_parameter_covariance ||
-      isInvalidCovDiag(gps_msg->pose_covariance.topLeftCorner<2, 2>())) {
-    const auto& sig = params_.gps.parameter_covariance.position_noise_sigmas;
-    gps_noise = gtsam::noiseModel::Diagonal::Sigmas(
-        Eigen::Map<const Eigen::VectorXd>(sig.data(), sig.size()) *
-        std::sqrt(params_.gps.covariance_scalar));
-  } else {
-    gtsam::Matrix22 gps_cov =
-        gps_msg->pose_covariance.block<2, 2>(0, 0) * params_.gps.covariance_scalar;
-    gps_noise = gtsam::noiseModel::Gaussian::Covariance(gps_cov);
-  }
+  gtsam::SharedNoiseModel gps_noise = gtsam::noiseModel::Gaussian::Covariance(resolveCov<2>(
+      params_.gps.use_parameter_covariance, params_.gps.parameter_covariance.position_noise_sigmas,
+      params_.gps.covariance_scalar, gps_msg->pose_covariance.topLeftCorner<2, 2>()));
 
   gps_noise = applyRobustKernel(gps_noise, params_.gps.robust_kernel, params_.gps.robust_k);
 
@@ -408,12 +412,10 @@ void FactorGraphCore::addDepthFactor(
 
   const auto& depth_msg = depth_msgs.back();
 
-  const double depth_var = depth_msg->pose_covariance(2, 2);
   const double depth_sigma =
-      (params_.depth.use_parameter_covariance || !std::isfinite(depth_var) || depth_var <= 0.0)
-          ? params_.depth.parameter_covariance.position_z_noise_sigma *
-                std::sqrt(params_.depth.covariance_scalar)
-          : std::sqrt(depth_var * params_.depth.covariance_scalar);
+      std::sqrt(resolveVar(params_.depth.use_parameter_covariance,
+                           params_.depth.parameter_covariance.position_z_noise_sigma,
+                           params_.depth.covariance_scalar, depth_msg->pose_covariance(2, 2)));
   gtsam::SharedNoiseModel depth_noise = gtsam::noiseModel::Isotropic::Sigma(1, depth_sigma);
 
   depth_noise = applyRobustKernel(depth_noise, params_.depth.robust_kernel, params_.depth.robust_k);
@@ -430,15 +432,10 @@ void FactorGraphCore::addAhrsFactor(gtsam::NonlinearFactorGraph& graph,
 
   const auto& ahrs_msg = ahrs_msgs.back();
 
-  gtsam::SharedNoiseModel ahrs_noise;
-  if (params_.ahrs.use_parameter_covariance || isInvalidCovDiag(ahrs_msg->orientation_covariance)) {
-    const auto& sig = params_.ahrs.parameter_covariance.orientation_noise_sigmas;
-    ahrs_noise = gtsam::noiseModel::Diagonal::Sigmas(Eigen::Map<const Eigen::Vector3d>(sig.data()) *
-                                                     std::sqrt(params_.ahrs.covariance_scalar));
-  } else {
-    gtsam::Matrix3 ahrs_cov = ahrs_msg->orientation_covariance * params_.ahrs.covariance_scalar;
-    ahrs_noise = gtsam::noiseModel::Gaussian::Covariance(ahrs_cov);
-  }
+  gtsam::SharedNoiseModel ahrs_noise = gtsam::noiseModel::Gaussian::Covariance(
+      resolveCov<3>(params_.ahrs.use_parameter_covariance,
+                    params_.ahrs.parameter_covariance.orientation_noise_sigmas,
+                    params_.ahrs.covariance_scalar, ahrs_msg->orientation_covariance));
 
   ahrs_noise = applyRobustKernel(ahrs_noise, params_.ahrs.robust_kernel, params_.ahrs.robust_k);
 
@@ -460,16 +457,10 @@ void FactorGraphCore::addMagFactor(
   gtsam::Point3 ref_vec(params_.mag.reference_field[0], params_.mag.reference_field[1],
                         params_.mag.reference_field[2]);
 
-  gtsam::SharedNoiseModel mag_noise;
-  if (params_.mag.use_parameter_covariance ||
-      isInvalidCovDiag(mag_msg->magnetic_field_covariance)) {
-    const auto& sig = params_.mag.parameter_covariance.magnetic_field_noise_sigmas;
-    mag_noise = gtsam::noiseModel::Diagonal::Sigmas(Eigen::Map<const Eigen::Vector3d>(sig.data()) *
-                                                    std::sqrt(params_.mag.covariance_scalar));
-  } else {
-    gtsam::Matrix33 mag_cov = mag_msg->magnetic_field_covariance * params_.mag.covariance_scalar;
-    mag_noise = gtsam::noiseModel::Gaussian::Covariance(mag_cov);
-  }
+  gtsam::SharedNoiseModel mag_noise = gtsam::noiseModel::Gaussian::Covariance(
+      resolveCov<3>(params_.mag.use_parameter_covariance,
+                    params_.mag.parameter_covariance.magnetic_field_noise_sigmas,
+                    params_.mag.covariance_scalar, mag_msg->magnetic_field_covariance));
 
   mag_noise = applyRobustKernel(mag_noise, params_.mag.robust_kernel, params_.mag.robust_k);
 
@@ -486,17 +477,9 @@ void FactorGraphCore::addDvlFactor(gtsam::NonlinearFactorGraph& graph,
 
   const auto& dvl_msg = dvl_msgs.back();
 
-  gtsam::SharedNoiseModel dvl_noise;
-  if (params_.dvl.use_parameter_covariance ||
-      isInvalidCovDiag(dvl_msg->twist_covariance.topLeftCorner<3, 3>())) {
-    const auto& sig = params_.dvl.parameter_covariance.velocity_noise_sigmas;
-    dvl_noise = gtsam::noiseModel::Diagonal::Sigmas(Eigen::Map<const Eigen::Vector3d>(sig.data()) *
-                                                    std::sqrt(params_.dvl.covariance_scalar));
-  } else {
-    gtsam::Matrix33 dvl_cov =
-        dvl_msg->twist_covariance.block<3, 3>(0, 0) * params_.dvl.covariance_scalar;
-    dvl_noise = gtsam::noiseModel::Gaussian::Covariance(dvl_cov);
-  }
+  gtsam::SharedNoiseModel dvl_noise = gtsam::noiseModel::Gaussian::Covariance(resolveCov<3>(
+      params_.dvl.use_parameter_covariance, params_.dvl.parameter_covariance.velocity_noise_sigmas,
+      params_.dvl.covariance_scalar, dvl_msg->twist_covariance.topLeftCorner<3, 3>()));
 
   dvl_noise = applyRobustKernel(dvl_noise, params_.dvl.robust_kernel, params_.dvl.robust_k);
 
@@ -506,7 +489,7 @@ void FactorGraphCore::addDvlFactor(gtsam::NonlinearFactorGraph& graph,
 }
 
 void FactorGraphCore::addConstVelFactor(gtsam::NonlinearFactorGraph& graph, double target_time) {
-  double dt = (target_time - prev_time_);
+  double dt = target_time - prev_time_;
   Eigen::Vector3d vel_random_walk =
       Eigen::Map<const Eigen::Vector3d>(params_.const_vel.prediction_noise_sigmas.data()) *
       std::sqrt(params_.const_vel.covariance_scalar);
@@ -533,8 +516,7 @@ void FactorGraphCore::addAuvDynamicsFactor(
 
   const auto& wrench_msg = last_wrench_msg_;
 
-  double dt = (target_time - prev_time_);
-
+  double dt = target_time - prev_time_;
   double sqrt_dt = std::sqrt(std::max(dt, 0.001));
   gtsam::Vector3 dynamics_sigmas =
       Eigen::Map<const Eigen::Vector3d>(params_.dynamics.prediction_noise_sigmas.data()) *
@@ -544,7 +526,7 @@ void FactorGraphCore::addAuvDynamicsFactor(
   dynamics_noise =
       applyRobustKernel(dynamics_noise, params_.dynamics.robust_kernel, params_.dynamics.robust_k);
 
-  graph.emplace_shared<coug_fgo::factors::AuvDynamicsFactorArm>(
+  graph.emplace_shared<AuvDynamicsFactorArm>(
       X(prev_step_), V(prev_step_), X(current_step_), V(current_step_), dt, wrench_msg->force,
       tfs_.target_T_com,
       gtsam::Matrix33(Eigen::Map<const Eigen::Vector3d>(params_.dynamics.mass.data()).asDiagonal()),
@@ -558,6 +540,7 @@ void FactorGraphCore::addAuvDynamicsFactor(
 void FactorGraphCore::addImuPreintFactor(
     gtsam::NonlinearFactorGraph& graph, const std::deque<std::shared_ptr<utils::ImuData>>& imu_msgs,
     double target_time) {
+  // Implements a zero-order hold (ZOH) for IMU measurements
   if (!imu_preintegrator_ || imu_msgs.empty()) {
     return;
   }
@@ -571,7 +554,7 @@ void FactorGraphCore::addImuPreintFactor(
       continue;
     }
 
-    double dt = (current_imu_time - last_imu_time);
+    double dt = current_imu_time - last_imu_time;
     if (dt > 1e-9) {
       imu_preintegrator_->integrateMeasurement(last_imu_acc_, last_imu_gyr_, dt);
     }
@@ -583,7 +566,7 @@ void FactorGraphCore::addImuPreintFactor(
 
   // Extra measurement to reach exact target time
   if (last_imu_time < target_time) {
-    double dt = (target_time - last_imu_time);
+    double dt = target_time - last_imu_time;
     if (dt > 1e-6) {
       imu_preintegrator_->integrateMeasurement(last_imu_acc_, last_imu_gyr_, dt);
     }
@@ -593,37 +576,6 @@ void FactorGraphCore::addImuPreintFactor(
   graph.emplace_shared<gtsam::CombinedImuFactor>(X(prev_step_), V(prev_step_), X(current_step_),
                                                  V(current_step_), B(prev_step_), B(current_step_),
                                                  *imu_preintegrator_);
-}
-
-gtsam::Rot3 FactorGraphCore::getInterpolatedOrientation(
-    const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs, double target_time) {
-  auto it_after = std::lower_bound(ahrs_msgs.begin(), ahrs_msgs.end(), target_time,
-                                   [](const auto& msg, double t) { return msg->timestamp < t; });
-
-  if (it_after == ahrs_msgs.begin()) {
-    return ahrs_msgs.front()->orientation;
-  }
-
-  // If past the last message, extrapolate into the future
-  if (it_after == ahrs_msgs.end()) {
-    if (ahrs_msgs.size() < 2) {
-      return ahrs_msgs.back()->orientation;
-    }
-    it_after--;
-  }
-
-  double t1 = (*(it_after - 1))->timestamp;
-  double t2 = (*it_after)->timestamp;
-  double denominator = t2 - t1;
-
-  if (std::abs(denominator) < 1e-9) {
-    return (*(it_after - 1))->orientation;
-  }
-
-  double alpha = (target_time - t1) / denominator;
-
-  // Use Slerp for quaternion interpolation (handles alpha > 1.0 for extrapolation)
-  return (*(it_after - 1))->orientation.slerp(alpha, (*it_after)->orientation);
 }
 
 void FactorGraphCore::addDvlLoosePreintFactor(
@@ -642,17 +594,10 @@ void FactorGraphCore::addDvlLoosePreintFactor(
   gtsam::Rot3 target_R_dvl = tfs_.target_T_dvl.rotation();
 
   // Propagate AHRS orientation uncertainty into the preintegrated translation covariance
-  gtsam::Matrix3 ahrs_cov;
-  if (params_.ahrs.use_parameter_covariance ||
-      isInvalidCovDiag(ahrs_msgs.back()->orientation_covariance)) {
-    const auto& sig = params_.ahrs.parameter_covariance.orientation_noise_sigmas;
-    ahrs_cov = (Eigen::Map<const Eigen::Vector3d>(sig.data()).array().square() *
-                params_.ahrs.covariance_scalar)
-                   .matrix()
-                   .asDiagonal();
-  } else {
-    ahrs_cov = ahrs_msgs.back()->orientation_covariance * params_.ahrs.covariance_scalar;
-  }
+  gtsam::Matrix3 ahrs_cov =
+      resolveCov<3>(params_.ahrs.use_parameter_covariance,
+                    params_.ahrs.parameter_covariance.orientation_noise_sigmas,
+                    params_.ahrs.covariance_scalar, ahrs_msgs.back()->orientation_covariance);
 
   gtsam::Rot3 map_R_ahrs_prev = getInterpolatedOrientation(ahrs_msgs, prev_time_);
   gtsam::Rot3 map_R_target_prev = map_R_ahrs_prev * ahrs_R_target;
@@ -677,30 +622,23 @@ void FactorGraphCore::addDvlLoosePreintFactor(
 
       last_dvl_velocity_ = dvl_msg->linear_velocity;
 
-      if (params_.dvl.use_parameter_covariance ||
-          isInvalidCovDiag(dvl_msg->twist_covariance.topLeftCorner<3, 3>())) {
-        const auto& sig = params_.dvl.parameter_covariance.velocity_noise_sigmas;
-        last_dvl_covariance_ = (Eigen::Map<const Eigen::Vector3d>(sig.data()).array().square() *
-                                params_.dvl.covariance_scalar)
-                                   .matrix()
-                                   .asDiagonal();
-      } else {
-        last_dvl_covariance_ =
-            dvl_msg->twist_covariance.block<3, 3>(0, 0) * params_.dvl.covariance_scalar;
-      }
+      last_dvl_covariance_ = resolveCov<3>(params_.dvl.use_parameter_covariance,
+                                           params_.dvl.parameter_covariance.velocity_noise_sigmas,
+                                           params_.dvl.covariance_scalar,
+                                           dvl_msg->twist_covariance.topLeftCorner<3, 3>());
     }
     last_dvl_time = current_dvl_time;
   }
 
   // Extra measurement to reach exact target time
   if (last_dvl_time < target_time) {
-    double dt = (target_time - last_dvl_time);
+    double dt = target_time - last_dvl_time;
     if (dt > 1e-6) {
       double mid_time = 0.5 * (last_dvl_time + target_time);
-      gtsam::Rot3 mid_ahrs_att = getInterpolatedOrientation(ahrs_msgs, mid_time);
-      gtsam::Rot3 mid_target_att = mid_ahrs_att * ahrs_R_target;
-      gtsam::Rot3 mid_dvl_att = mid_target_att * target_R_dvl;
-      dvl_loose_preintegrator_->integrateMeasurement(last_dvl_velocity_, mid_dvl_att, dt,
+      gtsam::Rot3 map_R_ahrs_mid = getInterpolatedOrientation(ahrs_msgs, mid_time);
+      gtsam::Rot3 map_R_target_mid = map_R_ahrs_mid * ahrs_R_target;
+      gtsam::Rot3 map_R_dvl_mid = map_R_target_mid * target_R_dvl;
+      dvl_loose_preintegrator_->integrateMeasurement(last_dvl_velocity_, map_R_dvl_mid, dt,
                                                      last_dvl_covariance_);
     }
     last_dvl_time = target_time;
@@ -726,9 +664,8 @@ void FactorGraphCore::addDvlTightPreintFactor(
 
   gtsam::Rot3 target_R_dvl = tfs_.target_T_dvl.rotation();
 
-  auto temp_imu_preint =
-      std::make_unique<gtsam::PreintegratedCombinedMeasurements>(*imu_preintegrator_);
-  temp_imu_preint->resetIntegrationAndSetBias(prev_imu_bias_);
+  gtsam::PreintegratedCombinedMeasurements temp_imu_preint(*imu_preintegrator_);
+  temp_imu_preint.resetIntegrationAndSetBias(prev_imu_bias_);
 
   gtsam::Vector3 current_imu_acc = held_imu_acc;
   gtsam::Vector3 current_imu_gyr = held_imu_gyr;
@@ -744,7 +681,7 @@ void FactorGraphCore::addDvlTightPreintFactor(
       }
       if (imu_time > last_imu_time) {
         double dt_imu = imu_time - last_imu_time;
-        temp_imu_preint->integrateMeasurement(current_imu_acc, current_imu_gyr, dt_imu);
+        temp_imu_preint.integrateMeasurement(current_imu_acc, current_imu_gyr, dt_imu);
         last_imu_time = imu_time;
       }
       current_imu_acc = (*imu_it)->linear_acceleration;
@@ -753,20 +690,27 @@ void FactorGraphCore::addDvlTightPreintFactor(
     }
 
     if (last_imu_time < t_end) {
-      double dt_rem = (t_end - last_imu_time);
+      double dt_rem = t_end - last_imu_time;
       if (dt_rem > 1e-6) {
-        temp_imu_preint->integrateMeasurement(current_imu_acc, current_imu_gyr, dt_rem);
+        temp_imu_preint.integrateMeasurement(current_imu_acc, current_imu_gyr, dt_rem);
       }
       last_imu_time = t_end;
     }
   };
 
-  auto extractImuRotation = [&](gtsam::Rot3& delta_R_ik, gtsam::Matrix3& rot_cov_k,
-                                gtsam::Matrix3& J_bg_k) {
-    delta_R_ik = temp_imu_preint->deltaRij();
-    gtsam::Matrix3 Jr = gtsam::Rot3::ExpmapDerivative(gtsam::Vector3(temp_imu_preint->theta()));
-    rot_cov_k = Jr * temp_imu_preint->preintMeasCov().block<3, 3>(0, 0) * Jr.transpose();
-    J_bg_k = Jr * temp_imu_preint->preintegrated_H_biasOmega().topRows<3>();
+  // Method derived from Forster et al. 2017, IEEE T-RO
+  // TODO: Review this paper more in depth
+  auto integrateDvlMeasurement = [&](double mid_time, double dt) {
+    stepImuPreintegrator(mid_time);
+
+    gtsam::Rot3 delta_R_ik = temp_imu_preint.deltaRij();
+    gtsam::Matrix3 Jr = gtsam::Rot3::ExpmapDerivative(gtsam::Vector3(temp_imu_preint.theta()));
+    gtsam::Matrix3 rot_cov_k =
+        Jr * temp_imu_preint.preintMeasCov().block<3, 3>(0, 0) * Jr.transpose();
+    gtsam::Matrix3 J_bg_k = Jr * temp_imu_preint.preintegrated_H_biasOmega().topRows<3>();
+
+    dvl_tight_preintegrator_->integrateMeasurement(last_dvl_velocity_, delta_R_ik, target_R_dvl, dt,
+                                                   last_dvl_covariance_, rot_cov_k, J_bg_k);
   };
 
   for (const auto& dvl_msg : dvl_msgs) {
@@ -777,48 +721,22 @@ void FactorGraphCore::addDvlTightPreintFactor(
 
     double dt = current_dvl_time - last_dvl_time;
     if (dt > 1e-9) {
-      stepImuPreintegrator(0.5 * (last_dvl_time + current_dvl_time));
-
-      // Extract preintegrated IMU relative rotation and Jacobians
-      gtsam::Rot3 delta_R_ik;
-      gtsam::Matrix3 rot_cov_k;
-      gtsam::Matrix3 J_bg_k;
-      extractImuRotation(delta_R_ik, rot_cov_k, J_bg_k);
-
-      dvl_tight_preintegrator_->integrateMeasurement(last_dvl_velocity_, delta_R_ik, target_R_dvl,
-                                                     dt, last_dvl_covariance_, rot_cov_k, J_bg_k);
+      integrateDvlMeasurement(0.5 * (last_dvl_time + current_dvl_time), dt);
 
       last_dvl_velocity_ = dvl_msg->linear_velocity;
-
-      if (params_.dvl.use_parameter_covariance ||
-          isInvalidCovDiag(dvl_msg->twist_covariance.topLeftCorner<3, 3>())) {
-        const auto& sig = params_.dvl.parameter_covariance.velocity_noise_sigmas;
-        last_dvl_covariance_ = (Eigen::Map<const Eigen::Vector3d>(sig.data()).array().square() *
-                                params_.dvl.covariance_scalar)
-                                   .matrix()
-                                   .asDiagonal();
-      } else {
-        last_dvl_covariance_ =
-            dvl_msg->twist_covariance.block<3, 3>(0, 0) * params_.dvl.covariance_scalar;
-      }
+      last_dvl_covariance_ = resolveCov<3>(params_.dvl.use_parameter_covariance,
+                                           params_.dvl.parameter_covariance.velocity_noise_sigmas,
+                                           params_.dvl.covariance_scalar,
+                                           dvl_msg->twist_covariance.topLeftCorner<3, 3>());
     }
     last_dvl_time = current_dvl_time;
   }
 
   // Extra measurement to reach exact target time
   if (last_dvl_time < target_time) {
-    double dt = (target_time - last_dvl_time);
+    double dt = target_time - last_dvl_time;
     if (dt > 1e-6) {
-      stepImuPreintegrator(0.5 * (last_dvl_time + target_time));
-
-      // Extract preintegrated IMU relative rotation and Jacobians
-      gtsam::Rot3 delta_R_ik;
-      gtsam::Matrix3 rot_cov_k;
-      gtsam::Matrix3 J_bg_k;
-      extractImuRotation(delta_R_ik, rot_cov_k, J_bg_k);
-
-      dvl_tight_preintegrator_->integrateMeasurement(last_dvl_velocity_, delta_R_ik, target_R_dvl,
-                                                     dt, last_dvl_covariance_, rot_cov_k, J_bg_k);
+      integrateDvlMeasurement(0.5 * (last_dvl_time + target_time), dt);
     }
     last_dvl_time = target_time;
   }
@@ -855,9 +773,9 @@ std::optional<utils::QueueBundle> FactorGraphCore::update(double target_time,
   gtsam::Values new_values;
   gtsam::IncrementalFixedLagSmoother::KeyTimestampMap new_timestamps;
 
-  utils::QueueBundle unused;
+  utils::QueueBundle leftover;
 
-  std::scoped_lock update_lock(buffer_mutex_);
+  std::scoped_lock state_lock(state_mutex_);
 
   const gtsam::Vector3 held_imu_acc = last_imu_acc_;
   const gtsam::Vector3 held_imu_gyr = last_imu_gyr_;
@@ -869,16 +787,16 @@ std::optional<utils::QueueBundle> FactorGraphCore::update(double target_time,
       msgs.pop_back();
     }
   };
-  splitAfterTarget(queues.imu, unused.imu);
-  splitAfterTarget(queues.gps, unused.gps);
-  splitAfterTarget(queues.depth, unused.depth);
-  splitAfterTarget(queues.mag, unused.mag);
-  splitAfterTarget(queues.ahrs, unused.ahrs);
-  splitAfterTarget(queues.dvl, unused.dvl);
-  splitAfterTarget(queues.wrench, unused.wrench);
+  splitAfterTarget(queues.imu, leftover.imu);
+  splitAfterTarget(queues.gps, leftover.gps);
+  splitAfterTarget(queues.depth, leftover.depth);
+  splitAfterTarget(queues.mag, leftover.mag);
+  splitAfterTarget(queues.ahrs, leftover.ahrs);
+  splitAfterTarget(queues.dvl, leftover.dvl);
+  splitAfterTarget(queues.wrench, leftover.wrench);
 
   if (params_.comparison.enable_loose_dvl_preintegration && !queues.ahrs.empty()) {
-    unused.ahrs.push_front(queues.ahrs.back());
+    leftover.ahrs.push_front(queues.ahrs.back());
   }
 
   addImuPreintFactor(new_graph, queues.imu, target_time);
@@ -970,7 +888,7 @@ std::optional<utils::QueueBundle> FactorGraphCore::update(double target_time,
   buffer_last_step_ = prev_step_;
   has_buffer_ = true;
 
-  return unused;
+  return leftover;
 }
 
 std::optional<OptimizeResult> FactorGraphCore::optimize() {
@@ -982,7 +900,7 @@ std::optional<OptimizeResult> FactorGraphCore::optimize() {
   size_t batch_last_step = 0;
 
   {
-    std::scoped_lock update_lock(buffer_mutex_);
+    std::scoped_lock state_lock(state_mutex_);
     if (!has_buffer_) {
       return std::nullopt;
     }
@@ -1019,7 +937,7 @@ std::optional<OptimizeResult> FactorGraphCore::optimize() {
     result.smoother_duration = std::chrono::duration<double>(smoother_end - smoother_start).count();
 
     {
-      std::scoped_lock update_lock(buffer_mutex_);
+      std::scoped_lock state_lock(state_mutex_);
       prev_pose_ = inc_smoother_->calculateEstimate<gtsam::Pose3>(X(batch_last_step));
       prev_vel_ = inc_smoother_->calculateEstimate<gtsam::Vector3>(V(batch_last_step));
       prev_imu_bias_ =
@@ -1038,7 +956,7 @@ std::optional<OptimizeResult> FactorGraphCore::optimize() {
     result.smoother_duration = std::chrono::duration<double>(smoother_end - smoother_start).count();
 
     {
-      std::scoped_lock update_lock(buffer_mutex_);
+      std::scoped_lock state_lock(state_mutex_);
       prev_pose_ = isam_->calculateEstimate<gtsam::Pose3>(X(batch_last_step));
       prev_vel_ = isam_->calculateEstimate<gtsam::Vector3>(V(batch_last_step));
       prev_imu_bias_ = isam_->calculateEstimate<gtsam::imuBias::ConstantBias>(B(batch_last_step));
@@ -1055,16 +973,15 @@ std::optional<OptimizeResult> FactorGraphCore::optimize() {
     auto smoother_start = std::chrono::steady_clock::now();
     gtsam::LevenbergMarquardtParams lm_params;
     gtsam::LevenbergMarquardtOptimizer optimizer(lm_graph_, lm_values_, lm_params);
-    gtsam::Values lm_result = optimizer.optimize();
-    lm_values_ = lm_result;
+    lm_values_ = optimizer.optimize();
     auto smoother_end = std::chrono::steady_clock::now();
     result.smoother_duration = std::chrono::duration<double>(smoother_end - smoother_start).count();
 
     {
-      std::scoped_lock update_lock(buffer_mutex_);
-      prev_pose_ = lm_result.at<gtsam::Pose3>(X(batch_last_step));
-      prev_vel_ = lm_result.at<gtsam::Vector3>(V(batch_last_step));
-      prev_imu_bias_ = lm_result.at<gtsam::imuBias::ConstantBias>(B(batch_last_step));
+      std::scoped_lock state_lock(state_mutex_);
+      prev_pose_ = lm_values_.at<gtsam::Pose3>(X(batch_last_step));
+      prev_vel_ = lm_values_.at<gtsam::Vector3>(V(batch_last_step));
+      prev_imu_bias_ = lm_values_.at<gtsam::imuBias::ConstantBias>(B(batch_last_step));
     }
 
     if (params_.publish_diagnostics || params_.publish_graph_metrics) {
@@ -1074,7 +991,7 @@ std::optional<OptimizeResult> FactorGraphCore::optimize() {
   }
 
   {
-    std::scoped_lock state_lock(buffer_mutex_);
+    std::scoped_lock state_lock(state_mutex_);
     result.pose = prev_pose_;
     result.velocity = prev_vel_;
     result.imu_bias = prev_imu_bias_;
@@ -1082,32 +999,23 @@ std::optional<OptimizeResult> FactorGraphCore::optimize() {
 
   // --- Calculate Covariances ---
   auto cov_start = std::chrono::steady_clock::now();
-  result.pose_cov = gtsam::Matrix::Identity(6, 6) * -1.0;
-  if (params_.publish_pose_cov) {
-    if (inc_smoother_) {
-      result.pose_cov = inc_smoother_->marginalCovariance(X(batch_last_step));
-    } else if (isam_) {
-      result.pose_cov = isam_->marginalCovariance(X(batch_last_step));
-    }
-  }
 
-  result.vel_cov = gtsam::Matrix::Identity(3, 3) * -1.0;
-  if (params_.publish_velocity && params_.publish_velocity_cov) {
-    if (inc_smoother_) {
-      result.vel_cov = inc_smoother_->marginalCovariance(V(batch_last_step));
-    } else if (isam_) {
-      result.vel_cov = isam_->marginalCovariance(V(batch_last_step));
+  auto marginal_cov = [&](bool enabled, gtsam::Key key, int dim) -> gtsam::Matrix {
+    if (enabled) {
+      if (inc_smoother_) {
+        return inc_smoother_->marginalCovariance(key);
+      }
+      if (isam_) {
+        return isam_->marginalCovariance(key);
+      }
     }
-  }
-
-  result.bias_cov = gtsam::Matrix::Identity(6, 6) * -1.0;
-  if (params_.publish_imu_bias && params_.publish_imu_bias_cov) {
-    if (inc_smoother_) {
-      result.bias_cov = inc_smoother_->marginalCovariance(B(batch_last_step));
-    } else if (isam_) {
-      result.bias_cov = isam_->marginalCovariance(B(batch_last_step));
-    }
-  }
+    return gtsam::Matrix::Identity(dim, dim) * -1.0;
+  };
+  result.pose_cov = marginal_cov(params_.publish_pose_cov, X(batch_last_step), 6);
+  result.vel_cov =
+      marginal_cov(params_.publish_velocity && params_.publish_velocity_cov, V(batch_last_step), 3);
+  result.bias_cov =
+      marginal_cov(params_.publish_imu_bias && params_.publish_imu_bias_cov, B(batch_last_step), 6);
 
   auto cov_end = std::chrono::steady_clock::now();
   result.cov_duration = std::chrono::duration<double>(cov_end - cov_start).count();
@@ -1130,7 +1038,7 @@ std::optional<OptimizeResult> FactorGraphCore::optimize() {
 }
 
 std::map<int64_t, gtsam::Key> FactorGraphCore::snapshotTimeKeys() const {
-  std::scoped_lock lock(buffer_mutex_);
+  std::scoped_lock lock(state_mutex_);
   return time_to_key_;
 }
 

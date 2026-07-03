@@ -176,9 +176,8 @@ void FactorGraphNode::setupRosInterfaces() {
               msg->pose.covariance.data());
           depth_queue_.push(data);
 
-          const auto kf_primary = parseKeyframeSource(params_.keyframe_source);
-          const auto kf_backup = parseKeyframeSource(params_.backup_keyframe_source);
-          if (kf_primary == KeyframeSource::kDepth || kf_backup == KeyframeSource::kDepth) {
+          if (keyframe_source_ == KeyframeSource::kDepth ||
+              backup_keyframe_source_ == KeyframeSource::kDepth) {
             {
               std::scoped_lock lock(frontend_trigger_mutex_);
               frontend_trigger_ = true;
@@ -247,9 +246,8 @@ void FactorGraphNode::setupRosInterfaces() {
               msg->twist.covariance.data());
           dvl_queue_.push(data);
 
-          const auto kf_primary = parseKeyframeSource(params_.keyframe_source);
-          const auto kf_backup = parseKeyframeSource(params_.backup_keyframe_source);
-          if (kf_primary == KeyframeSource::kDvl || kf_backup == KeyframeSource::kDvl) {
+          if (keyframe_source_ == KeyframeSource::kDvl ||
+              backup_keyframe_source_ == KeyframeSource::kDvl) {
             {
               std::scoped_lock lock(frontend_trigger_mutex_);
               frontend_trigger_ = true;
@@ -279,8 +277,8 @@ void FactorGraphNode::setupRosInterfaces() {
         sensor_options);
   }
 
-  if (parseKeyframeSource(params_.keyframe_source) == KeyframeSource::kTimer ||
-      parseKeyframeSource(params_.backup_keyframe_source) == KeyframeSource::kTimer) {
+  if (keyframe_source_ == KeyframeSource::kTimer ||
+      backup_keyframe_source_ == KeyframeSource::kTimer) {
     double period = 1.0 / params_.keyframe_timer_hz;
     keyframe_timer_ = create_wall_timer(std::chrono::duration<double>(period), [this]() {
       {
@@ -329,6 +327,9 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions& options)
       std::make_shared<factor_graph_node::ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
 
+  keyframe_source_ = parseKeyframeSource(params_.keyframe_source);
+  backup_keyframe_source_ = parseKeyframeSource(params_.backup_keyframe_source);
+
   // Ensure the keyframe sources are valid
   auto source_enabled = [this](KeyframeSource source) {
     switch (source) {
@@ -340,8 +341,7 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions& options)
         return true;
     }
   };
-  if (!source_enabled(parseKeyframeSource(params_.keyframe_source)) ||
-      !source_enabled(parseKeyframeSource(params_.backup_keyframe_source))) {
+  if (!source_enabled(keyframe_source_) || !source_enabled(backup_keyframe_source_)) {
     RCLCPP_FATAL(get_logger(),
                  "Keyframe source '%s' or backup '%s' references a disabled sensor! Shutting down.",
                  params_.keyframe_source.c_str(), params_.backup_keyframe_source.c_str());
@@ -684,7 +684,7 @@ void FactorGraphNode::initializeGraph() {
 }
 
 void FactorGraphNode::updateGraph() {
-  KeyframeSource active_source = parseKeyframeSource(params_.keyframe_source);
+  KeyframeSource active_source = keyframe_source_;
   if (active_source != KeyframeSource::kTimer) {
     std::optional<double> last_received = (active_source == KeyframeSource::kDvl)
                                               ? dvl_queue_.getLastTime()
@@ -694,9 +694,8 @@ void FactorGraphNode::updateGraph() {
     if (!last_received.has_value() ||
         (newest_stamp.has_value() &&
          (*newest_stamp - *last_received) > params_.keyframe_timeout_sec)) {
-      const auto backup = parseKeyframeSource(params_.backup_keyframe_source);
-      if (backup != KeyframeSource::kNone) {
-        active_source = backup;
+      if (backup_keyframe_source_ != KeyframeSource::kNone) {
+        active_source = backup_keyframe_source_;
         RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
                              "Primary keyframe source '%s' timed out! Using backup '%s'.",
                              params_.keyframe_source.c_str(),
@@ -731,9 +730,9 @@ void FactorGraphNode::updateGraph() {
   queues.dvl = dvl_queue_.drain();
   queues.wrench = wrench_queue_.drain();
 
-  auto unused = core_->update(*target_time, queues);
+  auto leftover = core_->update(*target_time, queues);
 
-  const utils::QueueBundle& to_restore = unused ? *unused : queues;
+  const utils::QueueBundle& to_restore = leftover ? *leftover : queues;
   imu_queue_.restore(to_restore.imu);
   gps_queue_.restore(to_restore.gps);
   depth_queue_.restore(to_restore.depth);
@@ -766,31 +765,27 @@ void FactorGraphNode::optimizeGraph() {
     }
 
     // --- Publish Results ---
-    publishGlobalOdom(result->pose, result->pose_cov,
-                      rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
+    const rclcpp::Time stamp(static_cast<int64_t>(result->target_time * 1e9));
+    publishGlobalOdom(result->pose, result->pose_cov, stamp);
 
     if (params_.publish_global_tf) {
-      broadcastGlobalTf(result->pose,
-                        rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
+      broadcastGlobalTf(result->pose, stamp);
     }
 
     if (params_.publish_smoothed_path) {
-      publishSmoothedPath(result->all_estimates,
-                          rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
+      publishSmoothedPath(result->all_estimates, stamp);
     }
 
     if (params_.publish_velocity) {
-      publishVelocity(result->velocity, result->vel_cov,
-                      rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
+      publishVelocity(result->velocity, result->vel_cov, stamp);
     }
 
     if (params_.publish_imu_bias) {
-      publishImuBias(result->imu_bias, result->bias_cov,
-                     rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
+      publishImuBias(result->imu_bias, result->bias_cov, stamp);
     }
 
     if (params_.publish_graph_metrics) {
-      publishGraphMetrics(rclcpp::Time(static_cast<int64_t>(result->target_time * 1e9)));
+      publishGraphMetrics(stamp);
     }
   } catch (const std::exception& e) {
     RCLCPP_FATAL(get_logger(), "%s", e.what());

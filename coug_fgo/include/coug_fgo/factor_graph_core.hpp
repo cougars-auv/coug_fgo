@@ -75,7 +75,7 @@ class FactorGraphCore {
  public:
   /**
    * @brief Constructs the core with node parameters.
-   * @param params Node parameters.
+   * @param params Node parameters (copied).
    */
   explicit FactorGraphCore(const factor_graph_node::Params& params);
 
@@ -90,7 +90,7 @@ class FactorGraphCore {
    * @brief Builds factors for one keyframe and writes the graph to the buffer.
    * @param target_time The keyframe timestamp.
    * @param queues Drained sensor data structs (consumed).
-   * @return Unused structs for re-queueing, or nullopt if timestamp was stale.
+   * @return Structs newer than the keyframe to re-queue, or nullopt if the timestamp was stale.
    */
   std::optional<utils::QueueBundle> update(double target_time, utils::QueueBundle& queues);
 
@@ -114,7 +114,7 @@ class FactorGraphCore {
    * @return Shared pointer to the configured preintegration parameters.
    */
   std::shared_ptr<gtsam::PreintegratedCombinedMeasurements::Params> configureImuPreintegration(
-      const StateInitializer& state_init);
+      const StateInitializer& state_init) const;
 
   // --- Factor Construction ---
   /**
@@ -129,7 +129,7 @@ class FactorGraphCore {
   /**
    * @brief Adds a 2D GPS position factor with lever arm compensation.
    * @param graph The target factor graph.
-   * @param gps_msgs Drained GPS odometry structs.
+   * @param gps_msgs Drained GPS odometry structs (only the newest is used).
    */
   void addGpsFactor(gtsam::NonlinearFactorGraph& graph,
                     const std::deque<std::shared_ptr<utils::OdometryData>>& gps_msgs);
@@ -137,23 +137,23 @@ class FactorGraphCore {
   /**
    * @brief Adds a 1D depth factor with lever arm compensation.
    * @param graph The target factor graph.
-   * @param depth_msgs Drained depth odometry structs.
+   * @param depth_msgs Drained depth odometry structs (only the newest is used).
    */
   void addDepthFactor(gtsam::NonlinearFactorGraph& graph,
                       const std::deque<std::shared_ptr<utils::OdometryData>>& depth_msgs);
 
   /**
-   * @brief Adds an AHRS yaw orientation factor with lever arm compensation.
+   * @brief Adds an AHRS attitude factor with sensor rotation and declination compensation.
    * @param graph The target factor graph.
-   * @param ahrs_msgs Drained AHRS IMU structs.
+   * @param ahrs_msgs Drained AHRS IMU structs (only the newest is used).
    */
   void addAhrsFactor(gtsam::NonlinearFactorGraph& graph,
                      const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs);
 
   /**
-   * @brief Adds a magnetometer heading factor with lever arm compensation.
+   * @brief Adds a magnetometer field factor with sensor rotation compensation.
    * @param graph The target factor graph.
-   * @param mag_msgs Drained magnetometer structs.
+   * @param mag_msgs Drained magnetometer structs (only the newest is used).
    */
   void addMagFactor(gtsam::NonlinearFactorGraph& graph,
                     const std::deque<std::shared_ptr<utils::MagneticFieldData>>& mag_msgs);
@@ -161,22 +161,22 @@ class FactorGraphCore {
   /**
    * @brief Adds a DVL body-frame velocity factor with lever arm compensation.
    * @param graph The target factor graph.
-   * @param dvl_msgs Drained DVL twist structs.
-   * @param held_imu_gyr The held gyro measurement (IMU frame) for the lever arm term.
+   * @param dvl_msgs Drained DVL twist structs (only the newest is used).
+   * @param held_imu_gyr The held gyro sample (IMU frame) at the keyframe, for the lever arm term.
    */
   void addDvlFactor(gtsam::NonlinearFactorGraph& graph,
                     const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
                     const gtsam::Vector3& held_imu_gyr);
 
   /**
-   * @brief Adds a constant-velocity (zero-acceleration) factor between keyframes.
+   * @brief Adds a constant target-frame velocity factor between keyframes.
    * @param graph The target factor graph.
    * @param target_time The current keyframe timestamp.
    */
   void addConstVelFactor(gtsam::NonlinearFactorGraph& graph, double target_time);
 
   /**
-   * @brief Adds a simplified Fossen AUV dynamics factor with lever arm compensation.
+   * @brief Adds a simplified Fossen AUV dynamics factor with thrust-frame rotation compensation.
    * @param graph The target factor graph.
    * @param wrench_msgs Drained thruster wrench structs (zero-order hold).
    * @param target_time The current keyframe timestamp.
@@ -196,17 +196,7 @@ class FactorGraphCore {
                           double target_time);
 
   /**
-   * @brief Interpolates AHRS-derived orientation at a target timestamp via SLERP.
-   * @param ahrs_msgs Time-sorted AHRS structs bracketing the target time.
-   * @param target_time The desired interpolation timestamp.
-   * @return The interpolated rotation as a GTSAM Rot3.
-   */
-  gtsam::Rot3 getInterpolatedOrientation(
-      const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs, double target_time);
-
-  /**
-   * @brief Integrates DVL measurements (rotated via AHRS) and adds a loosely-coupled preintegrated
-   * DVL factor.
+   * @brief Integrates AHRS-rotated DVL measurements and adds a loosely-coupled DVL factor.
    * @param graph The target factor graph.
    * @param dvl_msgs Drained, time-sorted DVL structs.
    * @param ahrs_msgs Drained AHRS structs for orientation interpolation.
@@ -218,14 +208,13 @@ class FactorGraphCore {
                                double target_time);
 
   /**
-   * @brief Integrates DVL measurements (rotated via relative IMU rotations) and adds a
-   * tightly-coupled preintegrated DVL factor.
+   * @brief Integrates IMU-rotated DVL measurements and adds a tightly-coupled DVL factor.
    * @param graph The target factor graph.
    * @param dvl_msgs Drained, time-sorted DVL structs.
    * @param imu_msgs Drained, time-sorted IMU structs for relative rotation calculation.
    * @param target_time Integration endpoint timestamp.
-   * @param held_imu_acc IMU acceleration at the start of the window.
-   * @param held_imu_gyr IMU angular velocity at the start of the window.
+   * @param held_imu_acc The zero-order-held IMU acceleration sample at the window start.
+   * @param held_imu_gyr The zero-order-held IMU gyro sample at the window start.
    */
   void addDvlTightPreintFactor(gtsam::NonlinearFactorGraph& graph,
                                const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
@@ -234,7 +223,7 @@ class FactorGraphCore {
                                const gtsam::Vector3& held_imu_gyr);
 
   // --- Parameters ---
-  const factor_graph_node::Params& params_;
+  const factor_graph_node::Params params_;
   utils::TfBundle tfs_;
 
   // --- GTSAM Solver ---
@@ -263,7 +252,7 @@ class FactorGraphCore {
   std::shared_ptr<utils::WrenchData> last_wrench_msg_;
 
   // --- Buffer ---
-  mutable std::mutex buffer_mutex_;
+  mutable std::mutex state_mutex_;
   std::map<int64_t, gtsam::Key> time_to_key_;
   gtsam::NonlinearFactorGraph buffer_graph_;
   gtsam::Values buffer_values_;

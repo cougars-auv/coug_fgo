@@ -63,28 +63,10 @@ class FGOConfig:
         return self.solver_type == "LevenbergMarquardt"
 
 
-def _deep_merge(base: dict, override: dict) -> None:
-    for k, v in override.items():
-        if isinstance(v, dict) and isinstance(base.get(k), dict):
-            _deep_merge(base[k], v)
-        else:
-            base[k] = v
-
-
-def _parse_config(
-    config_paths: list[str], namespace: str, verbose: bool = True
-) -> FGOConfig:
-    params = {}
-    for path in config_paths:
-        if verbose:
-            print(f"Loading config: {path}")
-        with open(path, "r") as f:
-            config = yaml.safe_load(f)
-        _deep_merge(params, config.get("/**", {}).get("ros__parameters", {}))
-        _deep_merge(
-            params,
-            config.get(f"/{namespace}", {}).get("**", {}).get("ros__parameters", {}),
-        )
+def _parse_config(fg: "pybind11fgo.FactorGraphPy") -> FGOConfig:
+    # Read the rclcpp-resolved parameters back from the C++ wrapper so both
+    # pipelines share a single config-loading code path
+    params = fg.get_config()
 
     sensor_topics = {
         "imu": params["imu_topic"],
@@ -100,10 +82,9 @@ def _parse_config(
     for sensor, topic in sensor_topics.items():
         topic_map.setdefault(topic, []).append(sensor)
 
-    required_sensors = {"imu"}
-    for s in ["gps", "depth", "mag", "ahrs", "dvl"]:
-        if params[s].get(f"enable_{s}") or params[s].get(f"enable_{s}_init_only"):
-            required_sensors.add(s)
+    required_sensors = {"imu"} | {
+        s for s, enabled in params["sensor_enabled"].items() if enabled
+    }
 
     source_to_topic_key = {"DVL": "dvl_topic", "Depth": "depth_odom_topic"}
     kf_source = params["keyframe_source"]
@@ -116,20 +97,6 @@ def _parse_config(
         else params[source_to_topic_key[backup_source]]
     )
 
-    source_to_sensor = {"DVL": "dvl", "Depth": "depth"}
-    for label, source in (
-        ("keyframe_source", kf_source),
-        ("backup_keyframe_source", backup_source),
-    ):
-        sensor = source_to_sensor.get(source)
-        if sensor is not None and sensor not in required_sensors:
-            raise ValueError(
-                f"{label} '{source}' references a disabled sensor! "
-                "Enable the sensor or change the keyframe source."
-            )
-
-    base_tf = params["base"]["parameter_tf"]
-
     return FGOConfig(
         topic_map=topic_map,
         required_sensors=required_sensors,
@@ -139,8 +106,8 @@ def _parse_config(
         kf_backup_topic=backup_topic,
         kf_timeout=params["keyframe_timeout_sec"],
         kf_period=1.0 / max(params["keyframe_timer_hz"], 0.1),
-        base_pos=np.array(base_tf["position"]),
-        base_rot=Rotation.from_quat(base_tf["orientation"]),
+        base_pos=np.array(params["base_tf_position"]),
+        base_rot=Rotation.from_quat(params["base_tf_orientation"]),
         solver_type=params["solver_type"],
     )
 
@@ -221,8 +188,11 @@ EXTRACTORS = {
 def run_factor_graph(
     bag_path: str, config_paths: list[str], namespace: str, verbose: bool = True
 ) -> tuple[dict | None, bool]:
-    cfg = _parse_config(config_paths, namespace, verbose)
+    if verbose:
+        for path in config_paths:
+            print(f"Loading config: {path}")
     fg = pybind11fgo.FactorGraphPy(config_paths, namespace)
+    cfg = _parse_config(fg)
     raw_results = []
 
     with AnyReader(

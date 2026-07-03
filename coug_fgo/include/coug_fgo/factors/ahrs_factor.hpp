@@ -14,7 +14,7 @@
 
 /**
  * @file ahrs_factor.hpp
- * @brief GTSAM factor for AHRS attitude measurements with a lever arm.
+ * @brief GTSAM factor for AHRS attitude measurements with extrinsic rotation compensation.
  * @author Nelson Durrant
  * @date May 2026
  */
@@ -31,7 +31,7 @@ namespace coug_fgo::factors {
 
 /**
  * @class AhrsFactorArm
- * @brief GTSAM factor for AHRS attitude measurements with a lever arm.
+ * @brief GTSAM factor for AHRS attitude measurements with extrinsic rotation compensation.
  */
 class AhrsFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
   gtsam::Rot3 measured_orientation_;
@@ -57,7 +57,7 @@ class AhrsFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
    * @brief Evaluates the error and Jacobians for the factor.
    * @param pose The AUV pose estimate.
    * @param H Optional Jacobian matrix.
-   * @return The 3D error vector (predicted - measured).
+   * @return The 3D rotation error in the Lie algebra, Logmap(measured^-1 * predicted).
    */
   gtsam::Vector evaluateError(const gtsam::Pose3& pose,
                               gtsam::OptionalMatrixType H = nullptr) const override {

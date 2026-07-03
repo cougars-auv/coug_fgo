@@ -31,8 +31,7 @@ namespace coug_fgo::factors {
 
 /**
  * @class DvlTightPreintFactorArm
- * @brief GTSAM factor for tightly-coupled preintegrated DVL translation measurements
- * with a lever arm.
+ * @brief GTSAM factor for tightly-coupled preintegrated DVL translations with a lever arm.
  */
 class DvlTightPreintFactorArm
     : public gtsam::NoiseModelFactor3<gtsam::Pose3, gtsam::Pose3, gtsam::imuBias::ConstantBias> {
@@ -47,9 +46,9 @@ class DvlTightPreintFactorArm
    * @param pose_key_i GTSAM key for the starting AUV pose.
    * @param pose_key_j GTSAM key for the ending AUV pose.
    * @param bias_key_i GTSAM key for the IMU bias at the start of the interval.
-   * @param target_T_dvl The static transformation from target (Base) to DVL.
+   * @param target_T_dvl The static transformation from target to DVL.
    * @param measured_translation The preintegrated translation measurement (target frame at i).
-   * @param dp_ij_dbias Jacobian mapping changes in gyro bias to changes in the measurement.
+   * @param d_translation_d_bias Jacobian mapping gyro bias changes to measurement changes.
    * @param gyro_bias_hat The gyro bias estimate used during pre-integration.
    * @param noise_model The noise model for the measurement.
    */
@@ -57,7 +56,8 @@ class DvlTightPreintFactorArm
                           const gtsam::Pose3& target_T_dvl,
                           const gtsam::Vector3& measured_translation,
                           const gtsam::Matrix3& d_translation_d_bias,
-                          const gtsam::Vector3& gyro_bias_hat, gtsam::SharedNoiseModel noise_model)
+                          const gtsam::Vector3& gyro_bias_hat,
+                          const gtsam::SharedNoiseModel& noise_model)
       : gtsam::NoiseModelFactor3<gtsam::Pose3, gtsam::Pose3, gtsam::imuBias::ConstantBias>(
             noise_model, pose_key_i, pose_key_j, bias_key_i),
         target_p_dvl_(target_T_dvl.translation()),

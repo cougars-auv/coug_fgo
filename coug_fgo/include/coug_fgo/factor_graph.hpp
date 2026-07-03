@@ -51,6 +51,7 @@
 #include "coug_fgo/factor_graph_core.hpp"
 #include "coug_fgo/factor_graph_parameters.hpp"
 #include "coug_fgo/state_initializer.hpp"
+#include "coug_fgo/utils/param_enums.hpp"
 #include "coug_fgo/utils/ros_conversions.hpp"
 #include "coug_fgo/utils/thread_safe_queue.hpp"
 
@@ -183,6 +184,8 @@ class FactorGraphNode : public rclcpp::Node {
   // --- Parameters ---
   std::shared_ptr<factor_graph_node::ParamListener> param_listener_;
   factor_graph_node::Params params_;
+  utils::KeyframeSource keyframe_source_{utils::KeyframeSource::kNone};
+  utils::KeyframeSource backup_keyframe_source_{utils::KeyframeSource::kNone};
 
   // --- Core ---
   std::unique_ptr<FactorGraphCore> core_;

@@ -31,7 +31,7 @@ namespace coug_fgo::factors {
 
 /**
  * @class ConstVelFactor
- * @brief GTSAM factor for constant body-frame velocity.
+ * @brief GTSAM factor for constant target-frame velocity.
  */
 class ConstVelFactor
     : public gtsam::NoiseModelFactor4<gtsam::Pose3, gtsam::Vector3, gtsam::Pose3, gtsam::Vector3> {
@@ -58,7 +58,8 @@ class ConstVelFactor
    * @param H_pose_i Optional Jacobian matrix with respect to pose_i.
    * @param H_vel_i Optional Jacobian matrix with respect to vel_i.
    * @param H_pose_j Optional Jacobian matrix with respect to pose_j.
-   * @return The 3D error vector (measured - predicted).
+   * @param H_vel_j Optional Jacobian matrix with respect to vel_j.
+   * @return The 3D target-frame velocity difference (v_i - v_j).
    */
   gtsam::Vector evaluateError(const gtsam::Pose3& pose_i, const gtsam::Vector3& vel_i,
                               const gtsam::Pose3& pose_j, const gtsam::Vector3& vel_j,

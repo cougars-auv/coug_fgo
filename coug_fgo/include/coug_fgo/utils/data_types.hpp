@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include <gtsam/base/Matrix.h>
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/geometry/Rot3.h>
 
@@ -50,7 +51,7 @@ struct TfBundle {
  * @brief C++ container for IMU data.
  */
 struct ImuData {
-  double timestamp;
+  double timestamp{0.0};
   gtsam::Vector3 linear_acceleration;
   gtsam::Vector3 angular_velocity;
   gtsam::Matrix3 linear_acceleration_covariance;
@@ -62,7 +63,7 @@ struct ImuData {
  * @brief C++ container for Odometry data.
  */
 struct OdometryData {
-  double timestamp;
+  double timestamp{0.0};
   gtsam::Pose3 pose;
   gtsam::Matrix66 pose_covariance;
 };
@@ -72,7 +73,7 @@ struct OdometryData {
  * @brief C++ container for Magnetometer data.
  */
 struct MagneticFieldData {
-  double timestamp;
+  double timestamp{0.0};
   gtsam::Vector3 magnetic_field;
   gtsam::Matrix3 magnetic_field_covariance;
 };
@@ -82,7 +83,7 @@ struct MagneticFieldData {
  * @brief C++ container for AHRS data.
  */
 struct AhrsData {
-  double timestamp;
+  double timestamp{0.0};
   gtsam::Rot3 orientation;
   gtsam::Matrix3 orientation_covariance;
 };
@@ -92,7 +93,7 @@ struct AhrsData {
  * @brief C++ container for Twist data.
  */
 struct TwistData {
-  double timestamp;
+  double timestamp{0.0};
   gtsam::Vector3 linear_velocity;
   gtsam::Matrix66 twist_covariance;
 };
@@ -102,7 +103,7 @@ struct TwistData {
  * @brief C++ container for Wrench data.
  */
 struct WrenchData {
-  double timestamp;
+  double timestamp{0.0};
   gtsam::Vector3 force;
   gtsam::Vector3 torque;
 };

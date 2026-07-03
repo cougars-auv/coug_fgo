@@ -30,8 +30,7 @@ namespace coug_fgo::factors {
 
 /**
  * @class DvlLoosePreintFactorArm
- * @brief GTSAM factor for loosely-coupled preintegrated DVL translation measurements
- * with a lever arm.
+ * @brief GTSAM factor for loosely-coupled preintegrated DVL translations with a lever arm.
  */
 class DvlLoosePreintFactorArm : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3> {
   gtsam::Point3 target_p_sensor_;
@@ -49,7 +48,7 @@ class DvlLoosePreintFactorArm : public gtsam::NoiseModelFactor2<gtsam::Pose3, gt
   DvlLoosePreintFactorArm(gtsam::Key pose_key_i, gtsam::Key pose_key_j,
                           const gtsam::Pose3& target_T_sensor,
                           const gtsam::Vector3& measured_translation,
-                          gtsam::SharedNoiseModel noise_model)
+                          const gtsam::SharedNoiseModel& noise_model)
       : gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>(noise_model, pose_key_i, pose_key_j),
         target_p_sensor_(target_T_sensor.translation()),
         measured_translation_(measured_translation) {}

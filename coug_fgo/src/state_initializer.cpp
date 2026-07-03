@@ -223,6 +223,7 @@ gtsam::Rot3 StateInitializer::computeInitialOrientation(const TfBundle& tfs) {
   gtsam::Vector3 accel_imu = initial_imu_->linear_acceleration;
   gtsam::Vector3 accel_target = tfs.target_T_imu.rotation().rotate(accel_imu);
 
+  // Use gravity to estimate initial roll and pitch (tilt estimation)
   roll = std::atan2(accel_target.y(), accel_target.z());
   pitch = std::atan2(-accel_target.x(), std::sqrt(accel_target.y() * accel_target.y() +
                                                   accel_target.z() * accel_target.z()));
@@ -239,7 +240,7 @@ gtsam::Rot3 StateInitializer::computeInitialOrientation(const TfBundle& tfs) {
     gtsam::Vector3 mag_sensor = initial_mag_->magnetic_field;
     gtsam::Vector3 mag_target = target_R_mag.rotate(mag_sensor);
 
-    // Use the tilt-compensated magnetic vector
+    // Project the magnetic field vector using the estimated tilt
     gtsam::Rot3 R_rp = gtsam::Rot3::Ypr(0.0, pitch, roll);
     gtsam::Vector3 mag_horizontal = R_rp.rotate(mag_target);
 

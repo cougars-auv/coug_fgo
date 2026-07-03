@@ -14,8 +14,7 @@
 
 /**
  * @file dvl_loose_preintegrator.hpp
- * @brief Utility for preintegrating loosely-coupled DVL velocity measurements into relative
- * translation.
+ * @brief Utility for preintegrating loosely-coupled DVL velocities into relative translation.
  * @author Nelson Durrant
  * @date May 2026
  */
@@ -24,15 +23,13 @@
 
 #include <gtsam/base/Matrix.h>
 #include <gtsam/base/Vector.h>
-#include <gtsam/geometry/Pose3.h>
 #include <gtsam/geometry/Rot3.h>
 
 namespace coug_fgo::utils {
 
 /**
  * @class DvlLoosePreintegrator
- * @brief Utility for preintegrating loosely-coupled DVL velocity measurements into relative
- * translation.
+ * @brief Utility for preintegrating loosely-coupled DVL velocities into relative translation.
  */
 class DvlLoosePreintegrator {
  public:
@@ -46,8 +43,7 @@ class DvlLoosePreintegrator {
    * @param initial_orientation The orientation at the start of the integration period.
    * @param target_R_ahrs Static extrinsic rotation from the AHRS to the target frame.
    * @param target_R_dvl Static extrinsic rotation from the DVL to the target frame.
-   * @param ahrs_cov AHRS attitude error covariance (AHRS frame), modeled as constant over the
-   * integration window (AHRS error is bias-like, not white).
+   * @param ahrs_cov Constant (bias-like) AHRS attitude error covariance in the AHRS frame.
    */
   void reset(const gtsam::Rot3& initial_orientation,
              const gtsam::Rot3& target_R_ahrs = gtsam::Rot3(),

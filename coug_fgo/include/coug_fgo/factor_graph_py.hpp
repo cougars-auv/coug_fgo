@@ -36,6 +36,8 @@
 #include "coug_fgo/factor_graph_parameters.hpp"
 #include "coug_fgo/state_initializer.hpp"
 
+namespace coug_fgo {
+
 /**
  * @class FactorGraphPy
  * @brief Python bindings wrapper for the FactorGraphCore.
@@ -46,6 +48,7 @@ class FactorGraphPy {
    * @brief Constructs the wrapper, loading parameters from ROS 2 YAML config files.
    * @param config_paths Paths to ROS 2 parameter YAML files.
    * @param ns Optional ROS namespace for parameter resolution.
+   * @throws std::invalid_argument If a keyframe source references a disabled sensor.
    */
   explicit FactorGraphPy(const std::vector<std::string>& config_paths);
   FactorGraphPy(const std::vector<std::string>& config_paths, const std::string& ns);
@@ -110,7 +113,7 @@ class FactorGraphPy {
    * @param timestamp Message timestamp in seconds.
    * @param force_torque 6-vector (fx, fy, fz, tx, ty, tz).
    */
-  void add_wrench(double timestamp, const Eigen::VectorXd& force_torque);
+  void add_wrench(double timestamp, const Eigen::Matrix<double, 6, 1>& force_torque);
 
   // --- Main Logic ---
   /**
@@ -133,6 +136,12 @@ class FactorGraphPy {
    */
   pybind11::dict optimize_graph();
 
+  /**
+   * @brief Returns the loaded configuration values needed by offline drivers.
+   * @return Dict of topics, enable flags, keyframe settings, base transform, and solver type.
+   */
+  pybind11::dict get_config() const;
+
  private:
   /**
    * @brief Extracts sensor-to-target transforms from the parameter struct.
@@ -151,3 +160,5 @@ class FactorGraphPy {
   coug_fgo::utils::QueueBundle queues_;
   bool is_initialized_{false};
 };
+
+}  // namespace coug_fgo

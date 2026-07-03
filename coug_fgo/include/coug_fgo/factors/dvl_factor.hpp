@@ -44,7 +44,7 @@ class DvlFactorArm
  public:
   /**
    * @brief Constructor for DvlFactorArm.
-   * @param pose_key GTSAM key for the starting AUV pose.
+   * @param pose_key GTSAM key for the AUV pose.
    * @param vel_key GTSAM key for the AUV map-frame velocity.
    * @param bias_key GTSAM key for the IMU bias.
    * @param target_T_sensor The static transformation from target to sensor.

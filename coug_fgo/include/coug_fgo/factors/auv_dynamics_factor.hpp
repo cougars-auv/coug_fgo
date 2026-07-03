@@ -14,7 +14,7 @@
 
 /**
  * @file auv_dynamics_factor.hpp
- * @brief GTSAM factor for a simplified version of Fossen's equations with a lever arm.
+ * @brief GTSAM factor for simplified Fossen dynamics with thrust-frame rotation compensation.
  * @author Nelson Durrant
  * @date May 2026
  */
@@ -31,11 +31,10 @@ namespace coug_fgo::factors {
 
 /**
  * @class AuvDynamicsFactorArm
- * @brief GTSAM factor for a simplified version of Fossen's equations with a lever arm.
+ * @brief GTSAM factor for simplified Fossen dynamics with thrust-frame rotation compensation.
  */
 class AuvDynamicsFactorArm
     : public gtsam::NoiseModelFactor4<gtsam::Pose3, gtsam::Vector3, gtsam::Pose3, gtsam::Vector3> {
- private:
   double dt_;
   gtsam::Vector3 target_f_;
   gtsam::Matrix33 mass_;
@@ -52,7 +51,7 @@ class AuvDynamicsFactorArm
    * @param vel_key_j GTSAM key for the ending AUV velocity.
    * @param dt The time interval between the two states.
    * @param control_force The sensor-frame force vector from thrusters.
-   * @param target_T_sensor The static transformation from target to sensor.
+   * @param target_T_sensor The static transformation from target to sensor (rotation only).
    * @param mass Combined mass (Rigid body + Added mass).
    * @param linear_drag Linear damping coefficient.
    * @param quad_drag Quadratic damping coefficient.
@@ -82,7 +81,7 @@ class AuvDynamicsFactorArm
    * @param H_vel_i Optional Jacobian matrix with respect to vel_i.
    * @param H_pose_j Optional Jacobian matrix with respect to pose_j.
    * @param H_vel_j Optional Jacobian matrix with respect to vel_j.
-   * @return The 3D error vector (predicted - measured).
+   * @return The 3D target-frame velocity residual (estimated - predicted).
    */
   gtsam::Vector evaluateError(const gtsam::Pose3& pose_i, const gtsam::Vector3& vel_i,
                               const gtsam::Pose3& pose_j, const gtsam::Vector3& vel_j,
