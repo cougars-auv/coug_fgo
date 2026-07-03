@@ -20,7 +20,6 @@ from launch.substitutions import (
     EnvironmentVariable,
     EqualsSubstitution,
     LaunchConfiguration,
-    OrSubstitution,
     PathJoinSubstitution,
     PythonExpression,
 )
@@ -189,7 +188,7 @@ def generate_launch_description() -> LaunchDescription:
                     },
                 ],
             ),
-            # TURTLMap (comparison)
+            # Loosely-coupled DVL preintegration (comparison)
             Node(
                 package="coug_fgo",
                 executable="factor_graph",
@@ -218,7 +217,7 @@ def generate_launch_description() -> LaunchDescription:
                     },
                 ],
             ),
-            # AQUA-SLAM (comparison)
+            # Tightly-coupled DVL preintegration (comparison)
             Node(
                 package="coug_fgo",
                 executable="factor_graph",
@@ -364,70 +363,6 @@ def generate_launch_description() -> LaunchDescription:
                     },
                 ],
                 condition=IfCondition(EqualsSubstitution(auv_ns, "bluerov2")),
-            ),
-            Node(
-                package="tf2_ros",
-                executable="static_transform_publisher",
-                name="map_to_aquaslam_odom_transform",
-                arguments=[
-                    # AQUA-SLAM's orientations and positions are in different frames
-                    # This just corrects the position
-                    "--x",
-                    "0.0",
-                    "--y",
-                    "0.0",
-                    "--z",
-                    "0.0",
-                    "--roll",
-                    "-1.57079632679",
-                    "--pitch",
-                    "0.0",
-                    "--yaw",
-                    "-1.57079632679",
-                    "--frame-id",
-                    "map",
-                    "--child-frame-id",
-                    "aquaslam_odom",
-                ],
-                parameters=[{"use_sim_time": use_sim_time}],
-                condition=IfCondition(
-                    OrSubstitution(
-                        EqualsSubstitution(auv_ns, "aquaslam"),
-                        EqualsSubstitution(auv_ns, "aquaslam_wt"),
-                    )
-                ),
-            ),
-            Node(
-                package="tf2_ros",
-                executable="static_transform_publisher",
-                name="map_to_apriltag_odom_transform",
-                arguments=[
-                    # AQUA-SLAM's orientations and positions are in different frames
-                    # This just corrects the position
-                    "--x",
-                    "0.0",
-                    "--y",
-                    "0.0",
-                    "--z",
-                    "0.0",
-                    "--roll",
-                    "-1.57079632679",
-                    "--pitch",
-                    "0.0",
-                    "--yaw",
-                    "-1.57079632679",
-                    "--frame-id",
-                    "map",
-                    "--child-frame-id",
-                    "apriltag_odom",
-                ],
-                parameters=[{"use_sim_time": use_sim_time}],
-                condition=IfCondition(
-                    OrSubstitution(
-                        EqualsSubstitution(auv_ns, "aquaslam"),
-                        EqualsSubstitution(auv_ns, "aquaslam_wt"),
-                    )
-                ),
             ),
             # --- Robot Localization Pipeline ---
             # https://docs.ros.org/en/melodic/api/robot_localization/html/state_estimation_nodes.html

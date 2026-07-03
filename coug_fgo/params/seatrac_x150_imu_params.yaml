@@ -9,18 +9,6 @@ seatrac_x150_imu_node:
     validation:
       gt<>: [0.0]
 
-  accel_noise_sigmas:
-    type: double_array
-    default_value: [0.0078, 0.0078, 0.0078]
-    validation:
-      fixed_size<>: [3]
-      lower_element_bounds<>: [0.0]
-  gyro_noise_sigmas:
-    type: double_array
-    default_value: [0.0012, 0.0012, 0.0012]
-    validation:
-      fixed_size<>: [3]
-      lower_element_bounds<>: [0.0]
   orientation_noise_sigmas:
     type: double_array
     default_value: [0.00349, 0.00349, 0.01745]

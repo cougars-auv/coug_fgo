@@ -101,33 +101,8 @@ sensor_msgs::msg::Imu SeatracX150ImuNode::convertToImu(
     imu_msg.orientation_covariance[0] = -1.0;
   }
 
-  if (msg->includes_comp_ahrs) {
-    // Convert raw units and correct for 45° physical mounting offset of IMU chip
-    constexpr double kAccScale = 9.80665 / 250.0;
-    constexpr double kDegToRad = M_PI / 180.0;
-
-    imu_msg.linear_acceleration.x = kAccScale * M_SQRT1_2 * (msg->acc_x - msg->acc_y);
-    imu_msg.linear_acceleration.y = -kAccScale * M_SQRT1_2 * (msg->acc_x + msg->acc_y);
-    imu_msg.linear_acceleration.z = kAccScale * msg->acc_z;
-
-    // TODO: Figure out raw ADC scalar for gyroscope
-    imu_msg.angular_velocity.x = kDegToRad * M_SQRT1_2 * (msg->gyro_y - msg->gyro_x);
-    imu_msg.angular_velocity.y = kDegToRad * M_SQRT1_2 * (msg->gyro_x + msg->gyro_y);
-    imu_msg.angular_velocity.z = -kDegToRad * msg->gyro_z;
-
-    auto& a = params_.accel_noise_sigmas;
-    imu_msg.linear_acceleration_covariance[0] = a[0] * a[0];
-    imu_msg.linear_acceleration_covariance[4] = a[1] * a[1];
-    imu_msg.linear_acceleration_covariance[8] = a[2] * a[2];
-
-    auto& g = params_.gyro_noise_sigmas;
-    imu_msg.angular_velocity_covariance[0] = g[0] * g[0];
-    imu_msg.angular_velocity_covariance[4] = g[1] * g[1];
-    imu_msg.angular_velocity_covariance[8] = g[2] * g[2];
-  } else {
-    imu_msg.linear_acceleration_covariance[0] = -1.0;
-    imu_msg.angular_velocity_covariance[0] = -1.0;
-  }
+  imu_msg.linear_acceleration_covariance[0] = -1.0;
+  imu_msg.angular_velocity_covariance[0] = -1.0;
 
   return imu_msg;
 }

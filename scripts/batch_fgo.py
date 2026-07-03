@@ -18,32 +18,10 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import fgo_utils
 
-NAMESPACE = "aquaslam"
+NAMESPACE = "turtlmap"
 BAG_PATHS = [
-    str(
-        Path.home()
-        / "cougars-dev/bags/aquaslam_batch/HalfTank_Easy_batch_2026-05-05-15-22-10"
-    ),
-    str(
-        Path.home()
-        / "cougars-dev/bags/aquaslam_batch/HalfTank_Hard_batch_2026-05-05-16-43-49"
-    ),
-    # str(
-    #     Path.home()
-    #     / "cougars-dev/bags/aquaslam_batch/HalfTank_Medium_batch_2026-05-05-16-46-35"
-    # ),
-    str(
-        Path.home()
-        / "cougars-dev/bags/aquaslam_batch/Structure_Easy_batch_2026-05-05-16-49-09"
-    ),
-    # str(
-    #     Path.home()
-    #     / "cougars-dev/bags/aquaslam_batch/Structure_Hard_batch_2026-05-05-16-52-43"
-    # ),
-    str(
-        Path.home()
-        / "cougars-dev/bags/aquaslam_batch/Structure_Medium_batch_2026-05-05-16-54-31"
-    ),
+    str(Path.home() / "cougars-dev/bags/turtlmap_batch/log1_batch_2026-05-05-11-16-18"),
+    str(Path.home() / "cougars-dev/bags/turtlmap_batch/log2_batch_2026-05-05-11-22-42"),
 ]
 FLEET_CONFIG_PATH = str(Path.home() / "cougars-dev/config/fleet/coug_fgo_params.yaml")
 AUV_CONFIG_PATH = str(Path.home() / f"cougars-dev/config/{NAMESPACE}_params.yaml")

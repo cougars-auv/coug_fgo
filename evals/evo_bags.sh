@@ -45,11 +45,10 @@ evo_rot_args=("${evo_base_args[@]}")
 # --- Evaluation ---
 evo_config set save_traj_in_zip true &>/dev/null
 
-AGENTS=("coug1sim" "coug2sim" "coug3sim" "blue1sim" \
-  "bluerov2" "turtlmap" "aquaslam" "aquaslam_wt")
+AGENTS=("coug1sim" "coug2sim" "coug3sim" "blue1sim" "bluerov2" "turtlmap")
 SUFFIXES=("odometry/global" "odometry/global_isam2" "odometry/global_lpi" "odometry/global_tpi" \
   # "odometry/global_iekf" "odometry/global_ukf" "odometry/global_ekf" \
-  "odometry/global_tm" "odometry/global_aqs" "odometry/dvl")
+  "odometry/global_tm" "odometry/sbg" "odometry/dvl")
 
 for bag_path in ${bags_to_eval}; do
   echo "" && gum style --foreground 75 --bold "Processing ${bag_path}..."

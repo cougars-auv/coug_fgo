@@ -74,15 +74,13 @@ def add_start_end_markers(
     start_symbol: str = "o",
     end_symbol: str = "x",
     size: int = 15,
-    y_idx: int = 1,
 ) -> None:
-    if traj.num_poses == 0:
-        return
-    start, end = traj.positions_xyz[0], traj.positions_xyz[-1]
-    ax.scatter(
-        start[0], start[y_idx], marker=start_symbol, color=color, zorder=10, s=size
-    )
-    ax.scatter(end[0], end[y_idx], marker=end_symbol, color=color, zorder=10, s=size)
+    if traj.num_poses > 0:
+        start, end = traj.positions_xyz[0], traj.positions_xyz[-1]
+        ax.scatter(
+            start[0], start[1], marker=start_symbol, color=color, zorder=10, s=size
+        )
+        ax.scatter(end[0], end[1], marker=end_symbol, color=color, zorder=10, s=size)
 
 
 def load_trajectories(
@@ -158,31 +156,26 @@ def plot_auv(
             except Exception as e:
                 print(f"Could not align {algo}: {e}")
 
-    is_xz = auv_name in ("aquaslam", "aquaslam_wt")
-    plot_mode = plot.PlotMode.xz if is_xz else plot.PlotMode.xy
-    y_idx = 2 if is_xz else 1
-    y_label = "$z$ (m)" if is_xz else "$y$ (m)"
-
     fig, ax = plt.subplots()
     ax.set_aspect("equal", adjustable="datalim")
-    ax.set(xlabel="$x$ (m)", ylabel=y_label, title="")
+    ax.set(xlabel="$x$ (m)", ylabel="$y$ (m)", title="")
 
     for algo in ALGORITHMS:
         if algo in est_trajs:
             plot.traj(
                 ax,
-                plot_mode,
+                plot.PlotMode.xy,
                 est_trajs[algo],
                 style="-",
                 color=COLORS[algo],
                 label=algo,
             )
-            add_start_end_markers(ax, est_trajs[algo], COLORS[algo], y_idx=y_idx)
+            add_start_end_markers(ax, est_trajs[algo], COLORS[algo])
 
     if gt_traj:
         gt_pos = positions_with_gaps(gt_traj)
-        ax.plot(gt_pos[:, 0], gt_pos[:, y_idx], "--", color=COLORS["GT"], label="GT")
-        add_start_end_markers(ax, gt_traj, COLORS["GT"], y_idx=y_idx)
+        ax.plot(gt_pos[:, 0], gt_pos[:, 1], "--", color=COLORS["GT"], label="GT")
+        add_start_end_markers(ax, gt_traj, COLORS["GT"])
 
     legend = plt.legend(frameon=True)
     legend.set_zorder(100)
