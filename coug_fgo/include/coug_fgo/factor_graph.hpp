@@ -47,6 +47,7 @@
 #include <string>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <thread>
+#include <vector>
 
 #include "coug_fgo/factor_graph_core.hpp"
 #include "coug_fgo/factor_graph_parameters.hpp"
@@ -114,10 +115,53 @@ class FactorGraphNode : public rclcpp::Node {
    */
   void processBackend();
 
+  // --- Helpers ---
+  /**
+   * @brief Wakes the frontend thread to process new data.
+   */
+  void notifyFrontend();
+
+  /**
+   * @brief Wakes the backend thread to run optimization.
+   */
+  void notifyBackend();
+
+  /**
+   * @brief Checks a rate limit and records the pass time; always passes if the rate is <= 0.
+   * @param last_time The last pass time (updated on pass).
+   * @param max_rate_hz The maximum allowed rate.
+   * @return True if enough time has elapsed since the last pass.
+   */
+  bool passesRateLimit(rclcpp::Time& last_time, double max_rate_hz);
+
+  /**
+   * @brief Fills a sensor TF from parameters or the TF tree (no-op once filled).
+   * @param tf_out The cached transform to fill.
+   * @param child The child (sensor) frame id.
+   * @param use_parameter_tf Build the transform from parameters instead of the TF tree.
+   * @param pos Parameter translation [x, y, z].
+   * @param quat Parameter orientation [x, y, z, w].
+   */
+  void loadOrLookupTf(geometry_msgs::msg::TransformStamped& tf_out, const std::string& child,
+                      bool use_parameter_tf, const std::vector<double>& pos,
+                      const std::vector<double>& quat);
+
+  /**
+   * @brief Drains every sensor queue into one bundle.
+   * @return The drained sensor data bundle.
+   */
+  utils::QueueBundle drainAllQueues();
+
+  /**
+   * @brief Restores a bundle of sensor data to the front of the queues.
+   * @param queues The bundle to restore.
+   */
+  void restoreAllQueues(const utils::QueueBundle& queues);
+
   // --- Publishing ---
   /**
-   * @brief Publishes the optimized global odometry.
-   * @param current_pose The estimated target pose.
+   * @brief Publishes the optimized pose as map-frame odometry of the base frame.
+   * @param current_pose The estimated target pose (re-expressed at the base frame).
    * @param pose_covariance The estimation error covariance.
    * @param timestamp The message timestamp.
    */
@@ -132,7 +176,7 @@ class FactorGraphNode : public rclcpp::Node {
   void broadcastGlobalTf(const gtsam::Pose3& current_pose, const rclcpp::Time& timestamp);
 
   /**
-   * @brief Publishes the full optimized trajectory path.
+   * @brief Publishes the full optimized trajectory as base-frame poses in the map frame.
    * @param values The final optimized values.
    * @param timestamp The path timestamp.
    */

@@ -45,8 +45,8 @@ class OdomToTfNode : public rclcpp::Node {
 
  protected:
   /**
-   * @brief Callback for receiving new odometry data.
-   * @param msg The incoming Odometry message.
+   * @brief Re-broadcasts the odometry pose as a parent-to-child TF transform.
+   * @param msg The incoming Odometry message (header and child_frame_id name the frames).
    */
   void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
 

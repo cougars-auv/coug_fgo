@@ -38,7 +38,7 @@ class DvlLoosePreintFactorArm : public gtsam::NoiseModelFactor2<gtsam::Pose3, gt
 
  public:
   /**
-   * @brief Constructor for DvlLoosePreintFactorArm.
+   * @brief Constructs the factor from a preintegrated translation delta.
    * @param pose_key_i GTSAM key for the starting AUV pose.
    * @param pose_key_j GTSAM key for the ending AUV pose.
    * @param target_T_sensor The static transformation from target to sensor.

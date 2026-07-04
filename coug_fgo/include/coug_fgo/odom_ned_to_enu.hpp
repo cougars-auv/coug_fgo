@@ -43,15 +43,15 @@ class OdomNedToEnuNode : public rclcpp::Node {
 
  protected:
   /**
-   * @brief Callback for receiving new odometry data.
-   * @param msg The incoming Odometry message.
+   * @brief Publishes the ENU-converted copy of an incoming odometry message.
+   * @param msg The incoming NED-referenced Odometry message.
    */
   void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
 
   /**
-   * @brief Converts an Odometry message from a NED to an ENU world convention.
-   * @param msg The incoming Odometry message.
-   * @return The converted Odometry message.
+   * @brief Rotates the position, orientation, and pose covariance from NED to ENU.
+   * @param msg The incoming NED-referenced Odometry message.
+   * @return The converted Odometry message; twist fields pass through untouched.
    */
   nav_msgs::msg::Odometry convertToEnu(const nav_msgs::msg::Odometry::SharedPtr msg);
 

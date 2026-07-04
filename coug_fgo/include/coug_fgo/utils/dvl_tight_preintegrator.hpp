@@ -34,7 +34,7 @@ namespace coug_fgo::utils {
 class DvlTightPreintegrator {
  public:
   /**
-   * @brief Constructor for DvlTightPreintegrator.
+   * @brief Constructs the preintegrator in a reset state.
    */
   DvlTightPreintegrator() { reset(); }
 
@@ -50,7 +50,7 @@ class DvlTightPreintegrator {
   }
 
   /**
-   * @brief Integrates a DVL measurement with joint covariance propagation
+   * @brief Integrates a DVL measurement with joint covariance propagation.
    * @param measured_vel The velocity measurement in the DVL sensor frame.
    * @param delta_R_ik Relative target-frame rotation from interval start (i) to measurement (k).
    * @param target_R_dvl Static extrinsic rotation from the DVL to the target frame.

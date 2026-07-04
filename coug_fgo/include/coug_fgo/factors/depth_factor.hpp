@@ -14,7 +14,7 @@
 
 /**
  * @file depth_factor.hpp
- * @brief GTSAM factor for depth (Z) measurements with a lever arm.
+ * @brief GTSAM factor for 1D depth (Z) measurements with a lever arm.
  * @author Nelson Durrant
  * @date May 2026
  */
@@ -30,7 +30,7 @@ namespace coug_fgo::factors {
 
 /**
  * @class DepthFactorArm
- * @brief GTSAM factor for depth measurements (Z-axis) with a lever arm.
+ * @brief GTSAM factor for 1D depth (Z) measurements with a lever arm.
  */
 class DepthFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
   double measured_depth_;
@@ -38,7 +38,7 @@ class DepthFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
 
  public:
   /**
-   * @brief Constructor for DepthFactorArm.
+   * @brief Constructs the factor, caching the sensor lever arm.
    * @param pose_key GTSAM key for the AUV pose.
    * @param measured_depth The depth measurement (Z-axis).
    * @param target_T_sensor The static transformation from target to sensor.

@@ -43,15 +43,15 @@ class ImuNedToEnuNode : public rclcpp::Node {
 
  protected:
   /**
-   * @brief Callback for receiving new IMU data.
-   * @param msg The incoming IMU message.
+   * @brief Publishes the ENU-converted copy of an incoming IMU message.
+   * @param msg The incoming NED-referenced IMU message.
    */
   void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg);
 
   /**
-   * @brief Converts an IMU message from a NED to an ENU world convention.
-   * @param msg The incoming IMU message.
-   * @return The converted IMU message.
+   * @brief Re-references the orientation from NED to ENU (body axes and covariance unchanged).
+   * @param msg The incoming NED-referenced IMU message.
+   * @return The converted IMU message; rates and accelerations pass through untouched.
    */
   sensor_msgs::msg::Imu convertToEnu(const sensor_msgs::msg::Imu::SharedPtr msg);
 

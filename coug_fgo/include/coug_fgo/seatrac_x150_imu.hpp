@@ -46,28 +46,28 @@ class SeatracX150ImuNode : public rclcpp::Node {
 
  protected:
   /**
-   * @brief Callback for receiving new ModemStatus data.
+   * @brief Publishes IMU and/or magnetometer messages when the modem report includes them.
    * @param msg The incoming ModemStatus message.
    */
   void modemStatusCallback(const seatrac_interfaces::msg::ModemStatus::SharedPtr msg);
 
   /**
-   * @brief Converts a ModemStatus message to an Imu message.
-   * @param msg The incoming ModemStatus message.
-   * @return The converted Imu message.
+   * @brief Builds a NED IMU message from the modem attitude with declination correction.
+   * @param msg The incoming ModemStatus message (attitude in 0.1-degree units).
+   * @return The converted Imu message (orientation only; parameter noise sigmas).
    */
   sensor_msgs::msg::Imu convertToImu(const seatrac_interfaces::msg::ModemStatus::SharedPtr msg);
 
   /**
-   * @brief Converts a ModemStatus message to a MagneticField message.
+   * @brief Builds a MagneticField message from the modem field readings.
    * @param msg The incoming ModemStatus message.
-   * @return The converted MagneticField message.
+   * @return The converted MagneticField message (parameter noise sigmas).
    */
   sensor_msgs::msg::MagneticField convertToMag(
       const seatrac_interfaces::msg::ModemStatus::SharedPtr msg);
 
   /**
-   * @brief Diagnostic task to report the status of the modem data.
+   * @brief Diagnostic task reporting time since the last modem report.
    * @param stat The diagnostic status wrapper.
    */
   void checkModemStatus(diagnostic_updater::DiagnosticStatusWrapper& stat);

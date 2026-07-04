@@ -41,6 +41,20 @@ using utils::toPoseMsg;
 using utils::toQuatMsg;
 using utils::toVectorMsg;
 
+namespace {
+
+/**
+ * @brief Maps a row-major ROS covariance array onto an N x N Eigen matrix.
+ * @param arr The flat covariance array from a ROS message.
+ * @return The covariance as a column-major Eigen matrix.
+ */
+template <int N, typename Array>
+Eigen::Matrix<double, N, N> toCovMatrix(const Array& arr) {
+  return Eigen::Map<const Eigen::Matrix<double, N, N, Eigen::RowMajor>>(arr.data());
+}
+
+}  // namespace
+
 void FactorGraphNode::setupRosInterfaces() {
   // --- ROS TF Interfaces ---
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(get_clock());
@@ -80,46 +94,14 @@ void FactorGraphNode::setupRosInterfaces() {
   auto sensor_options = rclcpp::SubscriptionOptions();
   sensor_options.callback_group = sensor_cb_group_;
 
-  auto load_or_lookup_tf = [this](geometry_msgs::msg::TransformStamped& tf_out,
-                                  const std::string& child, const std::string& sensor_name,
-                                  bool use_parameter_tf, const std::vector<double>& pos,
-                                  const std::vector<double>& quat) {
-    std::scoped_lock lock(tf_mutex_);
-    if (!tf_out.header.frame_id.empty()) {
-      return;
-    }
-
-    if (use_parameter_tf) {
-      tf_out.header.stamp = this->get_clock()->now();
-      tf_out.header.frame_id = params_.target_frame;
-      tf_out.child_frame_id = child;
-      tf_out.transform.translation.x = pos[0];
-      tf_out.transform.translation.y = pos[1];
-      tf_out.transform.translation.z = pos[2];
-      tf_out.transform.rotation.x = quat[0];
-      tf_out.transform.rotation.y = quat[1];
-      tf_out.transform.rotation.z = quat[2];
-      tf_out.transform.rotation.w = quat[3];
-    } else {
-      try {
-        if (!params_.target_frame.empty()) {
-          tf_out = tf_buffer_->lookupTransform(params_.target_frame, child, tf2::TimePointZero);
-        }
-      } catch (const tf2::TransformException& ex) {
-        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Could not transform %s to %s: %s",
-                             params_.target_frame.c_str(), child.c_str(), ex.what());
-      }
-    }
-  };
-
   // --- ROS Subscribers ---
   imu_sub_ = create_subscription<sensor_msgs::msg::Imu>(
       params_.imu_topic, rclcpp::SensorDataQoS().keep_last(200),
-      [this, load_or_lookup_tf](const sensor_msgs::msg::Imu::SharedPtr msg) {
+      [this](const sensor_msgs::msg::Imu::SharedPtr msg) {
         std::string child =
             params_.imu.use_parameter_frame ? params_.imu.parameter_frame : msg->header.frame_id;
-        load_or_lookup_tf(target_T_imu_tf_, child, "IMU", params_.imu.use_parameter_tf,
-                          params_.imu.parameter_tf.position, params_.imu.parameter_tf.orientation);
+        loadOrLookupTf(target_T_imu_tf_, child, params_.imu.use_parameter_tf,
+                       params_.imu.parameter_tf.position, params_.imu.parameter_tf.orientation);
         {
           std::scoped_lock lock(tf_mutex_);
           if (target_T_imu_tf_.header.frame_id.empty()) {
@@ -131,12 +113,8 @@ void FactorGraphNode::setupRosInterfaces() {
         data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
         data->linear_acceleration = toGtsam(msg->linear_acceleration);
         data->angular_velocity = toGtsam(msg->angular_velocity);
-        data->linear_acceleration_covariance =
-            Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(
-                msg->linear_acceleration_covariance.data());
-        data->angular_velocity_covariance =
-            Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(
-                msg->angular_velocity_covariance.data());
+        data->linear_acceleration_covariance = toCovMatrix<3>(msg->linear_acceleration_covariance);
+        data->angular_velocity_covariance = toCovMatrix<3>(msg->angular_velocity_covariance);
         imu_queue_.push(data);
       },
       sensor_options);
@@ -144,17 +122,15 @@ void FactorGraphNode::setupRosInterfaces() {
   if (params_.gps.enable_gps || params_.gps.enable_gps_init_only) {
     gps_sub_ = create_subscription<nav_msgs::msg::Odometry>(
         params_.gps_odom_topic, rclcpp::SensorDataQoS(),
-        [this, load_or_lookup_tf](const nav_msgs::msg::Odometry::SharedPtr msg) {
+        [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
           std::string child =
               params_.gps.use_parameter_frame ? params_.gps.parameter_frame : msg->child_frame_id;
-          load_or_lookup_tf(target_T_gps_tf_, child, "GPS", params_.gps.use_parameter_tf,
-                            params_.gps.parameter_tf.position,
-                            params_.gps.parameter_tf.orientation);
+          loadOrLookupTf(target_T_gps_tf_, child, params_.gps.use_parameter_tf,
+                         params_.gps.parameter_tf.position, params_.gps.parameter_tf.orientation);
           auto data = std::make_shared<utils::OdometryData>();
           data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
           data->pose = toGtsam(msg->pose.pose);
-          data->pose_covariance = Eigen::Map<const Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>(
-              msg->pose.covariance.data());
+          data->pose_covariance = toCovMatrix<6>(msg->pose.covariance);
           gps_queue_.push(data);
         },
         sensor_options);
@@ -163,26 +139,21 @@ void FactorGraphNode::setupRosInterfaces() {
   if (params_.depth.enable_depth || params_.depth.enable_depth_init_only) {
     depth_sub_ = create_subscription<nav_msgs::msg::Odometry>(
         params_.depth_odom_topic, rclcpp::SensorDataQoS(),
-        [this, load_or_lookup_tf](const nav_msgs::msg::Odometry::SharedPtr msg) {
+        [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
           std::string child = params_.depth.use_parameter_frame ? params_.depth.parameter_frame
                                                                 : msg->child_frame_id;
-          load_or_lookup_tf(target_T_depth_tf_, child, "Depth", params_.depth.use_parameter_tf,
-                            params_.depth.parameter_tf.position,
-                            params_.depth.parameter_tf.orientation);
+          loadOrLookupTf(target_T_depth_tf_, child, params_.depth.use_parameter_tf,
+                         params_.depth.parameter_tf.position,
+                         params_.depth.parameter_tf.orientation);
           auto data = std::make_shared<utils::OdometryData>();
           data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
           data->pose = toGtsam(msg->pose.pose);
-          data->pose_covariance = Eigen::Map<const Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>(
-              msg->pose.covariance.data());
+          data->pose_covariance = toCovMatrix<6>(msg->pose.covariance);
           depth_queue_.push(data);
 
           if (keyframe_source_ == KeyframeSource::kDepth ||
               backup_keyframe_source_ == KeyframeSource::kDepth) {
-            {
-              std::scoped_lock lock(frontend_trigger_mutex_);
-              frontend_trigger_ = true;
-            }
-            frontend_cv_.notify_one();
+            notifyFrontend();
           }
         },
         sensor_options);
@@ -191,18 +162,15 @@ void FactorGraphNode::setupRosInterfaces() {
   if (params_.mag.enable_mag || params_.mag.enable_mag_init_only) {
     mag_sub_ = create_subscription<sensor_msgs::msg::MagneticField>(
         params_.mag_topic, rclcpp::SensorDataQoS(),
-        [this, load_or_lookup_tf](const sensor_msgs::msg::MagneticField::SharedPtr msg) {
+        [this](const sensor_msgs::msg::MagneticField::SharedPtr msg) {
           std::string child =
               params_.mag.use_parameter_frame ? params_.mag.parameter_frame : msg->header.frame_id;
-          load_or_lookup_tf(target_T_mag_tf_, child, "Mag", params_.mag.use_parameter_tf,
-                            params_.mag.parameter_tf.position,
-                            params_.mag.parameter_tf.orientation);
+          loadOrLookupTf(target_T_mag_tf_, child, params_.mag.use_parameter_tf,
+                         params_.mag.parameter_tf.position, params_.mag.parameter_tf.orientation);
           auto data = std::make_shared<utils::MagneticFieldData>();
           data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
           data->magnetic_field = toGtsam(msg->magnetic_field);
-          data->magnetic_field_covariance =
-              Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(
-                  msg->magnetic_field_covariance.data());
+          data->magnetic_field_covariance = toCovMatrix<3>(msg->magnetic_field_covariance);
           mag_queue_.push(data);
         },
         sensor_options);
@@ -212,18 +180,15 @@ void FactorGraphNode::setupRosInterfaces() {
       params_.comparison.enable_loose_dvl_preintegration) {
     ahrs_sub_ = create_subscription<sensor_msgs::msg::Imu>(
         params_.ahrs_topic, rclcpp::SensorDataQoS().keep_last(200),
-        [this, load_or_lookup_tf](const sensor_msgs::msg::Imu::SharedPtr msg) {
+        [this](const sensor_msgs::msg::Imu::SharedPtr msg) {
           std::string child = params_.ahrs.use_parameter_frame ? params_.ahrs.parameter_frame
                                                                : msg->header.frame_id;
-          load_or_lookup_tf(target_T_ahrs_tf_, child, "AHRS", params_.ahrs.use_parameter_tf,
-                            params_.ahrs.parameter_tf.position,
-                            params_.ahrs.parameter_tf.orientation);
+          loadOrLookupTf(target_T_ahrs_tf_, child, params_.ahrs.use_parameter_tf,
+                         params_.ahrs.parameter_tf.position, params_.ahrs.parameter_tf.orientation);
           auto data = std::make_shared<utils::AhrsData>();
           data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
           data->orientation = toGtsam(msg->orientation);
-          data->orientation_covariance =
-              Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(
-                  msg->orientation_covariance.data());
+          data->orientation_covariance = toCovMatrix<3>(msg->orientation_covariance);
           ahrs_queue_.push(data);
         },
         sensor_options);
@@ -232,27 +197,20 @@ void FactorGraphNode::setupRosInterfaces() {
   if (params_.dvl.enable_dvl || params_.dvl.enable_dvl_init_only) {
     dvl_sub_ = create_subscription<geometry_msgs::msg::TwistWithCovarianceStamped>(
         params_.dvl_topic, rclcpp::SensorDataQoS(),
-        [this,
-         load_or_lookup_tf](const geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr msg) {
+        [this](const geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr msg) {
           std::string child =
               params_.dvl.use_parameter_frame ? params_.dvl.parameter_frame : msg->header.frame_id;
-          load_or_lookup_tf(target_T_dvl_tf_, child, "DVL", params_.dvl.use_parameter_tf,
-                            params_.dvl.parameter_tf.position,
-                            params_.dvl.parameter_tf.orientation);
+          loadOrLookupTf(target_T_dvl_tf_, child, params_.dvl.use_parameter_tf,
+                         params_.dvl.parameter_tf.position, params_.dvl.parameter_tf.orientation);
           auto data = std::make_shared<utils::TwistData>();
           data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
           data->linear_velocity = toGtsam(msg->twist.twist.linear);
-          data->twist_covariance = Eigen::Map<const Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>(
-              msg->twist.covariance.data());
+          data->twist_covariance = toCovMatrix<6>(msg->twist.covariance);
           dvl_queue_.push(data);
 
           if (keyframe_source_ == KeyframeSource::kDvl ||
               backup_keyframe_source_ == KeyframeSource::kDvl) {
-            {
-              std::scoped_lock lock(frontend_trigger_mutex_);
-              frontend_trigger_ = true;
-            }
-            frontend_cv_.notify_one();
+            notifyFrontend();
           }
         },
         sensor_options);
@@ -261,13 +219,13 @@ void FactorGraphNode::setupRosInterfaces() {
   if (params_.dynamics.enable_dynamics || params_.dynamics.enable_dynamics_dropout_only) {
     wrench_sub_ = create_subscription<geometry_msgs::msg::WrenchStamped>(
         params_.wrench_topic, rclcpp::SensorDataQoS(),
-        [this, load_or_lookup_tf](const geometry_msgs::msg::WrenchStamped::SharedPtr msg) {
+        [this](const geometry_msgs::msg::WrenchStamped::SharedPtr msg) {
           std::string child = params_.dynamics.use_parameter_frame
                                   ? params_.dynamics.parameter_frame
                                   : msg->header.frame_id;
-          load_or_lookup_tf(target_T_com_tf_, child, "COM", params_.dynamics.use_parameter_tf,
-                            params_.dynamics.parameter_tf.position,
-                            params_.dynamics.parameter_tf.orientation);
+          loadOrLookupTf(target_T_com_tf_, child, params_.dynamics.use_parameter_tf,
+                         params_.dynamics.parameter_tf.position,
+                         params_.dynamics.parameter_tf.orientation);
           auto data = std::make_shared<utils::WrenchData>();
           data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
           data->force = toGtsam(msg->wrench.force);
@@ -280,13 +238,8 @@ void FactorGraphNode::setupRosInterfaces() {
   if (keyframe_source_ == KeyframeSource::kTimer ||
       backup_keyframe_source_ == KeyframeSource::kTimer) {
     double period = 1.0 / params_.keyframe_timer_hz;
-    keyframe_timer_ = create_wall_timer(std::chrono::duration<double>(period), [this]() {
-      {
-        std::scoped_lock lock(frontend_trigger_mutex_);
-        frontend_trigger_ = true;
-      }
-      frontend_cv_.notify_one();
-    });
+    keyframe_timer_ =
+        create_wall_timer(std::chrono::duration<double>(period), [this]() { notifyFrontend(); });
   }
 
   // --- ROS Diagnostics ---
@@ -359,22 +312,96 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions& options)
 
 FactorGraphNode::~FactorGraphNode() {
   is_running_.store(false);
-  {
-    std::scoped_lock lock(frontend_trigger_mutex_);
-    frontend_trigger_ = true;
-  }
-  frontend_cv_.notify_all();
-  {
-    std::scoped_lock lock(backend_trigger_mutex_);
-    backend_trigger_ = true;
-  }
-  backend_cv_.notify_all();
+  notifyFrontend();
+  notifyBackend();
   if (frontend_thread_.joinable()) {
     frontend_thread_.join();
   }
   if (backend_thread_.joinable()) {
     backend_thread_.join();
   }
+}
+
+void FactorGraphNode::notifyFrontend() {
+  {
+    std::scoped_lock lock(frontend_trigger_mutex_);
+    frontend_trigger_ = true;
+  }
+  frontend_cv_.notify_one();
+}
+
+void FactorGraphNode::notifyBackend() {
+  {
+    std::scoped_lock lock(backend_trigger_mutex_);
+    backend_trigger_ = true;
+  }
+  backend_cv_.notify_one();
+}
+
+bool FactorGraphNode::passesRateLimit(rclcpp::Time& last_time, double max_rate_hz) {
+  if (max_rate_hz <= 0.0) {
+    return true;
+  }
+  rclcpp::Time now = get_clock()->now();
+  if (now - last_time < rclcpp::Duration::from_seconds(1.0 / max_rate_hz)) {
+    return false;
+  }
+  last_time = now;
+  return true;
+}
+
+void FactorGraphNode::loadOrLookupTf(geometry_msgs::msg::TransformStamped& tf_out,
+                                     const std::string& child, bool use_parameter_tf,
+                                     const std::vector<double>& pos,
+                                     const std::vector<double>& quat) {
+  std::scoped_lock lock(tf_mutex_);
+  if (!tf_out.header.frame_id.empty()) {
+    return;
+  }
+
+  if (use_parameter_tf) {
+    tf_out.header.stamp = get_clock()->now();
+    tf_out.header.frame_id = params_.target_frame;
+    tf_out.child_frame_id = child;
+    tf_out.transform.translation.x = pos[0];
+    tf_out.transform.translation.y = pos[1];
+    tf_out.transform.translation.z = pos[2];
+    tf_out.transform.rotation.x = quat[0];
+    tf_out.transform.rotation.y = quat[1];
+    tf_out.transform.rotation.z = quat[2];
+    tf_out.transform.rotation.w = quat[3];
+  } else {
+    try {
+      if (!params_.target_frame.empty()) {
+        tf_out = tf_buffer_->lookupTransform(params_.target_frame, child, tf2::TimePointZero);
+      }
+    } catch (const tf2::TransformException& ex) {
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Could not transform %s to %s: %s",
+                           params_.target_frame.c_str(), child.c_str(), ex.what());
+    }
+  }
+}
+
+utils::QueueBundle FactorGraphNode::drainAllQueues() {
+  utils::QueueBundle queues;
+  queues.imu = imu_queue_.drain();
+  queues.gps = gps_queue_.drain();
+  queues.depth = depth_queue_.drain();
+  queues.mag = mag_queue_.drain();
+  queues.ahrs = ahrs_queue_.drain();
+  queues.dvl = dvl_queue_.drain();
+  queues.wrench = wrench_queue_.drain();
+  return queues;
+}
+
+void FactorGraphNode::restoreAllQueues(const utils::QueueBundle& queues) {
+  imu_queue_.restore(queues.imu);
+  gps_queue_.restore(queues.gps);
+  depth_queue_.restore(queues.depth);
+  mag_queue_.restore(queues.mag);
+  ahrs_queue_.restore(queues.ahrs);
+  dvl_queue_.restore(queues.dvl);
+  wrench_queue_.restore(queues.wrench);
 }
 
 void FactorGraphNode::publishGlobalOdom(const gtsam::Pose3& current_pose,
@@ -530,27 +557,9 @@ void FactorGraphNode::processFrontend() {
 
       if (!is_initialized_.load()) {
         initializeGraph();
-      } else {
-        bool should_update = true;
-        if (params_.max_update_rate_hz > 0.0) {
-          rclcpp::Time now = get_clock()->now();
-          rclcpp::Duration min_period =
-              rclcpp::Duration::from_seconds(1.0 / params_.max_update_rate_hz);
-          if (now - last_update_time_ < min_period) {
-            should_update = false;
-          } else {
-            last_update_time_ = now;
-          }
-        }
-
-        if (should_update) {
-          updateGraph();
-          {
-            std::scoped_lock lock(backend_trigger_mutex_);
-            backend_trigger_ = true;
-          }
-          backend_cv_.notify_one();
-        }
+      } else if (passesRateLimit(last_update_time_, params_.max_update_rate_hz)) {
+        updateGraph();
+        notifyBackend();
       }
     }
   }
@@ -574,18 +583,7 @@ void FactorGraphNode::processBackend() {
         continue;
       }
 
-      bool should_optimize = true;
-      if (params_.max_opt_rate_hz > 0.0) {
-        rclcpp::Time now = get_clock()->now();
-        rclcpp::Duration min_period = rclcpp::Duration::from_seconds(1.0 / params_.max_opt_rate_hz);
-        if (now - last_opt_time_ < min_period) {
-          should_optimize = false;
-        } else {
-          last_opt_time_ = now;
-        }
-      }
-
-      if (should_optimize) {
+      if (passesRateLimit(last_opt_time_, params_.max_opt_rate_hz)) {
         optimizeGraph();
       }
     }
@@ -622,42 +620,17 @@ void FactorGraphNode::initializeGraph() {
     return;
   }
 
+  loadOrLookupTf(target_T_base_tf_, params_.base_frame, params_.base.use_parameter_tf,
+                 params_.base.parameter_tf.position, params_.base.parameter_tf.orientation);
   {
     std::scoped_lock lock(tf_mutex_);
     if (target_T_base_tf_.header.frame_id.empty()) {
-      if (params_.base.use_parameter_tf) {
-        target_T_base_tf_.header.stamp = this->get_clock()->now();
-        target_T_base_tf_.header.frame_id = params_.target_frame;
-        target_T_base_tf_.child_frame_id = params_.base_frame;
-        target_T_base_tf_.transform.translation.x = params_.base.parameter_tf.position[0];
-        target_T_base_tf_.transform.translation.y = params_.base.parameter_tf.position[1];
-        target_T_base_tf_.transform.translation.z = params_.base.parameter_tf.position[2];
-        target_T_base_tf_.transform.rotation.x = params_.base.parameter_tf.orientation[0];
-        target_T_base_tf_.transform.rotation.y = params_.base.parameter_tf.orientation[1];
-        target_T_base_tf_.transform.rotation.z = params_.base.parameter_tf.orientation[2];
-        target_T_base_tf_.transform.rotation.w = params_.base.parameter_tf.orientation[3];
-      } else {
-        try {
-          target_T_base_tf_ = tf_buffer_->lookupTransform(params_.target_frame, params_.base_frame,
-                                                          tf2::TimePointZero);
-        } catch (const tf2::TransformException& ex) {
-          RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Could not transform %s to %s: %s",
-                               params_.target_frame.c_str(), params_.base_frame.c_str(), ex.what());
-          return;
-        }
-      }
+      return;
     }
   }
 
   // --- Compute Initial State ---
-  utils::QueueBundle init_queues;
-  init_queues.imu = imu_queue_.drain();
-  init_queues.gps = gps_queue_.drain();
-  init_queues.depth = depth_queue_.drain();
-  init_queues.mag = mag_queue_.drain();
-  init_queues.ahrs = ahrs_queue_.drain();
-  init_queues.dvl = dvl_queue_.drain();
-  init_queues.wrench = wrench_queue_.drain();
+  utils::QueueBundle init_queues = drainAllQueues();
 
   auto back_time = [](const auto& q) { return q.empty() ? 0.0 : q.back()->timestamp; };
   double newest_stamp = std::max({back_time(init_queues.imu), back_time(init_queues.gps),
@@ -721,25 +694,9 @@ void FactorGraphNode::updateGraph() {
   last_target_time_ = *target_time;
 
   // --- Update Request ---
-  utils::QueueBundle queues;
-  queues.imu = imu_queue_.drain();
-  queues.gps = gps_queue_.drain();
-  queues.depth = depth_queue_.drain();
-  queues.mag = mag_queue_.drain();
-  queues.ahrs = ahrs_queue_.drain();
-  queues.dvl = dvl_queue_.drain();
-  queues.wrench = wrench_queue_.drain();
-
+  utils::QueueBundle queues = drainAllQueues();
   auto leftover = core_->update(*target_time, queues);
-
-  const utils::QueueBundle& to_restore = leftover ? *leftover : queues;
-  imu_queue_.restore(to_restore.imu);
-  gps_queue_.restore(to_restore.gps);
-  depth_queue_.restore(to_restore.depth);
-  mag_queue_.restore(to_restore.mag);
-  ahrs_queue_.restore(to_restore.ahrs);
-  dvl_queue_.restore(to_restore.dvl);
-  wrench_queue_.restore(to_restore.wrench);
+  restoreAllQueues(leftover ? *leftover : queues);
 }
 
 void FactorGraphNode::optimizeGraph() {
@@ -876,13 +833,7 @@ void FactorGraphNode::resetGraph(const std_srvs::srv::Trigger::Request::SharedPt
   std::unique_lock reset_lock(reset_mutex_);
 
   // Discard data and reset estimator state
-  imu_queue_.drain();
-  gps_queue_.drain();
-  depth_queue_.drain();
-  mag_queue_.drain();
-  ahrs_queue_.drain();
-  dvl_queue_.drain();
-  wrench_queue_.drain();
+  drainAllQueues();
 
   core_ = std::make_unique<FactorGraphCore>(params_);
   state_init_ = std::make_unique<StateInitializer>(params_);

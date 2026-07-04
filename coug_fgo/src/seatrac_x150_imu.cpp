@@ -93,7 +93,7 @@ sensor_msgs::msg::Imu SeatracX150ImuNode::convertToImu(
     q_ned_b.setRPY(roll_rad, pitch_rad, yaw_rad);
     imu_msg.orientation = tf2::toMsg(q_ned_b);
 
-    auto& s = params_.orientation_noise_sigmas;
+    const auto& s = params_.orientation_noise_sigmas;
     imu_msg.orientation_covariance[0] = s[0] * s[0];
     imu_msg.orientation_covariance[4] = s[1] * s[1];
     imu_msg.orientation_covariance[8] = s[2] * s[2];
@@ -119,7 +119,7 @@ sensor_msgs::msg::MagneticField SeatracX150ImuNode::convertToMag(
   mag_msg.magnetic_field.y = msg->mag_y;
   mag_msg.magnetic_field.z = msg->mag_z;
 
-  auto& m = params_.magnetic_field_noise_sigmas;
+  const auto& m = params_.magnetic_field_noise_sigmas;
   mag_msg.magnetic_field_covariance[0] = m[0] * m[0];
   mag_msg.magnetic_field_covariance[4] = m[1] * m[1];
   mag_msg.magnetic_field_covariance[8] = m[2] * m[2];

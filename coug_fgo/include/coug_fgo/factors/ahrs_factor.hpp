@@ -39,7 +39,7 @@ class AhrsFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
 
  public:
   /**
-   * @brief Constructor for AhrsFactorArm.
+   * @brief Constructs the factor, pre-rotating the measurement by the negative declination.
    * @param pose_key GTSAM key for the AUV pose.
    * @param measured_orientation The measured orientation of the sensor in the map frame.
    * @param target_T_sensor The static transformation from target to sensor.

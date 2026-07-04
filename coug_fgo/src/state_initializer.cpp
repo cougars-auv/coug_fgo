@@ -14,7 +14,7 @@
 
 /**
  * @file state_initializer.cpp
- * @brief Utility for initializing state priors from sensor data.
+ * @brief Implementation of the StateInitializer.
  * @author Nelson Durrant
  * @date May 2026
  */
@@ -22,6 +22,8 @@
 #include "coug_fgo/state_initializer.hpp"
 
 #include <cmath>
+#include <memory>
+#include <type_traits>
 
 #include "coug_fgo/utils/param_enums.hpp"
 
@@ -114,98 +116,66 @@ void StateInitializer::compute(const TfBundle& tfs) {
 }
 
 void StateInitializer::incrementAverages(QueueBundle& queues) {
-  // Average IMU
-  for (const auto& msg : queues.imu) {
-    if (imu_count_ == 0) {
-      initial_imu_ = std::make_shared<ImuData>(*msg);
-    } else {
-      double n = static_cast<double>(imu_count_ + 1);
-      initial_imu_->linear_acceleration +=
-          (msg->linear_acceleration - initial_imu_->linear_acceleration) / n;
-      initial_imu_->angular_velocity +=
-          (msg->angular_velocity - initial_imu_->angular_velocity) / n;
-      initial_imu_->timestamp = msg->timestamp;
+  auto average = [](auto& initial, size_t& count, const auto& msgs, const auto& blend) {
+    for (const auto& msg : msgs) {
+      if (count == 0) {
+        initial = std::make_shared<std::decay_t<decltype(*msg)>>(*msg);
+      } else {
+        blend(*initial, *msg, static_cast<double>(count + 1));
+        initial->timestamp = msg->timestamp;
+      }
+      count++;
     }
-    imu_count_++;
-  }
+  };
 
-  // Average GPS
+  average(initial_imu_, imu_count_, queues.imu, [](ImuData& avg, const ImuData& msg, double n) {
+    avg.linear_acceleration += (msg.linear_acceleration - avg.linear_acceleration) / n;
+    avg.angular_velocity += (msg.angular_velocity - avg.angular_velocity) / n;
+  });
+
   if (params_.gps.enable_gps || params_.gps.enable_gps_init_only) {
-    for (const auto& msg : queues.gps) {
-      if (gps_count_ == 0) {
-        initial_gps_ = std::make_shared<OdometryData>(*msg);
-      } else {
-        double n = static_cast<double>(gps_count_ + 1);
-        gtsam::Point3 current_p = msg->pose.translation();
-        gtsam::Point3 init_p = initial_gps_->pose.translation();
-        init_p += (current_p - init_p) / n;
-        initial_gps_->pose = gtsam::Pose3(initial_gps_->pose.rotation(), init_p);
-        initial_gps_->timestamp = msg->timestamp;
-      }
-      gps_count_++;
-    }
+    average(initial_gps_, gps_count_, queues.gps,
+            [](OdometryData& avg, const OdometryData& msg, double n) {
+              gtsam::Point3 p = avg.pose.translation();
+              p += (msg.pose.translation() - p) / n;
+              avg.pose = gtsam::Pose3(avg.pose.rotation(), p);
+            });
   }
 
-  // Average Depth
   if (params_.depth.enable_depth || params_.depth.enable_depth_init_only) {
-    for (const auto& msg : queues.depth) {
-      if (depth_count_ == 0) {
-        initial_depth_ = std::make_shared<OdometryData>(*msg);
-      } else {
-        double n = static_cast<double>(depth_count_ + 1);
-        gtsam::Point3 current_p = msg->pose.translation();
-        gtsam::Point3 init_p = initial_depth_->pose.translation();
-        init_p.z() += (current_p.z() - init_p.z()) / n;
-        initial_depth_->pose = gtsam::Pose3(initial_depth_->pose.rotation(), init_p);
-        initial_depth_->timestamp = msg->timestamp;
-      }
-      depth_count_++;
-    }
+    average(initial_depth_, depth_count_, queues.depth,
+            [](OdometryData& avg, const OdometryData& msg, double n) {
+              gtsam::Point3 p = avg.pose.translation();
+              p.z() += (msg.pose.translation().z() - p.z()) / n;
+              avg.pose = gtsam::Pose3(avg.pose.rotation(), p);
+            });
   }
 
-  // Average DVL
   if (params_.dvl.enable_dvl || params_.dvl.enable_dvl_init_only) {
-    for (const auto& msg : queues.dvl) {
-      if (dvl_count_ == 0) {
-        initial_dvl_ = std::make_shared<TwistData>(*msg);
-      } else {
-        double n = static_cast<double>(dvl_count_ + 1);
-        initial_dvl_->linear_velocity += (msg->linear_velocity - initial_dvl_->linear_velocity) / n;
-        initial_dvl_->timestamp = msg->timestamp;
-      }
-      dvl_count_++;
-    }
+    average(initial_dvl_, dvl_count_, queues.dvl,
+            [](TwistData& avg, const TwistData& msg, double n) {
+              avg.linear_velocity += (msg.linear_velocity - avg.linear_velocity) / n;
+            });
   }
 
-  // Average Magnetometer
   if (params_.mag.enable_mag || params_.mag.enable_mag_init_only) {
-    for (const auto& msg : queues.mag) {
-      if (mag_count_ == 0) {
-        initial_mag_ = std::make_shared<MagneticFieldData>(*msg);
-      } else {
-        double n = static_cast<double>(mag_count_ + 1);
-        initial_mag_->magnetic_field += (msg->magnetic_field - initial_mag_->magnetic_field) / n;
-        initial_mag_->timestamp = msg->timestamp;
-      }
-      mag_count_++;
-    }
+    average(initial_mag_, mag_count_, queues.mag,
+            [](MagneticFieldData& avg, const MagneticFieldData& msg, double n) {
+              avg.magnetic_field += (msg.magnetic_field - avg.magnetic_field) / n;
+            });
   }
 
-  // Average AHRS
   if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) {
-    for (const auto& msg : queues.ahrs) {
-      if (ahrs_count_ == 0) {
-        initial_ahrs_ = std::make_shared<AhrsData>(*msg);
-        ahrs_ref_ = msg->orientation;
-        ahrs_log_sum_ = gtsam::Vector3::Zero();
-      } else {
-        ahrs_log_sum_ += gtsam::Rot3::Logmap(ahrs_ref_.between(msg->orientation));
-        gtsam::Vector3 log_avg = ahrs_log_sum_ / static_cast<double>(ahrs_count_ + 1);
-        initial_ahrs_->orientation = ahrs_ref_.compose(gtsam::Rot3::Expmap(log_avg));
-        initial_ahrs_->timestamp = msg->timestamp;
-      }
-      ahrs_count_++;
+    // Average rotations in the tangent space anchored at the first sample
+    if (ahrs_count_ == 0 && !queues.ahrs.empty()) {
+      ahrs_ref_ = queues.ahrs.front()->orientation;
+      ahrs_log_sum_ = gtsam::Vector3::Zero();
     }
+    average(initial_ahrs_, ahrs_count_, queues.ahrs,
+            [this](AhrsData& avg, const AhrsData& msg, double n) {
+              ahrs_log_sum_ += gtsam::Rot3::Logmap(ahrs_ref_.between(msg.orientation));
+              avg.orientation = ahrs_ref_.compose(gtsam::Rot3::Expmap(ahrs_log_sum_ / n));
+            });
   }
 }
 
@@ -228,6 +198,7 @@ gtsam::Rot3 StateInitializer::computeInitialOrientation(const TfBundle& tfs) {
   pitch = std::atan2(-accel_target.x(), std::sqrt(accel_target.y() * accel_target.y() +
                                                   accel_target.z() * accel_target.z()));
 
+  // If no heading source is enabled below, yaw keeps the parameter prior value
   if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) {
     // Account for AHRS sensor rotation
     gtsam::Rot3 target_R_ahrs = tfs.target_T_ahrs.rotation();

@@ -49,16 +49,12 @@ class ThreadSafeQueue {
   }
 
   /**
-   * @brief Drains all items from the queue.
+   * @brief Drains all items from the queue, leaving it empty.
    * @return A deque containing all items that were in the queue.
    */
   std::deque<T> drain() {
-    std::deque<T> temp_q;
-    {
-      std::scoped_lock lock(mutex_);
-      temp_q = std::move(queue_);
-    }
-    return temp_q;
+    std::scoped_lock lock(mutex_);
+    return std::exchange(queue_, {});
   }
 
   /**
@@ -89,7 +85,8 @@ class ThreadSafeQueue {
   }
 
   /**
-   * @brief Gets the wall-clock seconds since the last item arrived, or nullopt if none has.
+   * @brief Gets the wall-clock time since the last item arrived.
+   * @return Seconds since the last arrival, or nullopt if no item has ever been pushed.
    */
   std::optional<double> secondsSinceLastArrival() const {
     std::scoped_lock lock(mutex_);

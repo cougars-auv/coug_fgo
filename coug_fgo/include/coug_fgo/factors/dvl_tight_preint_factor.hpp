@@ -42,14 +42,14 @@ class DvlTightPreintFactorArm
 
  public:
   /**
-   * @brief Constructor for DvlTightPreintFactorArm.
+   * @brief Constructs the factor from a preintegrated translation delta and its bias Jacobian.
    * @param pose_key_i GTSAM key for the starting AUV pose.
    * @param pose_key_j GTSAM key for the ending AUV pose.
    * @param bias_key_i GTSAM key for the IMU bias at the start of the interval.
    * @param target_T_dvl The static transformation from target to DVL.
    * @param measured_translation The preintegrated translation measurement (target frame at i).
    * @param d_translation_d_bias Jacobian mapping gyro bias changes to measurement changes.
-   * @param gyro_bias_hat The gyro bias estimate used during pre-integration.
+   * @param gyro_bias_hat The gyro bias estimate used during preintegration.
    * @param noise_model The noise model for the measurement.
    */
   DvlTightPreintFactorArm(gtsam::Key pose_key_i, gtsam::Key pose_key_j, gtsam::Key bias_key_i,

@@ -34,35 +34,37 @@ namespace coug_fgo {
 
 /**
  * @class StateInitializer
- * @brief Computes initial state priors for factor graph initialization.
+ * @brief Utility for initializing state priors from sensor data.
  */
 class StateInitializer {
  public:
   /**
-   * @brief Constructor for StateInitializer.
-   * @param params Node parameters; must outlive this object.
+   * @brief Constructs the initializer with node parameters.
+   * @param params Node parameters (held by reference; must outlive this object).
    */
   explicit StateInitializer(const factor_graph_node::Params& params);
 
   /**
    * @brief Updates the running averages with new data from sensor queues.
    * @param current_time Current time in seconds.
-   * @param queues Bundle of sensor message queues.
-   * @return True if initialization averaging is complete.
+   * @param queues Bundle of drained sensor message deques.
+   * @return True once ready: averaging window elapsed, or parameter priors with samples in hand.
    */
   bool update(double current_time, utils::QueueBundle& queues);
 
   /**
-   * @brief Computes initial pose, velocity, and bias.
+   * @brief Computes the initial pose, velocity, bias, and start time from the collected data.
    * @param tfs Bundle of core sensor transformations.
    */
   void compute(const utils::TfBundle& tfs);
 
+  // Computed initial state (valid after compute())
   const gtsam::Pose3& getPose() const { return pose_; }
   const gtsam::Vector3& getVelocity() const { return velocity_; }
   const gtsam::imuBias::ConstantBias& getBias() const { return bias_; }
   double getTime() const { return time_; }
 
+  // Averaged initial sensor samples (null if the sensor was never required)
   const std::shared_ptr<utils::ImuData>& getInitialImu() const { return initial_imu_; }
   const std::shared_ptr<utils::OdometryData>& getInitialGps() const { return initial_gps_; }
   const std::shared_ptr<utils::OdometryData>& getInitialDepth() const { return initial_depth_; }

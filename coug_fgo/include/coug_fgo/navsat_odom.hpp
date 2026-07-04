@@ -47,13 +47,13 @@ class NavsatOdomNode : public rclcpp::Node {
 
  protected:
   /**
-   * @brief Callback for receiving new GPS NavSatFix data.
-   * @param msg The incoming NavSatFix message.
+   * @brief Projects a GPS fix into ENU odometry relative to the origin and publishes it.
+   * @param msg The incoming NavSatFix message (dropped if no fix or unknown covariance).
    */
   void navsatCallback(const sensor_msgs::msg::NavSatFix::SharedPtr msg);
 
   /**
-   * @brief Callback for receiving an origin from an external source.
+   * @brief Latches the first valid externally-published origin fix.
    * @param msg The incoming origin NavSatFix message.
    */
   void originCallback(const sensor_msgs::msg::NavSatFix::SharedPtr msg);
@@ -65,13 +65,13 @@ class NavsatOdomNode : public rclcpp::Node {
   void setOrigin(const sensor_msgs::msg::NavSatFix& msg);
 
   /**
-   * @brief Diagnostic task to report the status of the ENU origin.
+   * @brief Diagnostic task reporting whether the ENU origin is set and its coordinates.
    * @param stat The diagnostic status wrapper.
    */
   void checkOriginStatus(diagnostic_updater::DiagnosticStatusWrapper& stat);
 
   /**
-   * @brief Diagnostic task to report the status of the GPS receiver.
+   * @brief Diagnostic task reporting GPS data freshness and fix status.
    * @param stat The diagnostic status wrapper.
    */
   void checkNavSatFix(diagnostic_updater::DiagnosticStatusWrapper& stat);

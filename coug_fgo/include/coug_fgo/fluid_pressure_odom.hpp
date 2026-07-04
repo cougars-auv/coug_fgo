@@ -46,13 +46,13 @@ class FluidPressureOdomNode : public rclcpp::Node {
 
  protected:
   /**
-   * @brief Callback for receiving new fluid pressure data.
-   * @param msg The incoming FluidPressure message.
+   * @brief Converts gauge pressure to Z-depth odometry with spike rejection and publishes it.
+   * @param msg The incoming FluidPressure message (Pascals after pressure_scale).
    */
   void pressureCallback(const sensor_msgs::msg::FluidPressure::SharedPtr msg);
 
   /**
-   * @brief Diagnostic task to report the status of the pressure sensor.
+   * @brief Diagnostic task reporting pressure data freshness and the last computed depth.
    * @param stat The diagnostic status wrapper.
    */
   void checkPressureStatus(diagnostic_updater::DiagnosticStatusWrapper& stat);

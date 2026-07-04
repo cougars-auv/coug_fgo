@@ -21,6 +21,7 @@
 
 #include "coug_fgo/fluid_pressure_odom.hpp"
 
+#include <cmath>
 #include <rclcpp_components/register_node_macro.hpp>
 
 namespace coug_fgo {
@@ -77,11 +78,8 @@ void FluidPressureOdomNode::pressureCallback(const sensor_msgs::msg::FluidPressu
   odom_msg.header.stamp = msg->header.stamp;
   odom_msg.header.frame_id = params_.map_frame;
 
-  if (params_.use_parameter_child_frame) {
-    odom_msg.child_frame_id = params_.parameter_child_frame;
-  } else {
-    odom_msg.child_frame_id = msg->header.frame_id;
-  }
+  odom_msg.child_frame_id =
+      params_.use_parameter_child_frame ? params_.parameter_child_frame : msg->header.frame_id;
 
   // depth [m] = (pressure [Pa] - atmospheric_pressure [Pa]) / (water_density [kg/m^3] * g [m/s^2])
   double pressure_to_depth = 1.0 / (params_.water_density * params_.gravity);

@@ -41,7 +41,7 @@ class MagFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
 
  public:
   /**
-   * @brief Constructor for MagFactorArm.
+   * @brief Constructs the factor, caching the sensor rotation.
    * @param pose_key GTSAM key for the AUV pose.
    * @param measured_field The measured magnetic field vector (sensor frame).
    * @param reference_field The reference magnetic field vector (map frame).

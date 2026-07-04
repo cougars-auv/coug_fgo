@@ -49,13 +49,13 @@ class DvlA50OdomNode : public rclcpp::Node {
 
  protected:
   /**
-   * @brief Callback for receiving new DVL DR data.
-   * @param msg The incoming DVLDR message.
+   * @brief Re-expresses the DVL dead-reckoning pose as base-frame odometry and publishes it.
+   * @param msg The incoming DVLDR message (position in meters, attitude in degrees).
    */
   void dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg);
 
   /**
-   * @brief Diagnostic task to report the status of the DVL data.
+   * @brief Diagnostic task reporting time since the last DVL DR report.
    * @param stat The diagnostic status wrapper.
    */
   void checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper& stat);

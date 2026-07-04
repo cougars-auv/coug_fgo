@@ -14,7 +14,7 @@
 
 /**
  * @file gps_factor.hpp
- * @brief GTSAM factor for GPS position measurements with a lever arm.
+ * @brief GTSAM factor for 2D GPS position measurements with a lever arm.
  * @author Nelson Durrant
  * @date May 2026
  */
@@ -31,7 +31,7 @@ namespace coug_fgo::factors {
 
 /**
  * @class Gps2dFactorArm
- * @brief GTSAM factor for GPS position measurements with a lever arm.
+ * @brief GTSAM factor for 2D GPS position measurements with a lever arm.
  */
 class Gps2dFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
   gtsam::Point3 measured_position_;
@@ -39,7 +39,7 @@ class Gps2dFactorArm : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
 
  public:
   /**
-   * @brief Constructor for Gps2dFactorArm.
+   * @brief Constructs the factor, caching the sensor lever arm.
    * @param pose_key GTSAM key for the AUV pose.
    * @param measured_position The measured 3D position (Z is ignored).
    * @param target_T_sensor The static transformation from target to sensor.

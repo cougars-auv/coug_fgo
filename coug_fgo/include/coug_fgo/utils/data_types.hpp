@@ -110,7 +110,7 @@ struct WrenchData {
 
 /**
  * @struct QueueBundle
- * @brief Container for sensor data queues.
+ * @brief Bundle of drained per-sensor message deques.
  */
 struct QueueBundle {
   std::deque<std::shared_ptr<ImuData>> imu;

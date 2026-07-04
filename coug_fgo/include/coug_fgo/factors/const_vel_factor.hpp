@@ -37,7 +37,7 @@ class ConstVelFactor
     : public gtsam::NoiseModelFactor4<gtsam::Pose3, gtsam::Vector3, gtsam::Pose3, gtsam::Vector3> {
  public:
   /**
-   * @brief Constructor for ConstVelFactor.
+   * @brief Constructs the factor linking consecutive pose/velocity pairs.
    * @param pose_key_i GTSAM key for the starting AUV pose.
    * @param vel_key_i GTSAM key for the starting AUV velocity.
    * @param pose_key_j GTSAM key for the ending AUV pose.

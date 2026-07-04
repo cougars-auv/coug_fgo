@@ -63,8 +63,8 @@ void DvlA50TwistNode::dvlCallback(const dvl_msgs::msg::DVL::SharedPtr msg) {
 
   if (params_.simulate_dropout && params_.dropout_frequency_hz > 0.0) {
     double cycle_period = 1.0 / params_.dropout_frequency_hz;
-    if (fmod(last_dvl_time_, cycle_period) < params_.dropout_duration_sec) {
-      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), (int)(cycle_period * 1000),
+    if (std::fmod(last_dvl_time_, cycle_period) < params_.dropout_duration_sec) {
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), static_cast<int>(cycle_period * 1000),
                            "Simulating DVL dropout...");
       return;
     }
@@ -82,11 +82,8 @@ void DvlA50TwistNode::dvlCallback(const dvl_msgs::msg::DVL::SharedPtr msg) {
 geometry_msgs::msg::TwistWithCovarianceStamped DvlA50TwistNode::convertToTwist(
     const dvl_msgs::msg::DVL::SharedPtr msg) {
   geometry_msgs::msg::TwistWithCovarianceStamped twist_msg;
-  if (params_.use_parameter_frame) {
-    twist_msg.header.frame_id = params_.parameter_frame;
-  } else {
-    twist_msg.header.frame_id = msg->header.frame_id;
-  }
+  twist_msg.header.frame_id =
+      params_.use_parameter_frame ? params_.parameter_frame : msg->header.frame_id;
 
   uint64_t sec = msg->time_of_validity / 1000000;
   uint64_t nanosec = (msg->time_of_validity % 1000000) * 1000;

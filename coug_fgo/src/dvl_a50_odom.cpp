@@ -77,12 +77,11 @@ void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
     return;
   }
 
-  geometry_msgs::msg::PoseStamped p_base_in_dvl;
-  p_base_in_dvl.header.frame_id = current_dvl_frame;
-  p_base_in_dvl.pose.position.x = dvl_T_base_tf.transform.translation.x;
-  p_base_in_dvl.pose.position.y = dvl_T_base_tf.transform.translation.y;
-  p_base_in_dvl.pose.position.z = dvl_T_base_tf.transform.translation.z;
-  p_base_in_dvl.pose.orientation = dvl_T_base_tf.transform.rotation;
+  geometry_msgs::msg::Pose p_base_in_dvl;
+  p_base_in_dvl.position.x = dvl_T_base_tf.transform.translation.x;
+  p_base_in_dvl.position.y = dvl_T_base_tf.transform.translation.y;
+  p_base_in_dvl.position.z = dvl_T_base_tf.transform.translation.z;
+  p_base_in_dvl.orientation = dvl_T_base_tf.transform.rotation;
 
   geometry_msgs::msg::TransformStamped odom_T_dvl_tf;
   odom_T_dvl_tf.header.frame_id = params_.odom_frame;
@@ -97,7 +96,7 @@ void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
   odom_T_dvl_tf.transform.rotation = tf2::toMsg(q);
 
   geometry_msgs::msg::Pose p_base_in_odom;
-  tf2::doTransform(p_base_in_dvl.pose, p_base_in_odom, odom_T_dvl_tf);
+  tf2::doTransform(p_base_in_dvl, p_base_in_odom, odom_T_dvl_tf);
 
   nav_msgs::msg::Odometry odom;
   odom.header.frame_id = params_.odom_frame;

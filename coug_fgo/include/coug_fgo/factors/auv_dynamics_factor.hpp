@@ -44,7 +44,7 @@ class AuvDynamicsFactorArm
 
  public:
   /**
-   * @brief Constructor for AuvDynamicsFactorArm.
+   * @brief Constructs the factor, rotating the control force into the target frame.
    * @param pose_key_i GTSAM key for the starting AUV pose.
    * @param vel_key_i GTSAM key for the starting AUV velocity.
    * @param pose_key_j GTSAM key for the ending AUV pose.
@@ -99,12 +99,14 @@ class AuvDynamicsFactorArm
         vel_j, H_pose_j ? &H_unrotate_Rj : nullptr, H_vel_j ? &H_unrotate_vj : nullptr);
 
     gtsam::Vector3 abs_v_target_i = v_target_i.cwiseAbs();
-    gtsam::Matrix33 J_drag_v = gtsam::Matrix33::Zero();
     gtsam::Vector3 drag_force =
         -(linear_drag_ * v_target_i + quad_drag_ * abs_v_target_i.asDiagonal() * v_target_i);
 
+    // Jacobian of the velocity prediction with respect to v_target_i
+    gtsam::Matrix33 J_scale = gtsam::Matrix33::Zero();
     if (H_pose_i || H_vel_i) {
-      J_drag_v = -(linear_drag_ + 2.0 * quad_drag_ * abs_v_target_i.asDiagonal());
+      gtsam::Matrix33 J_drag_v = -(linear_drag_ + 2.0 * quad_drag_ * abs_v_target_i.asDiagonal());
+      J_scale = gtsam::Matrix33::Identity() + dt_ * mass_inv_ * J_drag_v;
     }
 
     gtsam::Vector3 accel_target = mass_inv_ * (target_f_ + drag_force);
@@ -115,16 +117,12 @@ class AuvDynamicsFactorArm
 
     if (H_pose_i) {
       // Jacobian with respect to pose_i (3x6)
-      gtsam::Matrix33 J_scale = gtsam::Matrix33::Identity() + dt_ * mass_inv_ * J_drag_v;
-
       H_pose_i->setZero(3, 6);
       H_pose_i->block<3, 3>(0, 0) = -J_scale * H_unrotate_Ri;
     }
 
     if (H_vel_i) {
       // Jacobian with respect to vel_i (3x3)
-      gtsam::Matrix33 J_scale = gtsam::Matrix33::Identity() + dt_ * mass_inv_ * J_drag_v;
-
       *H_vel_i = -J_scale * H_unrotate_vi;
     }
 

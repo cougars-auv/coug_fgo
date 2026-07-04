@@ -46,21 +46,21 @@ class DvlA50TwistNode : public rclcpp::Node {
 
  protected:
   /**
-   * @brief Callback for receiving new DVL data.
+   * @brief Gates DVL samples on validity/FOM (and simulated dropout), then publishes the twist.
    * @param msg The incoming DVL message.
    */
   void dvlCallback(const dvl_msgs::msg::DVL::SharedPtr msg);
 
   /**
-   * @brief Converts a DVL message to a TwistWithCovarianceStamped message.
+   * @brief Converts a DVL report to a stamped twist with FOM- or message-derived covariance.
    * @param msg The incoming DVL message.
-   * @return The converted TwistWithCovarianceStamped message.
+   * @return The converted TwistWithCovarianceStamped message (DVL time-of-validity stamp).
    */
   geometry_msgs::msg::TwistWithCovarianceStamped convertToTwist(
       const dvl_msgs::msg::DVL::SharedPtr msg);
 
   /**
-   * @brief Diagnostic task to report the status of the DVL data.
+   * @brief Diagnostic task reporting DVL data freshness and velocity validity.
    * @param stat The diagnostic status wrapper.
    */
   void checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper& stat);

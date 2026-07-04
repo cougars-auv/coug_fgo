@@ -34,7 +34,7 @@ namespace coug_fgo::utils {
 class DvlLoosePreintegrator {
  public:
   /**
-   * @brief Constructor for DvlLoosePreintegrator.
+   * @brief Constructs the preintegrator in a reset state with identity extrinsics.
    */
   DvlLoosePreintegrator() { reset(gtsam::Rot3()); }
 

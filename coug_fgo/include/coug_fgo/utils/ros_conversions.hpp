@@ -75,7 +75,7 @@ inline gtsam::Pose3 toGtsam(const geometry_msgs::msg::Pose& msg) {
  * @return The resulting gtsam::Pose3.
  */
 inline gtsam::Pose3 toGtsam(const geometry_msgs::msg::Transform& msg) {
-  return gtsam::Pose3(toGtsam(msg.rotation), toGtsam(msg.translation));
+  return {toGtsam(msg.rotation), toGtsam(msg.translation)};
 }
 
 /**
