@@ -45,7 +45,7 @@ navsat_odom_node:
       not_empty<>: []
   output_topic:
     type: string
-    default_value: "odometry/gps"
+    default_value: "gps/odometry"
     validation:
       not_empty<>: []
   origin_topic:

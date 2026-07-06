@@ -57,7 +57,7 @@ def launch_setup(context, *args, **kwargs) -> list:
                     "map_frame": "map",
                     "set_origin": True,
                     "input_topic": f"/{auv_ns}/gps/fix",
-                    "output_topic": "odometry/gps_null",
+                    "output_topic": "gps/odometry_null",
                 },
             ],
         ),

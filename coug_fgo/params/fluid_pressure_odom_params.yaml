@@ -54,7 +54,7 @@ fluid_pressure_odom_node:
       not_empty<>: []
   output_topic:
     type: string
-    default_value: "odometry/depth"
+    default_value: "depth/odometry"
     validation:
       not_empty<>: []
 

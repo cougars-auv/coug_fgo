@@ -91,12 +91,12 @@ factor_graph_node:
       not_empty<>: []
   gps_odom_topic:
     type: string
-    default_value: "odometry/gps"
+    default_value: "gps/odometry"
     validation:
       not_empty<>: []
   depth_odom_topic:
     type: string
-    default_value: "odometry/depth"
+    default_value: "depth/odometry"
     validation:
       not_empty<>: []
   mag_topic:
