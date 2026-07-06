@@ -22,8 +22,11 @@
 #include "coug_fgo/factor_graph.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <rclcpp_components/register_node_macro.hpp>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 #include "coug_fgo/utils/param_enums.hpp"
 #include "coug_fgo/utils/ros_conversions.hpp"
@@ -609,14 +612,21 @@ void FactorGraphNode::initializeGraph() {
   }
 
   if (!(imu_ok && gps_ok && depth_ok && mag_ok && ahrs_ok && dvl_ok)) {
-    // TODO: Make this more professional
-    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "Waiting for sensors: %s%s%s%s%s%s",
-                         !imu_ok ? "[IMU] " : "",
-                         (!gps_ok && params_.gps.enable_gps) ? "[GPS] " : "",
-                         (!mag_ok && params_.mag.enable_mag) ? "[Mag] " : "",
-                         (!ahrs_ok && params_.ahrs.enable_ahrs) ? "[AHRS] " : "",
-                         (!depth_ok && params_.depth.enable_depth) ? "[Depth] " : "",
-                         (!dvl_ok && params_.dvl.enable_dvl) ? "[DVL] " : "");
+    std::vector<std::string> pending;
+    if (!imu_ok) pending.emplace_back("IMU");
+    if (!gps_ok) pending.emplace_back("GPS");
+    if (!mag_ok) pending.emplace_back("magnetometer");
+    if (!ahrs_ok) pending.emplace_back("AHRS");
+    if (!depth_ok) pending.emplace_back("depth");
+    if (!dvl_ok) pending.emplace_back("DVL");
+
+    std::string sensor_list = pending.front();
+    for (size_t i = 1; i < pending.size(); ++i) {
+      sensor_list += ", " + pending[i];
+    }
+
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Waiting for sensor transforms: %s",
+                         sensor_list.c_str());
     return;
   }
 
@@ -654,7 +664,6 @@ void FactorGraphNode::initializeGraph() {
 
   is_initialized_.store(true);
   RCLCPP_INFO(get_logger(), "Graph initialized successfully.");
-  // TODO: Print priors
 }
 
 void FactorGraphNode::updateGraph() {
@@ -670,7 +679,7 @@ void FactorGraphNode::updateGraph() {
          (*newest_stamp - *last_received) > params_.keyframe_timeout_sec)) {
       if (backup_keyframe_source_ != KeyframeSource::kNone) {
         active_source = backup_keyframe_source_;
-        RCLCPP_WARN(get_logger(), "Primary keyframe source '%s' timed out! Using backup '%s'.",
+        RCLCPP_WARN(get_logger(), "Primary keyframe source '%s' timed out. Using backup '%s'.",
                     params_.keyframe_source.c_str(), params_.backup_keyframe_source.c_str());
       }
     }

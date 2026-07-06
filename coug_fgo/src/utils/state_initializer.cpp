@@ -188,7 +188,6 @@ gtsam::Rot3 StateInitializer::computeInitialOrientation(const TfBundle& tfs) {
   pitch = std::atan2(-accel_target.x(), std::sqrt(accel_target.y() * accel_target.y() +
                                                   accel_target.z() * accel_target.z()));
 
-  // If no heading source is enabled below, yaw keeps the parameter prior value
   if (params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only) {
     // Account for AHRS sensor rotation
     gtsam::Rot3 target_R_ahrs = tfs.target_T_ahrs.rotation();
