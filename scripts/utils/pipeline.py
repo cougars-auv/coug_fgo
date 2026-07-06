@@ -557,7 +557,7 @@ def process_bag_offline(
     :param bag_path: Path to the ROS 2 bag directory.
     :param config_paths: Parameter YAML files, in increasing priority.
     :param namespace: Vehicle namespace used for topics and parameters.
-    :param urdf_path: Optional URDF path, resolved from configs if omitted.
+    :param urdf_path: Optional URDF path, resolved from config files if omitted.
     :param verbose: Whether to log progress and show a progress bar.
     :return: Result arrays keyed by state name (or None), and a crash flag.
     """
@@ -566,11 +566,11 @@ def process_bag_offline(
 
     if verbose:
         cfg_str = "\n".join(f"  - {p}" for p in config_paths)
-        logger.info(f"Loaded configs:\n{cfg_str}")
+        logger.info(f"Loaded config files:\n{cfg_str}")
         if urdf_path:
             logger.info(f"Loaded URDF: {urdf_path}")
         else:
-            logger.warning("No URDF found! Sensor TFs must come from parameters.")
+            logger.warning("No URDF found. Sensor TFs must come from parameters.")
 
     urdf = UrdfTree(urdf_path) if urdf_path else None
     pipeline = OfflineFactorGraph(config_paths, namespace, urdf, verbose)
@@ -598,7 +598,7 @@ def process_bag_offline(
                 )
                 logger.info(f"Matched connections:\n{conn_str}")
             else:
-                logger.warning("No matching sensor topics found in the bag!")
+                logger.warning("No matching sensor topics found in the bag.")
 
         pbar = tqdm(
             reader.messages(connections=matched_conns),
@@ -636,11 +636,11 @@ def process_bag_offline(
             ]
             if missing:
                 logger.error(
-                    f"Graph never initialized! No data received for: {', '.join(missing)}"
+                    f"Graph never initialized. No data received for: {', '.join(missing)}"
                 )
             else:
                 logger.error(
-                    "Graph never initialized! Not enough sensor data in the bag."
+                    "Graph never initialized. Not enough sensor data in the bag."
                 )
         else:
             logger.error("Graph initialized but produced no results.")

@@ -31,8 +31,6 @@ namespace coug_fgo {
 
 SeatracX150ImuNode::SeatracX150ImuNode(const rclcpp::NodeOptions& options)
     : Node("seatrac_x150_imu_node", options), diagnostic_updater_(this) {
-  RCLCPP_INFO(get_logger(), "Starting Seatrac x150 IMU Node...");
-
   param_listener_ =
       std::make_shared<seatrac_x150_imu_node::ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
@@ -58,7 +56,7 @@ SeatracX150ImuNode::SeatracX150ImuNode(const rclcpp::NodeOptions& options)
     diagnostic_updater_.add(prefix + "Modem Status", this, &SeatracX150ImuNode::checkModemStatus);
   }
 
-  RCLCPP_INFO(get_logger(), "Startup complete! Waiting for modem status updates...");
+  RCLCPP_INFO(get_logger(), "Initialization complete.");
 }
 
 void SeatracX150ImuNode::modemStatusCallback(

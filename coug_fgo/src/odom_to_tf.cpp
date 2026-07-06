@@ -27,8 +27,6 @@
 namespace coug_fgo {
 
 OdomToTfNode::OdomToTfNode(const rclcpp::NodeOptions& options) : Node("odom_to_tf_node", options) {
-  RCLCPP_INFO(get_logger(), "Starting Odom to TF Node...");
-
   param_listener_ =
       std::make_shared<odom_to_tf_node::ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
@@ -39,7 +37,7 @@ OdomToTfNode::OdomToTfNode(const rclcpp::NodeOptions& options) : Node("odom_to_t
       params_.input_topic, rclcpp::SensorDataQoS(),
       std::bind(&OdomToTfNode::odomCallback, this, std::placeholders::_1));
 
-  RCLCPP_INFO(get_logger(), "Startup complete! Waiting for odometry data...");
+  RCLCPP_INFO(get_logger(), "Initialization complete.");
 }
 
 void OdomToTfNode::odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {

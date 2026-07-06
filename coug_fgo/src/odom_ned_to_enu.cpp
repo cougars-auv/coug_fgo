@@ -28,8 +28,6 @@ namespace coug_fgo {
 
 OdomNedToEnuNode::OdomNedToEnuNode(const rclcpp::NodeOptions& options)
     : Node("odom_ned_to_enu_node", options) {
-  RCLCPP_INFO(get_logger(), "Starting Odom NED to ENU Node...");
-
   param_listener_ =
       std::make_shared<odom_ned_to_enu_node::ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
@@ -42,7 +40,7 @@ OdomNedToEnuNode::OdomNedToEnuNode(const rclcpp::NodeOptions& options)
   odom_pub_ =
       create_publisher<nav_msgs::msg::Odometry>(params_.output_topic, rclcpp::SystemDefaultsQoS());
 
-  RCLCPP_INFO(get_logger(), "Startup complete! Waiting for NED odometry data...");
+  RCLCPP_INFO(get_logger(), "Initialization complete.");
 }
 
 void OdomNedToEnuNode::odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {

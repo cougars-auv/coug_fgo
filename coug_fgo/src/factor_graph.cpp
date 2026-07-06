@@ -275,8 +275,6 @@ void FactorGraphNode::setupRosInterfaces() {
 
 FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions& options)
     : Node("factor_graph_node", options), diagnostic_updater_(this) {
-  RCLCPP_INFO(get_logger(), "Starting Factor Graph Node...");
-
   param_listener_ =
       std::make_shared<factor_graph_node::ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
@@ -297,7 +295,7 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions& options)
   };
   if (!source_enabled(keyframe_source_) || !source_enabled(backup_keyframe_source_)) {
     RCLCPP_FATAL(get_logger(),
-                 "Keyframe source '%s' or backup '%s' references a disabled sensor! Shutting down.",
+                 "Keyframe source '%s' or backup '%s' references a disabled sensor. Shutting down.",
                  params_.keyframe_source.c_str(), params_.backup_keyframe_source.c_str());
     throw std::runtime_error("Invalid keyframe source configuration.");
   }
@@ -308,7 +306,7 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions& options)
   frontend_thread_ = std::thread(&FactorGraphNode::frontendThreadLoop, this);
   backend_thread_ = std::thread(&FactorGraphNode::backendThreadLoop, this);
 
-  RCLCPP_INFO(get_logger(), "Startup complete! Waiting for sensor data...");
+  RCLCPP_INFO(get_logger(), "Initialization complete.");
 }
 
 FactorGraphNode::~FactorGraphNode() {
@@ -611,6 +609,7 @@ void FactorGraphNode::initializeGraph() {
   }
 
   if (!(imu_ok && gps_ok && depth_ok && mag_ok && ahrs_ok && dvl_ok)) {
+    // TODO: Make this more professional
     RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "Waiting for sensors: %s%s%s%s%s%s",
                          !imu_ok ? "[IMU] " : "",
                          (!gps_ok && params_.gps.enable_gps) ? "[GPS] " : "",
@@ -654,7 +653,7 @@ void FactorGraphNode::initializeGraph() {
   core_->initialize(*state_init_, tfs);
 
   is_initialized_.store(true);
-  RCLCPP_INFO(get_logger(), "Graph initialized successfully!");
+  RCLCPP_INFO(get_logger(), "Graph initialized successfully.");
   // TODO: Print priors
 }
 
@@ -671,10 +670,8 @@ void FactorGraphNode::updateGraph() {
          (*newest_stamp - *last_received) > params_.keyframe_timeout_sec)) {
       if (backup_keyframe_source_ != KeyframeSource::kNone) {
         active_source = backup_keyframe_source_;
-        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
-                             "Primary keyframe source '%s' timed out! Using backup '%s'.",
-                             params_.keyframe_source.c_str(),
-                             params_.backup_keyframe_source.c_str());
+        RCLCPP_WARN(get_logger(), "Primary keyframe source '%s' timed out! Using backup '%s'.",
+                    params_.keyframe_source.c_str(), params_.backup_keyframe_source.c_str());
       }
     }
   }
@@ -719,8 +716,8 @@ void FactorGraphNode::optimizeGraph() {
     processing_overflow_.store(result->processing_overflow);
 
     if (result->processing_overflow) {
-      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
-                           "Processing overflow. Batching %zu keyframes.", result->num_keyframes);
+      RCLCPP_WARN(get_logger(), "Processing overflow. Batching %zu keyframes.",
+                  result->num_keyframes);
     }
 
     // --- Publish Results ---
@@ -830,7 +827,7 @@ void FactorGraphNode::checkProcessingOverflow(diagnostic_updater::DiagnosticStat
 
 void FactorGraphNode::resetGraph(const std_srvs::srv::Trigger::Request::SharedPtr,
                                  std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
-  RCLCPP_WARN(get_logger(), "Reset requested!");
+  RCLCPP_WARN(get_logger(), "Reset requested.");
 
   std::unique_lock reset_lock(reset_mutex_);
 
@@ -853,9 +850,9 @@ void FactorGraphNode::resetGraph(const std_srvs::srv::Trigger::Request::SharedPt
   total_factors_.store(0);
   total_variables_.store(0);
 
-  RCLCPP_INFO(get_logger(), "Graph reset successfully. Waiting for sensor data...");
+  RCLCPP_INFO(get_logger(), "Graph reset successfully.");
   response->success = true;
-  response->message = "Factor graph reset successfully.";
+  response->message = "Graph reset successfully.";
 }
 
 }  // namespace coug_fgo

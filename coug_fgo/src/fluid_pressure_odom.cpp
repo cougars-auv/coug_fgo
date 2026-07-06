@@ -28,8 +28,6 @@ namespace coug_fgo {
 
 FluidPressureOdomNode::FluidPressureOdomNode(const rclcpp::NodeOptions& options)
     : Node("fluid_pressure_odom_node", options), diagnostic_updater_(this) {
-  RCLCPP_INFO(get_logger(), "Starting Fluid Pressure Odom Node...");
-
   param_listener_ =
       std::make_shared<fluid_pressure_odom_node::ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
@@ -53,7 +51,7 @@ FluidPressureOdomNode::FluidPressureOdomNode(const rclcpp::NodeOptions& options)
     diagnostic_updater_.add(pressure_task, this, &FluidPressureOdomNode::checkPressureStatus);
   }
 
-  RCLCPP_INFO(get_logger(), "Startup complete! Waiting for pressure data...");
+  RCLCPP_INFO(get_logger(), "Initialization complete.");
 }
 
 void FluidPressureOdomNode::pressureCallback(const sensor_msgs::msg::FluidPressure::SharedPtr msg) {
@@ -65,7 +63,7 @@ void FluidPressureOdomNode::pressureCallback(const sensor_msgs::msg::FluidPressu
       std::abs(pressure - last_pressure_) > params_.max_pressure_delta) {
     rejected_count_++;
     if (rejected_count_ <= params_.max_consecutive_rejections) {
-      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Rejected pressure spike.");
+      RCLCPP_WARN(get_logger(), "Rejected pressure spike.");
       return;
     }
     RCLCPP_WARN(get_logger(), "Accepting pressure step after %d consecutive rejections.",

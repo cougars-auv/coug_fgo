@@ -30,8 +30,6 @@ NavsatOdomNode::NavsatOdomNode(const rclcpp::NodeOptions& options)
     : Node("navsat_odom_node", options),
       diagnostic_updater_(this),
       local_cartesian_(0.0, 0.0, 0.0, GeographicLib::Geocentric::WGS84()) {
-  RCLCPP_INFO(get_logger(), "Starting NavSat Odom Node...");
-
   param_listener_ =
       std::make_shared<navsat_odom_node::ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
@@ -86,7 +84,7 @@ NavsatOdomNode::NavsatOdomNode(const rclcpp::NodeOptions& options)
     diagnostic_updater_.add(fix_task, this, &NavsatOdomNode::checkNavSatFix);
   }
 
-  RCLCPP_INFO(get_logger(), "Startup complete! Waiting for GPS origin...");
+  RCLCPP_INFO(get_logger(), "Initialization complete.");
 }
 
 void NavsatOdomNode::setOrigin(const sensor_msgs::msg::NavSatFix& msg) {
@@ -111,14 +109,12 @@ void NavsatOdomNode::navsatCallback(const sensor_msgs::msg::NavSatFix::SharedPtr
   last_fix_status_ = msg->status.status;
 
   if (msg->status.status == sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX) {
-    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Received NavSatFix with no fix.");
+    RCLCPP_WARN(get_logger(), "Received NavSatFix with no fix.");
     return;
   }
 
   if (!origin_set_) {
     if (!params_.set_origin) {
-      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
-                           "Waiting for origin from external source...");
       return;
     }
     setOrigin(*msg);
@@ -128,7 +124,7 @@ void NavsatOdomNode::navsatCallback(const sensor_msgs::msg::NavSatFix::SharedPtr
   }
 
   if (msg->position_covariance_type == sensor_msgs::msg::NavSatFix::COVARIANCE_TYPE_UNKNOWN) {
-    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 5000, "Unknown covariance type.");
+    RCLCPP_ERROR(get_logger(), "Unknown covariance type.");
     return;
   }
 

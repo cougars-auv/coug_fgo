@@ -24,8 +24,14 @@ from utils import metrics
 
 NAMESPACE = "turtlmap"
 BAG_PATHS = [
-    str(Path.home() / "cougars-dev/bags/turtlmap_batch/log1_batch_2026-05-05-11-16-18"),
-    str(Path.home() / "cougars-dev/bags/turtlmap_batch/log2_batch_2026-05-05-11-22-42"),
+    str(
+        Path.home()
+        / "cougars-dev/bags/turtlmap_offline/log1_offline_2026-07-06-16-08-28"
+    ),
+    str(
+        Path.home()
+        / "cougars-dev/bags/turtlmap_offline/log2_offline_2026-07-06-16-15-19"
+    ),
 ]
 CONFIG_PATHS = [
     str(Path.home() / "cougars-dev/config/fleet/coug_fgo_params.yaml"),

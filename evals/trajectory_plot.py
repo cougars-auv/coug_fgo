@@ -235,6 +235,8 @@ def main() -> None:
 
     for evo_dir in target_dir.rglob("evo"):
         bag_dir = evo_dir.parent
+        if not (bag_dir / "metadata.yaml").exists():
+            continue
         for agent_dir in filter(Path.is_dir, evo_dir.iterdir()):
             generate_plots(
                 agent_dir,

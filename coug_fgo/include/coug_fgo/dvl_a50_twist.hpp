@@ -77,6 +77,7 @@ class DvlA50TwistNode : public rclcpp::Node {
   // --- State ---
   double last_dvl_time_{0.0};
   bool last_velocity_valid_{false};
+  bool is_simulating_dropout_{false};
 };
 
 }  // namespace coug_fgo

@@ -28,8 +28,6 @@ namespace coug_fgo {
 
 ImuNedToEnuNode::ImuNedToEnuNode(const rclcpp::NodeOptions& options)
     : Node("imu_ned_to_enu_node", options) {
-  RCLCPP_INFO(get_logger(), "Starting IMU NED to ENU Node...");
-
   param_listener_ =
       std::make_shared<imu_ned_to_enu_node::ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
@@ -42,7 +40,7 @@ ImuNedToEnuNode::ImuNedToEnuNode(const rclcpp::NodeOptions& options)
   imu_pub_ =
       create_publisher<sensor_msgs::msg::Imu>(params_.output_topic, rclcpp::SystemDefaultsQoS());
 
-  RCLCPP_INFO(get_logger(), "Startup complete! Waiting for NED IMU data...");
+  RCLCPP_INFO(get_logger(), "Initialization complete.");
 }
 
 void ImuNedToEnuNode::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg) {

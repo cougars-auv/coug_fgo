@@ -28,8 +28,6 @@ namespace coug_fgo {
 
 DvlA50TwistNode::DvlA50TwistNode(const rclcpp::NodeOptions& options)
     : Node("dvl_a50_twist_node", options), diagnostic_updater_(this) {
-  RCLCPP_INFO(get_logger(), "Starting DVL A50 Twist Node...");
-
   param_listener_ =
       std::make_shared<dvl_a50_twist_node::ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
@@ -53,7 +51,7 @@ DvlA50TwistNode::DvlA50TwistNode(const rclcpp::NodeOptions& options)
     diagnostic_updater_.add(dvl_task, this, &DvlA50TwistNode::checkDvlStatus);
   }
 
-  RCLCPP_INFO(get_logger(), "Startup complete! Waiting for DVL data...");
+  RCLCPP_INFO(get_logger(), "Initialization complete.");
 }
 
 void DvlA50TwistNode::dvlCallback(const dvl_msgs::msg::DVL::SharedPtr msg) {
@@ -63,15 +61,19 @@ void DvlA50TwistNode::dvlCallback(const dvl_msgs::msg::DVL::SharedPtr msg) {
 
   if (params_.simulate_dropout && params_.dropout_frequency_hz > 0.0) {
     double cycle_period = 1.0 / params_.dropout_frequency_hz;
-    if (std::fmod(last_dvl_time_, cycle_period) < params_.dropout_duration_sec) {
-      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), static_cast<int>(cycle_period * 1000),
-                           "Simulating DVL dropout...");
+    bool should_drop = std::fmod(last_dvl_time_, cycle_period) < params_.dropout_duration_sec;
+    if (should_drop) {
+      if (!is_simulating_dropout_) {
+        RCLCPP_WARN(get_logger(), "Simulating DVL dropout.");
+        is_simulating_dropout_ = true;
+      }
       return;
     }
+    is_simulating_dropout_ = false;
   }
 
   if (!msg->velocity_valid && msg->fom > params_.fom_valid_threshold) {
-    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Received invalid DVL velocity.");
+    RCLCPP_WARN(get_logger(), "Received invalid DVL velocity.");
     return;
   }
 

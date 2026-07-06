@@ -29,8 +29,6 @@ namespace coug_fgo {
 
 DvlA50OdomNode::DvlA50OdomNode(const rclcpp::NodeOptions& options)
     : Node("dvl_a50_odom_node", options), diagnostic_updater_(this) {
-  RCLCPP_INFO(get_logger(), "Starting DVL A50 Odom Node...");
-
   param_listener_ =
       std::make_shared<dvl_a50_odom_node::ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
@@ -57,7 +55,7 @@ DvlA50OdomNode::DvlA50OdomNode(const rclcpp::NodeOptions& options)
     diagnostic_updater_.add(dvl_task, this, &DvlA50OdomNode::checkDvlStatus);
   }
 
-  RCLCPP_INFO(get_logger(), "Startup complete! Waiting for DVL DR data...");
+  RCLCPP_INFO(get_logger(), "Initialization complete.");
 }
 
 void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
