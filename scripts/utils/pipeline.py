@@ -71,8 +71,14 @@ class UrdfTree:
         self._joints: dict[str, tuple[str, np.ndarray, Rotation]] = {}
         self._links: set[str] = set()
         for joint in ET.fromstring(xml_text).findall("joint"):
-            parent = joint.find("parent").attrib["link"]
-            child = joint.find("child").attrib["link"]
+            parent_el, child_el = joint.find("parent"), joint.find("child")
+            if parent_el is None or child_el is None:
+                raise ValueError(
+                    f"URDF joint '{joint.attrib.get('name', '?')}' is missing a "
+                    "parent or child link"
+                )
+            parent = parent_el.attrib["link"]
+            child = child_el.attrib["link"]
             origin = joint.find("origin")
             attrib = origin.attrib if origin is not None else {}
             pos = np.array([float(v) for v in attrib.get("xyz", "0 0 0").split()])
@@ -136,6 +142,9 @@ def resolve_urdf_path(namespace: str, config_paths: list[str]) -> str | None:
             data = yaml.safe_load(yaml_path.read_text())
         except OSError:
             return None
+        except yaml.YAMLError as e:
+            logger.warning(f"Could not parse params file {yaml_path}: {e}")
+            return None
         for top_key in top_keys:
             try:
                 return data[top_key]["coug_description_launch"]["ros__parameters"][
@@ -154,7 +163,8 @@ def resolve_urdf_path(namespace: str, config_paths: list[str]) -> str | None:
                 fleet_path = config_dir / "coug_description_params.yaml"
                 urdf_file = urdf_file or read_urdf_file(fleet_path, ["/**"])
     if urdf_file is None:
-        urdf_file = "couguv_holoocean.urdf.xacro"  # TODO: Throw an error isntead
+        logger.warning("No urdf_file parameter found in any config.")
+        return None
 
     urdf_dirs = [
         Path.home() / "cougars-dev/ros2_ws/src/coug_description/coug_description/urdf",
@@ -617,18 +627,23 @@ def process_bag_offline(
             crashed = True
     raw_results = pipeline.results
 
-    if verbose and not pipeline.is_initialized:
-        missing = [
-            s
-            for s in ("imu", "gps", "depth", "mag", "ahrs", "dvl")
-            if pipeline.enabled[s] and s not in pipeline.tfs_resolved
-        ]
-        if missing:
-            logger.error(
-                f"Graph never initialized! No data received for: {', '.join(missing)}"
-            )
+    if verbose and not raw_results:
+        if not pipeline.is_initialized:
+            missing = [
+                s
+                for s in ("imu", "gps", "depth", "mag", "ahrs", "dvl")
+                if pipeline.enabled[s] and s not in pipeline.tfs_resolved
+            ]
+            if missing:
+                logger.error(
+                    f"Graph never initialized! No data received for: {', '.join(missing)}"
+                )
+            else:
+                logger.error(
+                    "Graph never initialized! Not enough sensor data in the bag."
+                )
         else:
-            logger.error("Graph never initialized! Not enough sensor data in the bag.")
+            logger.error("Graph initialized but produced no results.")
     if not raw_results:
         return None, crashed
 

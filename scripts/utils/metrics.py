@@ -89,6 +89,9 @@ def load_ground_truth(bag_path: str, namespace: str) -> dict:
     if data.size == 0:
         logger.warning(f"Ground truth file is empty: {tum_path}")
         return {}
+    if data.shape[1] < len(TUM_KEYS):
+        logger.warning(f"Ground truth file has too few columns: {tum_path}")
+        return {}
 
     pose = {k: data[:, i] for i, k in enumerate(TUM_KEYS)}
     roll, pitch, yaw = Rotation.from_quat(data[:, 4:8]).as_euler("xyz").T
@@ -113,14 +116,18 @@ def compute_ape_rmse(
     if not gt or not est or crashed:
         return float("inf")
 
-    gt_sync, est_sync = sync.associate_trajectories(
-        _to_trajectory(gt), _to_trajectory(est), max_diff=max_diff
-    )
-    est_sync.align(gt_sync)
+    try:
+        gt_sync, est_sync = sync.associate_trajectories(
+            _to_trajectory(gt), _to_trajectory(est), max_diff=max_diff
+        )
+        est_sync.align(gt_sync)
 
-    ape = metrics.APE(metrics.PoseRelation.translation_part)
-    ape.process_data((gt_sync, est_sync))
-    return ape.get_statistic(metrics.StatisticsType.rmse)
+        ape = metrics.APE(metrics.PoseRelation.translation_part)
+        ape.process_data((gt_sync, est_sync))
+        return ape.get_statistic(metrics.StatisticsType.rmse)
+    except Exception as e:
+        logger.warning(f"Could not compute APE RMSE: {e}")
+        return float("inf")
 
 
 def run_evo_evaluations(
