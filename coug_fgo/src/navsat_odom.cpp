@@ -67,7 +67,7 @@ NavsatOdomNode::NavsatOdomNode(const rclcpp::NodeOptions& options)
     origin.longitude = params_.origin_longitude;
     origin.altitude = params_.origin_altitude;
     setOrigin(origin);
-    RCLCPP_INFO(get_logger(), "Parameter Origin Set: Lat %.6f, Lon %.6f, Alt %.2f",
+    RCLCPP_INFO(get_logger(), "Parameter origin set: Lat %.6f, Lon %.6f, Alt %.2f",
                 origin_navsat_.latitude, origin_navsat_.longitude, origin_navsat_.altitude);
   }
 

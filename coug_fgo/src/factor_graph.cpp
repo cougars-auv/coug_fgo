@@ -304,8 +304,8 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions& options)
   setupRosInterfaces();
   core_ = std::make_unique<FactorGraphCore>(params_);
   state_init_ = std::make_unique<StateInitializer>(params_);
-  frontend_thread_ = std::thread(&FactorGraphNode::processFrontend, this);
-  backend_thread_ = std::thread(&FactorGraphNode::processBackend, this);
+  frontend_thread_ = std::thread(&FactorGraphNode::frontendThreadLoop, this);
+  backend_thread_ = std::thread(&FactorGraphNode::backendThreadLoop, this);
 
   RCLCPP_INFO(get_logger(), "Startup complete! Waiting for sensor data...");
 }
@@ -338,7 +338,7 @@ void FactorGraphNode::notifyBackend() {
   backend_cv_.notify_one();
 }
 
-bool FactorGraphNode::passesRateLimit(rclcpp::Time& last_time, double max_rate_hz) {
+bool FactorGraphNode::checkAndUpdateRateLimit(rclcpp::Time& last_time, double max_rate_hz) {
   if (max_rate_hz <= 0.0) {
     return true;
   }
@@ -541,7 +541,7 @@ void FactorGraphNode::publishGraphMetrics(const rclcpp::Time& timestamp) {
   graph_metrics_pub_->publish(metrics_msg);
 }
 
-void FactorGraphNode::processFrontend() {
+void FactorGraphNode::frontendThreadLoop() {
   while (is_running_.load()) {
     std::unique_lock<std::mutex> lock(frontend_trigger_mutex_);
     frontend_cv_.wait(lock, [this] { return frontend_trigger_ || !is_running_.load(); });
@@ -557,7 +557,7 @@ void FactorGraphNode::processFrontend() {
 
       if (!is_initialized_.load()) {
         initializeGraph();
-      } else if (passesRateLimit(last_update_time_, params_.max_update_rate_hz)) {
+      } else if (checkAndUpdateRateLimit(last_update_time_, params_.max_update_rate_hz)) {
         updateGraph();
         notifyBackend();
       }
@@ -565,7 +565,7 @@ void FactorGraphNode::processFrontend() {
   }
 }
 
-void FactorGraphNode::processBackend() {
+void FactorGraphNode::backendThreadLoop() {
   while (is_running_.load()) {
     std::unique_lock<std::mutex> lock(backend_trigger_mutex_);
     backend_cv_.wait(lock, [this] { return backend_trigger_ || !is_running_.load(); });
@@ -583,7 +583,7 @@ void FactorGraphNode::processBackend() {
         continue;
       }
 
-      if (passesRateLimit(last_opt_time_, params_.max_opt_rate_hz)) {
+      if (checkAndUpdateRateLimit(last_opt_time_, params_.max_opt_rate_hz)) {
         optimizeGraph();
       }
     }
@@ -654,6 +654,7 @@ void FactorGraphNode::initializeGraph() {
 
   is_initialized_.store(true);
   RCLCPP_INFO(get_logger(), "Graph initialized successfully!");
+  // TODO: Print priors
 }
 
 void FactorGraphNode::updateGraph() {

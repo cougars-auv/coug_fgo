@@ -23,46 +23,69 @@
 
 #include <gtsam/inference/Symbol.h>
 
+#include <optional>
 #include <rclcpp/rclcpp.hpp>
 #include <stdexcept>
-
-#include "coug_fgo/utils/param_enums.hpp"
+#include <unordered_map>
 
 using gtsam::symbol_shorthand::B;  // Bias (ax,ay,az,gx,gy,gz)
 using gtsam::symbol_shorthand::V;  // Velocity (x,y,z)
-using gtsam::symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
 
 namespace coug_fgo {
 
 namespace {
 
 /**
- * @brief Ensures the keyframe sources are valid (mirrors the FactorGraphNode constructor check).
- * @param params The loaded parameters.
- * @throws std::invalid_argument If a keyframe source references a disabled sensor.
+ * @brief Converts a ROS (x, y, z, w) quaternion and translation to a GTSAM Pose3.
+ * @param position Translation [x, y, z].
+ * @param quat_xyzw Orientation quaternion (x, y, z, w).
+ * @return The equivalent GTSAM Pose3.
  */
-void checkKeyframeSources(const factor_graph_node::Params& params) {
-  auto source_enabled = [&params](utils::KeyframeSource source) {
-    switch (source) {
-      case utils::KeyframeSource::kDvl:
-        return params.dvl.enable_dvl || params.dvl.enable_dvl_init_only;
-      case utils::KeyframeSource::kDepth:
-        return params.depth.enable_depth || params.depth.enable_depth_init_only;
-      default:
-        return true;
-    }
-  };
-  if (!source_enabled(utils::parseKeyframeSource(params.keyframe_source)) ||
-      !source_enabled(utils::parseKeyframeSource(params.backup_keyframe_source))) {
-    throw std::invalid_argument("Keyframe source '" + params.keyframe_source + "' or backup '" +
-                                params.backup_keyframe_source + "' references a disabled sensor!");
+gtsam::Pose3 toPose3(const Eigen::Vector3d& position, const Eigen::Vector4d& quat_xyzw) {
+  gtsam::Rot3 r = gtsam::Rot3::Quaternion(quat_xyzw(3), quat_xyzw(0), quat_xyzw(1), quat_xyzw(2));
+  return gtsam::Pose3(r, gtsam::Point3(position));
+}
+
+/**
+ * @brief Converts one optimized state into a Python dict of named scalars.
+ * @param time State timestamp in seconds.
+ * @param pose The optimized pose.
+ * @param velocity The optimized velocity, if available.
+ * @param bias The optimized IMU bias, if available.
+ * @return Dict with time, position, orientation, velocity, and bias entries.
+ */
+pybind11::dict toStateDict(double time, const gtsam::Pose3& pose,
+                           const std::optional<gtsam::Vector3>& velocity,
+                           const std::optional<gtsam::imuBias::ConstantBias>& bias) {
+  pybind11::dict d;
+  gtsam::Quaternion q = pose.rotation().toQuaternion();
+
+  d["time"] = time;
+  d["x"] = pose.translation().x();
+  d["y"] = pose.translation().y();
+  d["z"] = pose.translation().z();
+  d["qx"] = q.x();
+  d["qy"] = q.y();
+  d["qz"] = q.z();
+  d["qw"] = q.w();
+
+  if (velocity) {
+    d["vx"] = velocity->x();
+    d["vy"] = velocity->y();
+    d["vz"] = velocity->z();
   }
+  if (bias) {
+    d["bias_accel_x"] = bias->accelerometer().x();
+    d["bias_accel_y"] = bias->accelerometer().y();
+    d["bias_accel_z"] = bias->accelerometer().z();
+    d["bias_gyro_x"] = bias->gyroscope().x();
+    d["bias_gyro_y"] = bias->gyroscope().y();
+    d["bias_gyro_z"] = bias->gyroscope().z();
+  }
+  return d;
 }
 
 }  // namespace
-
-FactorGraphPy::FactorGraphPy(const std::vector<std::string>& config_paths)
-    : FactorGraphPy(config_paths, "") {}
 
 FactorGraphPy::FactorGraphPy(const std::vector<std::string>& config_paths, const std::string& ns) {
   if (!rclcpp::ok()) {
@@ -77,28 +100,242 @@ FactorGraphPy::FactorGraphPy(const std::vector<std::string>& config_paths, const
 
   rclcpp::NodeOptions options;
   options.arguments(args);
-  auto dummy_node = std::make_shared<rclcpp::Node>("factor_graph_node", ns, options);
+  auto param_node = std::make_shared<rclcpp::Node>("factor_graph_node", ns, options);
 
-  auto param_listener = std::make_shared<factor_graph_node::ParamListener>(
-      dummy_node->get_node_parameters_interface());
+  factor_graph_node::ParamListener param_listener(param_node->get_node_parameters_interface());
+  params_ = param_listener.get_params();
 
-  params_ = param_listener->get_params();
-  checkKeyframeSources(params_);
-  tfs_ = extract_tfs(params_);
-
-  state_init_ = std::make_unique<coug_fgo::StateInitializer>(params_);
-  core_ = std::make_unique<coug_fgo::FactorGraphCore>(params_);
+  core_ = std::make_unique<FactorGraphCore>(params_);
+  state_init_ = std::make_unique<StateInitializer>(params_);
 }
 
-bool FactorGraphPy::initialize_graph(double current_time) {
+pybind11::dict FactorGraphPy::get_params() const {
+  pybind11::dict p;
+
+  // --- Node Settings ---
+  p["solver_type"] = params_.solver_type;
+  p["max_update_rate_hz"] = params_.max_update_rate_hz;
+  p["max_opt_rate_hz"] = params_.max_opt_rate_hz;
+  p["publish_smoothed_path"] = params_.publish_smoothed_path;
+  p["publish_pose_cov"] = params_.publish_pose_cov;
+  p["publish_velocity_cov"] = params_.publish_velocity_cov;
+  p["publish_imu_bias_cov"] = params_.publish_imu_bias_cov;
+
+  // --- Keyframe Settings ---
+  p["keyframe_source"] = params_.keyframe_source;
+  p["backup_keyframe_source"] = params_.backup_keyframe_source;
+  p["keyframe_timeout_sec"] = params_.keyframe_timeout_sec;
+  p["keyframe_timer_hz"] = params_.keyframe_timer_hz;
+
+  // --- ROS Topics and Frames ---
+  pybind11::dict topics;
+  topics["imu"] = params_.imu_topic;
+  topics["gps"] = params_.gps_odom_topic;
+  topics["depth"] = params_.depth_odom_topic;
+  topics["mag"] = params_.mag_topic;
+  topics["ahrs"] = params_.ahrs_topic;
+  topics["dvl"] = params_.dvl_topic;
+  topics["wrench"] = params_.wrench_topic;
+  p["topics"] = topics;
+
+  p["target_frame"] = params_.target_frame;
+  p["base_frame"] = params_.base_frame;
+
+  // --- Sensor Settings ---
+  auto sensor_dict = [](const auto& s, bool enable, bool enable_extra_only) {
+    pybind11::dict d;
+    d["enable"] = enable;
+    d["enable_extra_only"] = enable_extra_only;  // init_only (sensors) or dropout_only (dynamics)
+    d["use_parameter_frame"] = s.use_parameter_frame;
+    d["parameter_frame"] = s.parameter_frame;
+    d["use_parameter_tf"] = s.use_parameter_tf;
+    d["tf_position"] = s.parameter_tf.position;
+    d["tf_orientation"] = s.parameter_tf.orientation;
+    return d;
+  };
+
+  pybind11::dict sensors;
+  sensors["imu"] = sensor_dict(params_.imu, true, false);
+  sensors["gps"] =
+      sensor_dict(params_.gps, params_.gps.enable_gps, params_.gps.enable_gps_init_only);
+  sensors["depth"] =
+      sensor_dict(params_.depth, params_.depth.enable_depth, params_.depth.enable_depth_init_only);
+  sensors["mag"] =
+      sensor_dict(params_.mag, params_.mag.enable_mag, params_.mag.enable_mag_init_only);
+  sensors["ahrs"] =
+      sensor_dict(params_.ahrs, params_.ahrs.enable_ahrs, params_.ahrs.enable_ahrs_init_only);
+  sensors["dvl"] =
+      sensor_dict(params_.dvl, params_.dvl.enable_dvl, params_.dvl.enable_dvl_init_only);
+  sensors["dynamics"] = sensor_dict(params_.dynamics, params_.dynamics.enable_dynamics,
+                                    params_.dynamics.enable_dynamics_dropout_only);
+
+  pybind11::dict base;
+  base["enable"] = true;
+  base["enable_extra_only"] = false;
+  base["use_parameter_frame"] = false;
+  base["parameter_frame"] = params_.base_frame;
+  base["use_parameter_tf"] = params_.base.use_parameter_tf;
+  base["tf_position"] = params_.base.parameter_tf.position;
+  base["tf_orientation"] = params_.base.parameter_tf.orientation;
+  sensors["base"] = base;
+  p["sensors"] = sensors;
+
+  // --- Comparison Methods ---
+  pybind11::dict comparison;
+  comparison["enable_loose_dvl_preintegration"] =
+      params_.comparison.enable_loose_dvl_preintegration;
+  comparison["enable_tight_dvl_preintegration"] =
+      params_.comparison.enable_tight_dvl_preintegration;
+  p["comparison"] = comparison;
+
+  return p;
+}
+
+void FactorGraphPy::set_tf(const std::string& name, const Eigen::Vector3d& position,
+                           const Eigen::Vector4d& quat_xyzw) {
+  static const std::unordered_map<std::string, gtsam::Pose3 utils::TfBundle::*> kTfFields = {
+      {"imu", &utils::TfBundle::target_T_imu},     {"gps", &utils::TfBundle::target_T_gps},
+      {"depth", &utils::TfBundle::target_T_depth}, {"mag", &utils::TfBundle::target_T_mag},
+      {"ahrs", &utils::TfBundle::target_T_ahrs},   {"dvl", &utils::TfBundle::target_T_dvl},
+      {"base", &utils::TfBundle::target_T_base},   {"com", &utils::TfBundle::target_T_com}};
+
+  auto it = kTfFields.find(name);
+  if (it == kTfFields.end()) {
+    throw std::invalid_argument("Unknown transform name: " + name);
+  }
+  tfs_.*(it->second) = toPose3(position, quat_xyzw);
+}
+
+utils::QueueBundle FactorGraphPy::to_bundle(const ImuBatch& imu, const OdomBatch& gps,
+                                            const DepthBatch& depth, const MagBatch& mag,
+                                            const AhrsBatch& ahrs, const TwistBatch& dvl,
+                                            const WrenchBatch& wrench) {
+  utils::QueueBundle queues;
+
+  for (const auto& [t, accel, gyro, accel_cov, gyro_cov] : imu) {
+    auto msg = std::make_shared<utils::ImuData>();
+    msg->timestamp = t;
+    msg->linear_acceleration = accel;
+    msg->angular_velocity = gyro;
+    msg->linear_acceleration_covariance = accel_cov;
+    msg->angular_velocity_covariance = gyro_cov;
+    queues.imu.push_back(msg);
+  }
+
+  for (const auto& [t, position, pose_cov] : gps) {
+    auto msg = std::make_shared<utils::OdometryData>();
+    msg->timestamp = t;
+    msg->pose = gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(position));
+    msg->pose_covariance = pose_cov;
+    queues.gps.push_back(msg);
+  }
+
+  for (const auto& [t, depth_z, pose_cov] : depth) {
+    auto msg = std::make_shared<utils::OdometryData>();
+    msg->timestamp = t;
+    msg->pose = gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(0, 0, depth_z));
+    msg->pose_covariance = pose_cov;
+    queues.depth.push_back(msg);
+  }
+
+  for (const auto& [t, field, field_cov] : mag) {
+    auto msg = std::make_shared<utils::MagneticFieldData>();
+    msg->timestamp = t;
+    msg->magnetic_field = field;
+    msg->magnetic_field_covariance = field_cov;
+    queues.mag.push_back(msg);
+  }
+
+  for (const auto& [t, quat_xyzw, orientation_cov] : ahrs) {
+    auto msg = std::make_shared<utils::AhrsData>();
+    msg->timestamp = t;
+    msg->orientation =
+        gtsam::Rot3::Quaternion(quat_xyzw(3), quat_xyzw(0), quat_xyzw(1), quat_xyzw(2));
+    msg->orientation_covariance = orientation_cov;
+    queues.ahrs.push_back(msg);
+  }
+
+  for (const auto& [t, velocity, twist_cov] : dvl) {
+    auto msg = std::make_shared<utils::TwistData>();
+    msg->timestamp = t;
+    msg->linear_velocity = velocity;
+    msg->twist_covariance = twist_cov;
+    queues.dvl.push_back(msg);
+  }
+
+  for (const auto& [t, force_torque] : wrench) {
+    auto msg = std::make_shared<utils::WrenchData>();
+    msg->timestamp = t;
+    msg->force = force_torque.head<3>();
+    msg->torque = force_torque.tail<3>();
+    queues.wrench.push_back(msg);
+  }
+
+  return queues;
+}
+
+pybind11::dict FactorGraphPy::from_bundle(const utils::QueueBundle& queues) {
+  ImuBatch imu;
+  for (const auto& m : queues.imu) {
+    imu.emplace_back(m->timestamp, m->linear_acceleration, m->angular_velocity,
+                     m->linear_acceleration_covariance, m->angular_velocity_covariance);
+  }
+
+  OdomBatch gps;
+  for (const auto& m : queues.gps) {
+    gps.emplace_back(m->timestamp, m->pose.translation(), m->pose_covariance);
+  }
+
+  DepthBatch depth;
+  for (const auto& m : queues.depth) {
+    depth.emplace_back(m->timestamp, m->pose.translation().z(), m->pose_covariance);
+  }
+
+  MagBatch mag;
+  for (const auto& m : queues.mag) {
+    mag.emplace_back(m->timestamp, m->magnetic_field, m->magnetic_field_covariance);
+  }
+
+  AhrsBatch ahrs;
+  for (const auto& m : queues.ahrs) {
+    gtsam::Quaternion q = m->orientation.toQuaternion();
+    ahrs.emplace_back(m->timestamp, Eigen::Vector4d(q.x(), q.y(), q.z(), q.w()),
+                      m->orientation_covariance);
+  }
+
+  TwistBatch dvl;
+  for (const auto& m : queues.dvl) {
+    dvl.emplace_back(m->timestamp, m->linear_velocity, m->twist_covariance);
+  }
+
+  WrenchBatch wrench;
+  for (const auto& m : queues.wrench) {
+    Vector6d force_torque;
+    force_torque << m->force, m->torque;
+    wrench.emplace_back(m->timestamp, force_torque);
+  }
+
+  pybind11::dict batches;
+  batches["imu"] = imu;
+  batches["gps"] = gps;
+  batches["depth"] = depth;
+  batches["mag"] = mag;
+  batches["ahrs"] = ahrs;
+  batches["dvl"] = dvl;
+  batches["wrench"] = wrench;
+  return batches;
+}
+
+bool FactorGraphPy::initialize(double current_time, const ImuBatch& imu, const OdomBatch& gps,
+                               const DepthBatch& depth, const MagBatch& mag, const AhrsBatch& ahrs,
+                               const TwistBatch& dvl, const WrenchBatch& wrench) {
   if (is_initialized_) {
     return true;
   }
 
-  coug_fgo::utils::QueueBundle init_queues = std::move(queues_);
-  queues_ = coug_fgo::utils::QueueBundle();
+  utils::QueueBundle queues = to_bundle(imu, gps, depth, mag, ahrs, dvl, wrench);
 
-  if (state_init_->update(current_time, init_queues)) {
+  if (state_init_->update(current_time, queues)) {
     state_init_->compute(tfs_);
     core_->initialize(*state_init_, tfs_);
     is_initialized_ = true;
@@ -106,219 +343,69 @@ bool FactorGraphPy::initialize_graph(double current_time) {
   return is_initialized_;
 }
 
-void FactorGraphPy::add_imu(double timestamp, const Eigen::Vector3d& accel,
-                            const Eigen::Vector3d& gyro, const Eigen::Matrix3d& accel_cov,
-                            const Eigen::Matrix3d& gyro_cov) {
-  auto msg = std::make_shared<coug_fgo::utils::ImuData>();
-  msg->timestamp = timestamp;
-  msg->linear_acceleration = accel;
-  msg->angular_velocity = gyro;
-  msg->linear_acceleration_covariance = accel_cov;
-  msg->angular_velocity_covariance = gyro_cov;
-  queues_.imu.push_back(msg);
-}
-
-void FactorGraphPy::add_dvl(double timestamp, const Eigen::Vector3d& velocity,
-                            const Eigen::Matrix<double, 6, 6>& twist_cov) {
-  auto msg = std::make_shared<coug_fgo::utils::TwistData>();
-  msg->timestamp = timestamp;
-  msg->linear_velocity = velocity;
-  msg->twist_covariance = twist_cov;
-  queues_.dvl.push_back(msg);
-}
-
-void FactorGraphPy::add_ahrs(double timestamp, const Eigen::Vector4d& quat_xyzw,
-                             const Eigen::Matrix3d& orientation_cov) {
-  auto msg = std::make_shared<coug_fgo::utils::AhrsData>();
-  msg->timestamp = timestamp;
-  msg->orientation =
-      gtsam::Rot3::Quaternion(quat_xyzw(3), quat_xyzw(0), quat_xyzw(1), quat_xyzw(2));
-  msg->orientation_covariance = orientation_cov;
-  queues_.ahrs.push_back(msg);
-}
-
-void FactorGraphPy::add_depth(double timestamp, double depth_z,
-                              const Eigen::Matrix<double, 6, 6>& pose_cov) {
-  auto msg = std::make_shared<coug_fgo::utils::OdometryData>();
-  msg->timestamp = timestamp;
-  msg->pose = gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(0, 0, depth_z));
-  msg->pose_covariance = pose_cov;
-  queues_.depth.push_back(msg);
-}
-
-void FactorGraphPy::add_gps(double timestamp, const Eigen::Vector3d& position,
-                            const Eigen::Matrix<double, 6, 6>& pose_cov) {
-  auto msg = std::make_shared<coug_fgo::utils::OdometryData>();
-  msg->timestamp = timestamp;
-  msg->pose = gtsam::Pose3(gtsam::Rot3(), position);
-  msg->pose_covariance = pose_cov;
-  queues_.gps.push_back(msg);
-}
-
-void FactorGraphPy::add_mag(double timestamp, const Eigen::Vector3d& mag_field,
-                            const Eigen::Matrix3d& mag_cov) {
-  auto msg = std::make_shared<coug_fgo::utils::MagneticFieldData>();
-  msg->timestamp = timestamp;
-  msg->magnetic_field = mag_field;
-  msg->magnetic_field_covariance = mag_cov;
-  queues_.mag.push_back(msg);
-}
-
-void FactorGraphPy::add_wrench(double timestamp, const Eigen::Matrix<double, 6, 1>& force_torque) {
-  auto msg = std::make_shared<coug_fgo::utils::WrenchData>();
-  msg->timestamp = timestamp;
-  msg->force = force_torque.head<3>();
-  msg->torque = force_torque.tail<3>();
-  queues_.wrench.push_back(msg);
-}
-
-bool FactorGraphPy::update_graph(double target_time) {
+pybind11::object FactorGraphPy::update(double target_time, const ImuBatch& imu,
+                                       const OdomBatch& gps, const DepthBatch& depth,
+                                       const MagBatch& mag, const AhrsBatch& ahrs,
+                                       const TwistBatch& dvl, const WrenchBatch& wrench) {
   if (!is_initialized_) {
-    return false;
+    return pybind11::none();
   }
 
-  coug_fgo::utils::QueueBundle update_queues = std::move(queues_);
-
-  auto unused = core_->update(target_time, update_queues);
-
-  queues_ = unused ? std::move(*unused) : std::move(update_queues);
-  return unused.has_value();
+  utils::QueueBundle queues = to_bundle(imu, gps, depth, mag, ahrs, dvl, wrench);
+  auto leftover = core_->update(target_time, queues);
+  if (!leftover) {
+    return pybind11::none();
+  }
+  return from_bundle(*leftover);
 }
 
-pybind11::dict FactorGraphPy::optimize_graph() {
-  pybind11::dict result;
+pybind11::dict FactorGraphPy::optimize() {
   if (!is_initialized_) {
-    return result;
+    return {};
   }
 
   auto opt_result = core_->optimize();
-  if (opt_result) {
-    gtsam::Pose3 p = opt_result->pose;
-    gtsam::Vector3 v = opt_result->velocity;
-    gtsam::Vector3 b_a = opt_result->imu_bias.accelerometer();
-    gtsam::Vector3 b_g = opt_result->imu_bias.gyroscope();
-    gtsam::Quaternion q = p.rotation().toQuaternion();
+  if (!opt_result) {
+    return {};
+  }
 
-    result["time"] = opt_result->target_time;
+  pybind11::dict result = toStateDict(opt_result->target_time, opt_result->pose,
+                                      opt_result->velocity, opt_result->imu_bias);
 
-    result["x"] = p.translation().x();
-    result["y"] = p.translation().y();
-    result["z"] = p.translation().z();
-    result["qx"] = q.x();
-    result["qy"] = q.y();
-    result["qz"] = q.z();
-    result["qw"] = q.w();
+  if (params_.publish_pose_cov) result["pose_cov"] = opt_result->pose_cov;
+  if (params_.publish_velocity_cov) result["vel_cov"] = opt_result->vel_cov;
+  if (params_.publish_imu_bias_cov) result["bias_cov"] = opt_result->bias_cov;
 
-    result["vx"] = v.x();
-    result["vy"] = v.y();
-    result["vz"] = v.z();
+  if (params_.publish_smoothed_path && !opt_result->all_estimates.empty()) {
+    const gtsam::Values& estimates = opt_result->all_estimates;
+    pybind11::list smoothed;
 
-    result["bias_accel_x"] = b_a.x();
-    result["bias_accel_y"] = b_a.y();
-    result["bias_accel_z"] = b_a.z();
-    result["bias_gyro_x"] = b_g.x();
-    result["bias_gyro_y"] = b_g.y();
-    result["bias_gyro_z"] = b_g.z();
-
-    if (params_.publish_pose_cov) result["pose_cov"] = opt_result->pose_cov;
-    if (params_.publish_velocity_cov) result["vel_cov"] = opt_result->vel_cov;
-    if (params_.publish_imu_bias_cov) result["bias_cov"] = opt_result->bias_cov;
-
-    if (params_.publish_smoothed_path && !opt_result->all_estimates.empty()) {
-      pybind11::list smoothed;
-      for (const auto& [time, x_key] : core_->snapshotTimeKeys()) {
-        if (!opt_result->all_estimates.exists(x_key)) continue;
-        gtsam::Symbol sym(x_key);
-        auto step = sym.index();
-        auto v_key = V(step);
-        auto b_key = B(step);
-
-        gtsam::Pose3 sp = opt_result->all_estimates.at<gtsam::Pose3>(x_key);
-        gtsam::Quaternion sq = sp.rotation().toQuaternion();
-        pybind11::dict entry;
-        entry["time"] = static_cast<double>(time) * 1e-9;
-        entry["x"] = sp.translation().x();
-        entry["y"] = sp.translation().y();
-        entry["z"] = sp.translation().z();
-        entry["qx"] = sq.x();
-        entry["qy"] = sq.y();
-        entry["qz"] = sq.z();
-        entry["qw"] = sq.w();
-
-        if (opt_result->all_estimates.exists(v_key)) {
-          gtsam::Vector3 sv = opt_result->all_estimates.at<gtsam::Vector3>(v_key);
-          entry["vx"] = sv.x();
-          entry["vy"] = sv.y();
-          entry["vz"] = sv.z();
-        }
-        if (opt_result->all_estimates.exists(b_key)) {
-          auto sb = opt_result->all_estimates.at<gtsam::imuBias::ConstantBias>(b_key);
-          entry["bias_accel_x"] = sb.accelerometer().x();
-          entry["bias_accel_y"] = sb.accelerometer().y();
-          entry["bias_accel_z"] = sb.accelerometer().z();
-          entry["bias_gyro_x"] = sb.gyroscope().x();
-          entry["bias_gyro_y"] = sb.gyroscope().y();
-          entry["bias_gyro_z"] = sb.gyroscope().z();
-        }
-        smoothed.append(entry);
+    for (const auto& [time_ns, x_key] : core_->snapshotTimeKeys()) {
+      if (!estimates.exists(x_key)) {
+        continue;
       }
-      result["smoothed_path"] = smoothed;
+      size_t step = gtsam::Symbol(x_key).index();
+
+      std::optional<gtsam::Vector3> velocity;
+      if (estimates.exists(V(step))) {
+        velocity = estimates.at<gtsam::Vector3>(V(step));
+      }
+      std::optional<gtsam::imuBias::ConstantBias> bias;
+      if (estimates.exists(B(step))) {
+        bias = estimates.at<gtsam::imuBias::ConstantBias>(B(step));
+      }
+      smoothed.append(toStateDict(static_cast<double>(time_ns) * 1e-9,
+                                  estimates.at<gtsam::Pose3>(x_key), velocity, bias));
     }
+    result["smoothed_path"] = smoothed;
   }
   return result;
 }
 
-pybind11::dict FactorGraphPy::get_config() const {
-  pybind11::dict cfg;
-  cfg["imu_topic"] = params_.imu_topic;
-  cfg["gps_odom_topic"] = params_.gps_odom_topic;
-  cfg["depth_odom_topic"] = params_.depth_odom_topic;
-  cfg["mag_topic"] = params_.mag_topic;
-  cfg["ahrs_topic"] = params_.ahrs_topic;
-  cfg["dvl_topic"] = params_.dvl_topic;
-  cfg["wrench_topic"] = params_.wrench_topic;
-
-  // Mirrors the subscription predicates in FactorGraphNode::setupRosInterfaces()
-  pybind11::dict enabled;
-  enabled["gps"] = params_.gps.enable_gps || params_.gps.enable_gps_init_only;
-  enabled["depth"] = params_.depth.enable_depth || params_.depth.enable_depth_init_only;
-  enabled["mag"] = params_.mag.enable_mag || params_.mag.enable_mag_init_only;
-  enabled["ahrs"] = params_.ahrs.enable_ahrs || params_.ahrs.enable_ahrs_init_only ||
-                    params_.comparison.enable_loose_dvl_preintegration;
-  enabled["dvl"] = params_.dvl.enable_dvl || params_.dvl.enable_dvl_init_only;
-  cfg["sensor_enabled"] = enabled;
-
-  cfg["keyframe_source"] = params_.keyframe_source;
-  cfg["backup_keyframe_source"] = params_.backup_keyframe_source;
-  cfg["keyframe_timeout_sec"] = params_.keyframe_timeout_sec;
-  cfg["keyframe_timer_hz"] = params_.keyframe_timer_hz;
-  cfg["solver_type"] = params_.solver_type;
-  cfg["base_tf_position"] = params_.base.parameter_tf.position;
-  cfg["base_tf_orientation"] = params_.base.parameter_tf.orientation;
-  return cfg;
-}
-
-coug_fgo::utils::TfBundle FactorGraphPy::extract_tfs(const factor_graph_node::Params& p) {
-  coug_fgo::utils::TfBundle tfs;
-
-  auto make_tf = [](const std::vector<double>& pos,
-                    const std::vector<double>& quat) -> gtsam::Pose3 {
-    // Convert ROS (x, y, z, w) to GTSAM (w, x, y, z) quaternion conventions
-    gtsam::Rot3 r = gtsam::Rot3::Quaternion(quat[3], quat[0], quat[1], quat[2]);
-    gtsam::Point3 t(pos[0], pos[1], pos[2]);
-    return gtsam::Pose3(r, t);
-  };
-
-  tfs.target_T_imu = make_tf(p.imu.parameter_tf.position, p.imu.parameter_tf.orientation);
-  tfs.target_T_dvl = make_tf(p.dvl.parameter_tf.position, p.dvl.parameter_tf.orientation);
-  tfs.target_T_depth = make_tf(p.depth.parameter_tf.position, p.depth.parameter_tf.orientation);
-  tfs.target_T_gps = make_tf(p.gps.parameter_tf.position, p.gps.parameter_tf.orientation);
-  tfs.target_T_ahrs = make_tf(p.ahrs.parameter_tf.position, p.ahrs.parameter_tf.orientation);
-  tfs.target_T_mag = make_tf(p.mag.parameter_tf.position, p.mag.parameter_tf.orientation);
-  tfs.target_T_com = make_tf(p.dynamics.parameter_tf.position, p.dynamics.parameter_tf.orientation);
-  tfs.target_T_base = make_tf(p.base.parameter_tf.position, p.base.parameter_tf.orientation);
-
-  return tfs;
+void FactorGraphPy::reset() {
+  core_ = std::make_unique<FactorGraphCore>(params_);
+  state_init_ = std::make_unique<StateInitializer>(params_);
+  is_initialized_ = false;
 }
 
 }  // namespace coug_fgo
@@ -329,25 +416,28 @@ PYBIND11_MODULE(pybind11fgo, m) {
   m.doc() = "Python bindings for the FactorGraphCore.";
 
   pybind11::class_<FactorGraphPy>(m, "FactorGraphPy")
-      .def(pybind11::init<const std::vector<std::string>&>(), pybind11::arg("config_paths"))
       .def(pybind11::init<const std::vector<std::string>&, const std::string&>(),
-           pybind11::arg("config_paths"), pybind11::arg("namespace"))
-      .def("add_imu", &FactorGraphPy::add_imu, pybind11::arg("timestamp"), pybind11::arg("accel"),
-           pybind11::arg("gyro"), pybind11::arg("accel_cov"), pybind11::arg("gyro_cov"))
-      .def("add_dvl", &FactorGraphPy::add_dvl, pybind11::arg("timestamp"),
-           pybind11::arg("velocity"), pybind11::arg("twist_cov"))
-      .def("add_ahrs", &FactorGraphPy::add_ahrs, pybind11::arg("timestamp"),
-           pybind11::arg("quat_xyzw"), pybind11::arg("orientation_cov"))
-      .def("add_depth", &FactorGraphPy::add_depth, pybind11::arg("timestamp"),
-           pybind11::arg("depth_z"), pybind11::arg("pose_cov"))
-      .def("add_gps", &FactorGraphPy::add_gps, pybind11::arg("timestamp"),
-           pybind11::arg("position"), pybind11::arg("pose_cov"))
-      .def("add_mag", &FactorGraphPy::add_mag, pybind11::arg("timestamp"),
-           pybind11::arg("mag_field"), pybind11::arg("mag_cov"))
-      .def("add_wrench", &FactorGraphPy::add_wrench, pybind11::arg("timestamp"),
-           pybind11::arg("force_torque"))
-      .def("initialize_graph", &FactorGraphPy::initialize_graph, pybind11::arg("current_time"))
-      .def("update_graph", &FactorGraphPy::update_graph, pybind11::arg("target_time"))
-      .def("optimize_graph", &FactorGraphPy::optimize_graph)
-      .def("get_config", &FactorGraphPy::get_config);
+           pybind11::arg("config_paths"), pybind11::arg("namespace") = "")
+      .def("get_params", &FactorGraphPy::get_params)
+      .def("set_tf", &FactorGraphPy::set_tf, pybind11::arg("name"), pybind11::arg("position"),
+           pybind11::arg("quat_xyzw"))
+      .def("initialize", &FactorGraphPy::initialize, pybind11::arg("current_time"),
+           pybind11::arg("imu") = FactorGraphPy::ImuBatch(),
+           pybind11::arg("gps") = FactorGraphPy::OdomBatch(),
+           pybind11::arg("depth") = FactorGraphPy::DepthBatch(),
+           pybind11::arg("mag") = FactorGraphPy::MagBatch(),
+           pybind11::arg("ahrs") = FactorGraphPy::AhrsBatch(),
+           pybind11::arg("dvl") = FactorGraphPy::TwistBatch(),
+           pybind11::arg("wrench") = FactorGraphPy::WrenchBatch())
+      .def("update", &FactorGraphPy::update, pybind11::arg("target_time"),
+           pybind11::arg("imu") = FactorGraphPy::ImuBatch(),
+           pybind11::arg("gps") = FactorGraphPy::OdomBatch(),
+           pybind11::arg("depth") = FactorGraphPy::DepthBatch(),
+           pybind11::arg("mag") = FactorGraphPy::MagBatch(),
+           pybind11::arg("ahrs") = FactorGraphPy::AhrsBatch(),
+           pybind11::arg("dvl") = FactorGraphPy::TwistBatch(),
+           pybind11::arg("wrench") = FactorGraphPy::WrenchBatch())
+      .def("optimize", &FactorGraphPy::optimize)
+      .def("reset", &FactorGraphPy::reset)
+      .def_property_readonly("is_initialized", &FactorGraphPy::is_initialized);
 }

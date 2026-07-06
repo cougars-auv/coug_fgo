@@ -108,12 +108,12 @@ class FactorGraphNode : public rclcpp::Node {
   /**
    * @brief The background loop run by the dedicated frontend thread.
    */
-  void processFrontend();
+  void frontendThreadLoop();
 
   /**
    * @brief The background loop run by the dedicated backend thread.
    */
-  void processBackend();
+  void backendThreadLoop();
 
   // --- Helpers ---
   /**
@@ -132,7 +132,7 @@ class FactorGraphNode : public rclcpp::Node {
    * @param max_rate_hz The maximum allowed rate.
    * @return True if enough time has elapsed since the last pass.
    */
-  bool passesRateLimit(rclcpp::Time& last_time, double max_rate_hz);
+  bool checkAndUpdateRateLimit(rclcpp::Time& last_time, double max_rate_hz);
 
   /**
    * @brief Fills a sensor TF from parameters or the TF tree (no-op once filled).
