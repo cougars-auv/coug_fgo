@@ -19,7 +19,7 @@
  * @date May 2026
  */
 
-#include "coug_fgo/state_initializer.hpp"
+#include "coug_fgo/utils/state_initializer.hpp"
 
 #include <cmath>
 #include <memory>
@@ -27,17 +27,7 @@
 
 #include "coug_fgo/utils/param_enums.hpp"
 
-namespace coug_fgo {
-
-using utils::AhrsData;
-using utils::ImuData;
-using utils::KeyframeSource;
-using utils::MagneticFieldData;
-using utils::OdometryData;
-using utils::parseKeyframeSource;
-using utils::QueueBundle;
-using utils::TfBundle;
-using utils::TwistData;
+namespace coug_fgo::utils {
 
 StateInitializer::StateInitializer(const factor_graph_node::Params& params) : params_(params) {}
 
@@ -283,4 +273,4 @@ gtsam::imuBias::ConstantBias StateInitializer::computeInitialBias() {
   return gtsam::imuBias::ConstantBias(init_accel_bias, init_gyro_bias);
 }
 
-}  // namespace coug_fgo
+}  // namespace coug_fgo::utils

@@ -34,6 +34,7 @@ using utils::KeyframeSource;
 using utils::parseKeyframeSource;
 using utils::parseSolverType;
 using utils::SolverType;
+using utils::StateInitializer;
 using utils::toCovariance36Msg;
 using utils::toGtsam;
 using utils::toPoseCovarianceMsg;

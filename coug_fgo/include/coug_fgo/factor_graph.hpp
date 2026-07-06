@@ -51,9 +51,9 @@
 
 #include "coug_fgo/factor_graph_core.hpp"
 #include "coug_fgo/factor_graph_parameters.hpp"
-#include "coug_fgo/state_initializer.hpp"
 #include "coug_fgo/utils/param_enums.hpp"
 #include "coug_fgo/utils/ros_conversions.hpp"
+#include "coug_fgo/utils/state_initializer.hpp"
 #include "coug_fgo/utils/thread_safe_queue.hpp"
 
 namespace coug_fgo {
@@ -233,7 +233,7 @@ class FactorGraphNode : public rclcpp::Node {
 
   // --- Core ---
   std::unique_ptr<FactorGraphCore> core_;
-  std::unique_ptr<StateInitializer> state_init_;
+  std::unique_ptr<utils::StateInitializer> state_init_;
 
   // --- Node State ---
   std::atomic<bool> is_initialized_{false};

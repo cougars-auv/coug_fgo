@@ -30,7 +30,7 @@
 #include "coug_fgo/factor_graph_parameters.hpp"
 #include "coug_fgo/utils/data_types.hpp"
 
-namespace coug_fgo {
+namespace coug_fgo::utils {
 
 /**
  * @class StateInitializer
@@ -129,4 +129,4 @@ class StateInitializer {
   std::shared_ptr<utils::TwistData> initial_dvl_;
 };
 
-}  // namespace coug_fgo
+}  // namespace coug_fgo::utils

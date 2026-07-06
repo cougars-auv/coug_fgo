@@ -64,6 +64,7 @@ using utils::parseRobustKernel;
 using utils::parseSolverType;
 using utils::RobustKernel;
 using utils::SolverType;
+using utils::StateInitializer;
 
 namespace {
 

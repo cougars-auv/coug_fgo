@@ -33,6 +33,8 @@ using gtsam::symbol_shorthand::V;  // Velocity (x,y,z)
 
 namespace coug_fgo {
 
+using utils::StateInitializer;
+
 namespace {
 
 /**

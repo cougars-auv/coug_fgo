@@ -33,7 +33,7 @@
 
 #include "coug_fgo/factor_graph_core.hpp"
 #include "coug_fgo/factor_graph_parameters.hpp"
-#include "coug_fgo/state_initializer.hpp"
+#include "coug_fgo/utils/state_initializer.hpp"
 
 namespace coug_fgo {
 
@@ -130,7 +130,7 @@ class FactorGraphPy {
   // --- Core ---
   factor_graph_node::Params params_;
   std::unique_ptr<FactorGraphCore> core_;
-  std::unique_ptr<StateInitializer> state_init_;
+  std::unique_ptr<utils::StateInitializer> state_init_;
 
   // --- State ---
   utils::TfBundle tfs_;

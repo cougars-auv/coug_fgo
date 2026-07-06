@@ -77,7 +77,7 @@ generate_parameter_library(
 ament_auto_add_library(factor_graph_component SHARED
   src/factor_graph_core.cpp
   src/factor_graph.cpp
-  src/state_initializer.cpp
+  src/utils/state_initializer.cpp
   src/dvl_a50_twist.cpp
   src/dvl_a50_odom.cpp
   src/fluid_pressure_odom.cpp
