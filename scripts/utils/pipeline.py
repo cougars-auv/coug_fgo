@@ -41,6 +41,11 @@ logger = logging.getLogger(__name__)
 SENSORS = ("imu", "gps", "depth", "mag", "ahrs", "dvl", "wrench")
 
 
+# =============================================================================
+# URDF RESOLUTION
+# =============================================================================
+
+
 class UrdfTree:
     """
     Resolves static transforms parsed directly from a URDF or xacro file.
@@ -112,7 +117,7 @@ class UrdfTree:
 
 def resolve_urdf_path(namespace: str, config_paths: list[str]) -> str | None:
     """
-    Find the URDF file referenced by the coug_description parameters.
+    Find the URDF file referenced by the coug_description_launch parameters.
 
     :param namespace: Vehicle namespace used to select namespaced parameters.
     :param config_paths: Parameter YAML files to search for a urdf_file entry.
@@ -149,7 +154,7 @@ def resolve_urdf_path(namespace: str, config_paths: list[str]) -> str | None:
                 fleet_path = config_dir / "coug_description_params.yaml"
                 urdf_file = urdf_file or read_urdf_file(fleet_path, ["/**"])
     if urdf_file is None:
-        urdf_file = "couguv_holoocean.urdf.xacro"
+        urdf_file = "couguv_holoocean.urdf.xacro"  # TODO: Throw an error isntead
 
     urdf_dirs = [
         Path.home() / "cougars-dev/ros2_ws/src/coug_description/coug_description/urdf",
@@ -262,11 +267,7 @@ EXTRACTORS = {
 
 class OfflineFactorGraph:
     """
-    Drives the coug_fgo_py factor graph with bag data instead of topics.
-
-    Queueing, keyframe triggering, and transform resolution are reimplemented
-    here to match the online node; the graph operations themselves map 1:1
-    onto the coug_fgo_py binding calls.
+    Drives the offline coug_fgo_py factor graph using ROS 2 bag data.
 
     :author: Nelson Durrant
     :date: July 2026
