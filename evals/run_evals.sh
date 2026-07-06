@@ -48,7 +48,7 @@ evo_config set save_traj_in_zip true &>/dev/null
 AGENTS=("coug1sim" "coug2sim" "coug3sim" "blue1sim" "bluerov2" "turtlmap")
 SUFFIXES=("odometry/global" "odometry/global_isam2" "odometry/global_lpi" "odometry/global_tpi" \
   # "odometry/global_iekf" "odometry/global_ukf" "odometry/global_ekf" \
-  "odometry/global_tm" "odometry/sbg" "odometry/dvl")
+  "odometry/global_tm" "dvl/odometry" "imu/odometry")
 
 for bag_path in ${bags_to_eval}; do
   echo "" && gum style --foreground 75 --bold "Processing ${bag_path}..."
@@ -60,7 +60,7 @@ for bag_path in ${bags_to_eval}; do
 
     # Export ground truth TUM trajectory
     truth="/${agent}/odometry/truth"
-    truth_dir="${bag_path}/evo/${agent}/odometry"
+    truth_dir="${bag_path}/evo/${agent}"
     mkdir -p "${truth_dir}"
 
     if ! ls "${truth_dir}"/*.tum 1> /dev/null 2>&1; then
@@ -72,7 +72,11 @@ for bag_path in ${bags_to_eval}; do
 
     for suffix in "${SUFFIXES[@]}"; do
       topic="/${agent}/${suffix}"
-      out_dir="${bag_path}/evo/${agent}/${suffix}"
+
+      # Name the output folder after the non-odometry topic segment
+      name="${suffix#odometry/}"
+      name="${name%/odometry}"
+      out_dir="${bag_path}/evo/${agent}/${name}"
       if ! ls "${out_dir}"/*.tum 1> /dev/null 2>&1; then
         grep -q "name: ${topic}" "${bag_path}/metadata.yaml" || continue
         grep -A 20 "name: ${topic}" "${bag_path}/metadata.yaml" | grep -m 1 "message_count:" | grep -q "message_count: 0" && continue
@@ -110,12 +114,12 @@ for bag_path in ${bags_to_eval}; do
         evo_rpe tum "${gt_tum}" "${est_tum}" -r angle_deg "${evo_rot_args[@]}" --delta 1 --delta_unit m --all_pairs --save_results "${out_dir}/rpe_rot.zip"
     done
 
-    if ls "${bag_path}/evo/${agent}"/*/*/*.zip 1> /dev/null 2>&1; then
+    if ls "${bag_path}/evo/${agent}"/*/*.zip 1> /dev/null 2>&1; then
       echo "" && gum style --foreground 75 --bold "Exporting ${agent} benchmarks..."
       rm -f "${bag_path}/evo/${agent}/benchmark_"*.csv
       for metric in ape_trans ape_rot rpe_trans rpe_rot; do
-        if ls "${bag_path}/evo/${agent}"/*/*/${metric}.zip 1> /dev/null 2>&1; then
-          evo_res "${bag_path}/evo/${agent}"/*/*/${metric}.zip --save_table "${bag_path}/evo/${agent}/benchmark_${metric}.csv"
+        if ls "${bag_path}/evo/${agent}"/*/${metric}.zip 1> /dev/null 2>&1; then
+          evo_res "${bag_path}/evo/${agent}"/*/${metric}.zip --save_table "${bag_path}/evo/${agent}/benchmark_${metric}.csv"
         fi
       done
     fi

@@ -16,12 +16,12 @@
 import sys
 from pathlib import Path
 
-import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
+import pandas as pd
 import scienceplots  # noqa: F401
-from rosbags.highlevel import AnyReader
+import seaborn as sns
 import yaml
+from rosbags.highlevel import AnyReader
 
 plt.style.use(["science", "ieee"])
 
@@ -30,6 +30,13 @@ FGO_TOPIC = "factor_graph_node/metrics"
 
 
 def get_smoother_lag(bag_dir: Path, agent_name: str) -> float | None:
+    """
+    Read the smoother lag parameter from a bag's saved config files.
+
+    :param bag_dir: Path to the ROS 2 bag directory.
+    :param agent_name: Agent namespace used to select namespaced parameters.
+    :return: The smoother lag in seconds, or None if it was not found.
+    """
     config_paths = [
         bag_dir / "config" / "fleet" / "coug_fgo_params.yaml",
         bag_dir / "config" / f"{agent_name}_params.yaml",
@@ -59,6 +66,13 @@ def get_smoother_lag(bag_dir: Path, agent_name: str) -> float | None:
 
 
 def read_bag_durations(bag_dir: Path, agent_name: str) -> list[float]:
+    """
+    Read the total solver durations from a bag's metrics topic.
+
+    :param bag_dir: Path to the ROS 2 bag directory.
+    :param agent_name: Agent namespace to read the metrics topic for.
+    :return: Total optimization durations in seconds.
+    """
     topic = f"/{agent_name}/{FGO_TOPIC}"
     try:
         with AnyReader([bag_dir]) as reader:
@@ -75,6 +89,12 @@ def read_bag_durations(bag_dir: Path, agent_name: str) -> list[float]:
 
 
 def load_data(target_dir: Path) -> pd.DataFrame:
+    """
+    Collect solver durations and smoother lags from all evaluated bags.
+
+    :param target_dir: Directory tree containing evaluated bags.
+    :return: DataFrame pairing each duration with its configured lag.
+    """
     timing_data = []
 
     for evo_dir in target_dir.rglob("evo"):
@@ -99,6 +119,12 @@ def load_data(target_dir: Path) -> pd.DataFrame:
 
 
 def generate_plots(df: pd.DataFrame, output_dir: Path) -> None:
+    """
+    Save violin and box plots of solver duration by smoother lag.
+
+    :param df: DataFrame pairing durations with smoother lag values.
+    :param output_dir: Directory to save the figures in.
+    """
     if df.empty:
         return
 
@@ -130,7 +156,7 @@ def generate_plots(df: pd.DataFrame, output_dir: Path) -> None:
         ax.set(title="", xlabel="Smoother Lag (s)", ylabel="Duration (s)")
 
         save_path = output_dir / f"lag_{plot_type}.png"
-        fig.savefig(str(save_path), dpi=300, bbox_inches="tight")
+        fig.savefig(save_path, dpi=300, bbox_inches="tight")
         plt.close(fig)
 
 

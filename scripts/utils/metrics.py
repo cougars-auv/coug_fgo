@@ -29,11 +29,36 @@ logger = logging.getLogger(__name__)
 TUM_KEYS = ("time", "x", "y", "z", "qx", "qy", "qz", "qw")
 
 
-def _odometry_dir(bag_path: str, namespace: str) -> Path:
-    return Path(bag_path) / "evo" / namespace / "odometry"
+def _evo_agent_dir(bag_path: str, namespace: str) -> Path:
+    """
+    Return the bag's evo output directory for one agent namespace.
+
+    :param bag_path: Path to the ROS 2 bag directory.
+    :param namespace: Vehicle namespace whose outputs are stored.
+    :return: The agent's evo output directory.
+    """
+    return Path(bag_path) / "evo" / namespace
+
+
+def _find_ground_truth(bag_path: str, namespace: str) -> Path | None:
+    """
+    Return the ground truth TUM file exported at the agent's evo root.
+
+    :param bag_path: Path to the ROS 2 bag directory.
+    :param namespace: Vehicle namespace the ground truth was exported under.
+    :return: Path to the ground truth TUM file, or None if not found.
+    """
+    tum_files = sorted(_evo_agent_dir(bag_path, namespace).glob("*.tum"))
+    return tum_files[0] if tum_files else None
 
 
 def _to_trajectory(pose: dict) -> PoseTrajectory3D:
+    """
+    Convert pose arrays keyed by state name into an evo trajectory.
+
+    :param pose: Arrays keyed by state name, with time and xyzw quaternion.
+    :return: The poses as an evo PoseTrajectory3D.
+    """
     return PoseTrajectory3D(
         positions_xyz=np.column_stack([pose["x"], pose["y"], pose["z"]]),
         orientations_quat_wxyz=np.column_stack(
@@ -44,27 +69,47 @@ def _to_trajectory(pose: dict) -> PoseTrajectory3D:
 
 
 def load_ground_truth(bag_path: str, namespace: str) -> dict:
-    tum_path = _odometry_dir(bag_path, namespace) / f"{namespace}_odometry_truth.tum"
+    """
+    Load the exported ground truth trajectory into state arrays.
+
+    :param bag_path: Path to the ROS 2 bag directory.
+    :param namespace: Vehicle namespace the ground truth was exported under.
+    :return: Arrays keyed by state name, or an empty dict if unavailable.
+    """
+    tum_path = _find_ground_truth(bag_path, namespace)
+    if tum_path is None:
+        agent_dir = _evo_agent_dir(bag_path, namespace)
+        logger.warning(f"No ground truth TUM file found in {agent_dir}")
+        return {}
     try:
         data = np.loadtxt(tum_path, comments="#", ndmin=2)
     except (OSError, ValueError):
-        logger.warning(f"Could not load GT from {tum_path}")
+        logger.warning(f"Could not load ground truth from {tum_path}")
         return {}
     if data.size == 0:
-        logger.warning(f"GT file is empty: {tum_path}")
+        logger.warning(f"Ground truth file is empty: {tum_path}")
         return {}
 
     pose = {k: data[:, i] for i, k in enumerate(TUM_KEYS)}
     roll, pitch, yaw = Rotation.from_quat(data[:, 4:8]).as_euler("xyz").T
     pose.update({"roll": roll, "pitch": pitch, "yaw": yaw})
 
-    logger.info(f"Loaded GT: {tum_path}")
+    logger.info(f"Loaded ground truth: {tum_path}")
     return pose
 
 
 def compute_ape_rmse(
     gt: dict | None, est: dict | None, crashed: bool = False, max_diff: float = 0.05
 ) -> float:
+    """
+    Compute the aligned translational APE RMSE between two trajectories.
+
+    :param gt: Ground truth arrays keyed by state name.
+    :param est: Estimated arrays keyed by state name.
+    :param crashed: Whether the pipeline crashed while producing the estimate.
+    :param max_diff: Maximum timestamp difference for pose association.
+    :return: RMSE in meters, or infinity if the inputs are unusable.
+    """
     if not gt or not est or crashed:
         return float("inf")
 
@@ -81,6 +126,14 @@ def compute_ape_rmse(
 def run_evo_evaluations(
     gt_file: str, est_file: str, evo_dir: Path, evo_flags: list[str]
 ) -> None:
+    """
+    Run the evo APE and RPE evaluations and save the result archives.
+
+    :param gt_file: Ground truth trajectory in TUM format.
+    :param est_file: Estimated trajectory in TUM format.
+    :param evo_dir: Directory to save the evo result archives in.
+    :param evo_flags: Extra evo flags; plane projections skip rotation runs.
+    """
     base_flags = ["--t_max_diff", "0.05", "--no_warnings"]
 
     plane_flags = [
@@ -116,6 +169,18 @@ def evaluate_and_save(
     urdf_path: str | None = None,
     verbose: bool = True,
 ) -> tuple[dict | None, dict]:
+    """
+    Run the offline pipeline on a bag, then save and evaluate results.
+
+    :param bag_path: Path to the ROS 2 bag directory.
+    :param config_paths: Parameter YAML files, in increasing priority.
+    :param namespace: Vehicle namespace used for topics and parameters.
+    :param evo_dir_name: Subdirectory name for this run's evo outputs.
+    :param evo_flags: Extra evo flags passed to the APE and RPE evaluations.
+    :param urdf_path: Optional URDF path, resolved from configs if omitted.
+    :param verbose: Whether to log progress and show a progress bar.
+    :return: Result arrays (or None on failure) and the ground truth arrays.
+    """
     logger.info(f"Processing bag: {bag_path}")
     pose_gt = load_ground_truth(bag_path, namespace)
     results, _ = process_bag_offline(
@@ -124,22 +189,28 @@ def evaluate_and_save(
     if not results:
         return None, pose_gt
 
-    odom_dir = _odometry_dir(bag_path, namespace)
-    evo_dir = odom_dir / evo_dir_name
+    evo_dir = _evo_agent_dir(bag_path, namespace) / evo_dir_name
     evo_dir.mkdir(parents=True, exist_ok=True)
 
-    est_path = evo_dir / f"{namespace}_odometry_{evo_dir_name}.tum"
+    est_path = evo_dir / f"{namespace}_{evo_dir_name}.tum"
     np.savetxt(est_path, np.column_stack([results[k] for k in TUM_KEYS]), fmt="%.9f")
-    logger.info(f"Saved TUM: {est_path}")
+    logger.info(f"Saved TUM trajectory: {est_path}")
 
-    if pose_gt:
-        gt_path = odom_dir / f"{namespace}_odometry_truth.tum"
+    gt_path = _find_ground_truth(bag_path, namespace)
+    if pose_gt and gt_path is not None:
         run_evo_evaluations(str(gt_path), str(est_path), evo_dir, evo_flags)
 
     return results, pose_gt
 
 
 def _mask_gaps(t: np.ndarray, vals: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Insert NaN breaks at large timestamp gaps to avoid bridging in plots.
+
+    :param t: Sample timestamps.
+    :param vals: Sample values aligned with the timestamps.
+    :return: Timestamps and values with NaN entries inserted at the gaps.
+    """
     if len(t) < 2:
         return t, vals
     dts = np.diff(t)
@@ -152,6 +223,13 @@ def _mask_gaps(t: np.ndarray, vals: np.ndarray) -> tuple[np.ndarray, np.ndarray]
 
 
 def plot_results(results: dict, pose_gt: dict, label: str = "") -> None:
+    """
+    Plot the estimated states against ground truth where available.
+
+    :param results: Estimated arrays keyed by state name.
+    :param pose_gt: Ground truth arrays keyed by state name (may be empty).
+    :param label: Figure window title, typically the bag name.
+    """
     t0 = results["time"][0]
     t_fgo = results["time"] - t0
 

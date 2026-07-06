@@ -16,14 +16,14 @@
 import sys
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
+import scienceplots  # noqa: F401
+import seaborn as sns
 from evo.core import lie_algebra as lie
 from evo.core import sync
 from evo.core.trajectory import PoseTrajectory3D
 from evo.tools import file_interface, plot
-import matplotlib.pyplot as plt
-import seaborn as sns
-import scienceplots  # noqa: F401
 
 sns.reset_orig()
 plt.style.use(["science", "ieee"])
@@ -62,7 +62,7 @@ NAME_MAPPING = {
     "global_ukf": "UKF",
     "global_ekf": "EKF",
     "global_tm": "TM",
-    "sbg": "SBG",
+    "imu": "SBG",
     "dvl": "DVL",
 }
 
@@ -75,6 +75,16 @@ def add_start_end_markers(
     end_symbol: str = "x",
     size: int = 15,
 ) -> None:
+    """
+    Mark the start and end points of a trajectory on the given axes.
+
+    :param ax: Axes to draw on.
+    :param traj: Trajectory whose endpoints are marked.
+    :param color: Marker color.
+    :param start_symbol: Marker symbol for the start point.
+    :param end_symbol: Marker symbol for the end point.
+    :param size: Marker size.
+    """
     if traj.num_poses > 0:
         start, end = traj.positions_xyz[0], traj.positions_xyz[-1]
         ax.scatter(
@@ -86,17 +96,19 @@ def add_start_end_markers(
 def load_data(
     evo_agent_dir: Path,
 ) -> tuple[dict[str, PoseTrajectory3D], PoseTrajectory3D | None]:
-    odom_dir = evo_agent_dir / "odometry"
-    if not odom_dir.is_dir():
-        return {}, None
+    """
+    Load the estimated and ground truth trajectories for one agent.
 
-    gt_files = sorted(odom_dir.glob("*.tum"))
+    :param evo_agent_dir: Agent directory inside a bag's evo folder.
+    :return: Estimated trajectories keyed by algorithm, and the ground truth.
+    """
+    gt_files = sorted(evo_agent_dir.glob("*.tum"))
     gt_traj = (
         file_interface.read_tum_trajectory_file(str(gt_files[0])) if gt_files else None
     )
 
     est_trajs = {}
-    for sub in sorted(odom_dir.iterdir()):
+    for sub in sorted(evo_agent_dir.iterdir()):
         algo = NAME_MAPPING.get(sub.name)
         if (
             sub.is_dir()
@@ -114,6 +126,14 @@ def align_to_ref(
     do_align: bool,
     do_align_origin: bool,
 ) -> None:
+    """
+    Align an estimated trajectory to the reference in place.
+
+    :param est: Estimated trajectory to modify.
+    :param ref: Reference (ground truth) trajectory.
+    :param do_align: Whether to apply an Umeyama alignment.
+    :param do_align_origin: Whether to align the first pose to the reference.
+    """
     if do_align_origin:
         est.align_origin(ref)
     if not do_align:
@@ -127,6 +147,12 @@ def align_to_ref(
 
 
 def positions_with_gaps(traj: PoseTrajectory3D) -> np.ndarray:
+    """
+    Return positions with NaN breaks inserted at large timestamp gaps.
+
+    :param traj: Trajectory to extract positions from.
+    :return: Positions with NaN rows inserted where the timestamps jump.
+    """
     pos = traj.positions_xyz
     ts = traj.timestamps
     if len(ts) < 2:
@@ -144,6 +170,15 @@ def generate_plots(
     do_align: bool = False,
     do_align_origin: bool = False,
 ) -> None:
+    """
+    Save a top-down trajectory plot for one agent.
+
+    :param evo_agent_dir: Agent directory inside a bag's evo folder.
+    :param output_dir: Directory to save the figure in.
+    :param auv_name: Agent name used in the output file name.
+    :param do_align: Whether to apply an Umeyama alignment to the estimates.
+    :param do_align_origin: Whether to align estimate origins to the truth.
+    """
     est_trajs, gt_traj = load_data(evo_agent_dir)
 
     if not est_trajs and gt_traj is None:

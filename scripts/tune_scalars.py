@@ -13,19 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import math
 from datetime import datetime
 from pathlib import Path
 
+import colorlog
 import matplotlib.pyplot as plt
 import optuna
-
-import logging
-import colorlog
 from tqdm.contrib.logging import logging_redirect_tqdm
 
 from utils import metrics
 from utils import pipeline as fgo_pipeline
+
+logger = logging.getLogger(__name__)
 
 NAMESPACE = "turtlmap"
 BAG_PATHS = [
@@ -47,7 +48,32 @@ MIN_SCALAR = 0.01
 MAX_SCALAR = 100
 
 
+def setup_logging() -> None:
+    """Configure colored console logging for the script."""
+    handler = colorlog.StreamHandler()
+    handler.setFormatter(
+        colorlog.ColoredFormatter(
+            "%(log_color)s[%(levelname)s] %(message)s",
+            log_colors={
+                "DEBUG": "cyan",
+                "INFO": "white",
+                "WARNING": "yellow",
+                "ERROR": "red",
+                "CRITICAL": "red,bg_white",
+            },
+        )
+    )
+    logging.basicConfig(level=logging.INFO, handlers=[handler])
+
+
 def objective(trial: optuna.Trial, ground_truths: list[dict]) -> float:
+    """
+    Score one set of covariance scalars across all configured bags.
+
+    :param trial: Optuna trial used to suggest the scalar values.
+    :param ground_truths: Ground truth arrays for each bag in BAG_PATHS.
+    :return: Root mean square of the per-bag APE RMSE values.
+    """
     scalars = {
         s: trial.suggest_float(s, MIN_SCALAR, MAX_SCALAR, log=True)
         for s in SCALARS_TO_TUNE
@@ -66,20 +92,7 @@ def objective(trial: optuna.Trial, ground_truths: list[dict]) -> float:
 
 
 def main() -> None:
-    handler = colorlog.StreamHandler()
-    handler.setFormatter(
-        colorlog.ColoredFormatter(
-            "%(log_color)s[%(levelname)s] %(message)s",
-            log_colors={
-                "DEBUG": "cyan",
-                "INFO": "white",
-                "WARNING": "yellow",
-                "ERROR": "red",
-                "CRITICAL": "red,bg_white",
-            },
-        )
-    )
-    logging.basicConfig(level=logging.INFO, handlers=[handler])
+    setup_logging()
 
     ground_truths = [metrics.load_ground_truth(bag, NAMESPACE) for bag in BAG_PATHS]
 
@@ -93,7 +106,7 @@ def main() -> None:
             n_trials=N_OPTUNA_TRIALS,
             show_progress_bar=True,
         )
-    print(f"Best scalars: {study.best_params}")
+    logger.info(f"Best scalars: {study.best_params}")
 
     plot_args = []
     with logging_redirect_tqdm():

@@ -16,10 +16,10 @@
 import sys
 from pathlib import Path
 
-import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
+import pandas as pd
 import scienceplots  # noqa: F401
+import seaborn as sns
 from rosbags.highlevel import AnyReader
 
 plt.style.use(["science", "ieee"])
@@ -40,6 +40,13 @@ NAME_MAPPING = {
 
 
 def load_data(bag_dir: Path, agent_name: str) -> pd.DataFrame:
+    """
+    Read the solver timing metrics for one agent from a bag.
+
+    :param bag_dir: Path to the ROS 2 bag directory.
+    :param agent_name: Agent namespace to read the metrics topics for.
+    :return: DataFrame of per-message timing durations by algorithm.
+    """
     timing_data = []
     try:
         with AnyReader([bag_dir]) as reader:
@@ -73,6 +80,13 @@ def load_data(bag_dir: Path, agent_name: str) -> pd.DataFrame:
 
 
 def generate_plots(bag_dir: Path, output_dir: Path, agent_name: str) -> None:
+    """
+    Save violin and box plots of the solver timing for one agent.
+
+    :param bag_dir: Path to the ROS 2 bag directory.
+    :param output_dir: Directory to save the figures in.
+    :param agent_name: Agent namespace to read the metrics topics for.
+    """
     df = load_data(bag_dir, agent_name)
 
     if df.empty:

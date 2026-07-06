@@ -412,7 +412,7 @@ void FactorGraphPy::reset() {
 
 using coug_fgo::FactorGraphPy;
 
-PYBIND11_MODULE(pybind11fgo, m) {
+PYBIND11_MODULE(coug_fgo_py, m) {
   m.doc() = "Python bindings for the FactorGraphCore.";
 
   pybind11::class_<FactorGraphPy>(m, "FactorGraphPy")

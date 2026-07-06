@@ -13,15 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import glob
-import os
 import sys
 from pathlib import Path
 
-import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
+import pandas as pd
 import scienceplots  # noqa: F401
+import seaborn as sns
 
 plt.style.use(["science", "ieee"])
 
@@ -58,7 +56,7 @@ NAME_MAPPING = {
     "global_ukf": "UKF",
     "global_ekf": "EKF",
     "global_tm": "TM",
-    "sbg": "SBG",
+    "imu": "SBG",
     "dvl": "DVL",
 }
 
@@ -71,33 +69,44 @@ METRICS_CONFIG = [
 
 
 def load_data(bags_dir: Path) -> dict[str, pd.DataFrame]:
+    """
+    Collect benchmark CSV rows from all bags into per-metric DataFrames.
+
+    :param bags_dir: Directory tree containing exported benchmark CSV files.
+    :return: DataFrames of algorithm RMSE values keyed by CSV file name.
+    """
     data_store = {cfg[0]: [] for cfg in METRICS_CONFIG}
-    files = glob.glob(os.path.join(bags_dir, "**", "benchmark_*.csv"), recursive=True)
     sorted_mapping = sorted(NAME_MAPPING.items(), key=lambda x: len(x[0]), reverse=True)
 
-    for f in files:
-        filename = os.path.basename(f)
-        if filename in data_store:
-            try:
-                df = pd.read_csv(f, index_col=0)
-                for algo_key, row in df.iterrows():
-                    label = algo_key
-                    for key, val in sorted_mapping:
-                        if key in str(algo_key):
-                            label = val
-                            break
+    for path in sorted(bags_dir.rglob("benchmark_*.csv")):
+        if path.name not in data_store:
+            continue
+        try:
+            df = pd.read_csv(path, index_col=0)
+            for algo_key, row in df.iterrows():
+                label = algo_key
+                for key, val in sorted_mapping:
+                    if key in str(algo_key):
+                        label = val
+                        break
 
-                    if label in ALGORITHMS:
-                        data_store[filename].append(
-                            {"Algorithm": label, "RMSE": row["rmse"]}
-                        )
-            except Exception as e:
-                print(f"Error reading {f}: {e}")
+                if label in ALGORITHMS:
+                    data_store[path.name].append(
+                        {"Algorithm": label, "RMSE": row["rmse"]}
+                    )
+        except Exception as e:
+            print(f"Error reading {path}: {e}")
 
     return {k: pd.DataFrame(v) for k, v in data_store.items() if v}
 
 
 def generate_plots(data_map: dict[str, pd.DataFrame], output_dir: Path) -> None:
+    """
+    Save violin, box, and strip plots for each benchmark metric.
+
+    :param data_map: DataFrames of algorithm RMSE values keyed by CSV name.
+    :param output_dir: Directory to save the figures in.
+    """
     for filename, label, prefix in METRICS_CONFIG:
         if filename not in data_map or data_map[filename].empty:
             continue

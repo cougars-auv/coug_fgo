@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import os
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from contextlib import contextmanager
 from pathlib import Path
-
-import logging
 
 import numpy as np
 import yaml
@@ -43,7 +42,19 @@ SENSORS = ("imu", "gps", "depth", "mag", "ahrs", "dvl", "wrench")
 
 
 class UrdfTree:
+    """
+    Resolves static transforms parsed directly from a URDF or xacro file.
+
+    :author: Nelson Durrant
+    :date: July 2026
+    """
+
     def __init__(self, urdf_path: str):
+        """
+        Parse the joint tree from a robot description file.
+
+        :param urdf_path: Path to a URDF or xacro robot description.
+        """
         path = Path(urdf_path)
         if path.suffix == ".xacro":
             import xacro
@@ -67,6 +78,13 @@ class UrdfTree:
     def lookup(
         self, target_frame: str, source_frame: str
     ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the static transform between two frames in the tree.
+
+        :param target_frame: Frame to express the transform in.
+        :param source_frame: Frame whose pose is being looked up.
+        :return: Position and xyzw quaternion of the source in the target.
+        """
         target_pos, target_rot = self._root_tf(target_frame)
         source_pos, source_rot = self._root_tf(source_frame)
         pos = target_rot.inv().apply(source_pos - target_pos)
@@ -74,6 +92,12 @@ class UrdfTree:
         return pos, rot.as_quat()
 
     def _root_tf(self, frame: str) -> tuple[np.ndarray, Rotation]:
+        """
+        Accumulate the fixed transform from the URDF root to a frame.
+
+        :param frame: Frame name, with any frame_prefix stripped off.
+        :return: Position and rotation of the frame in the root link.
+        """
         link = frame.split("/")[-1]  # Strip robot_state_publisher frame_prefix
         if link not in self._links:
             raise KeyError(f"Frame '{frame}' not found in the URDF!")
@@ -87,7 +111,22 @@ class UrdfTree:
 
 
 def resolve_urdf_path(namespace: str, config_paths: list[str]) -> str | None:
+    """
+    Find the URDF file referenced by the coug_description parameters.
+
+    :param namespace: Vehicle namespace used to select namespaced parameters.
+    :param config_paths: Parameter YAML files to search for a urdf_file entry.
+    :return: Absolute path to the URDF file, or None if it was not found.
+    """
+
     def read_urdf_file(yaml_path: Path, top_keys: list[str]) -> str | None:
+        """
+        Read the urdf_file parameter from one YAML file, if present.
+
+        :param yaml_path: Path to the parameter YAML file.
+        :param top_keys: Top-level namespace keys to try, in order.
+        :return: The urdf_file value, or None if it was not found.
+        """
         try:
             data = yaml.safe_load(yaml_path.read_text())
         except OSError:
@@ -138,18 +177,43 @@ def resolve_urdf_path(namespace: str, config_paths: list[str]) -> str | None:
 
 
 def _stamp(m) -> float:
+    """
+    Return a message header stamp as seconds since the epoch.
+
+    :param m: Message with a std_msgs/Header field.
+    :return: Timestamp in seconds.
+    """
     return m.header.stamp.sec + m.header.stamp.nanosec * 1e-9
 
 
 def _vec3(v) -> np.ndarray:
+    """
+    Return a Vector3-like message as a numpy array.
+
+    :param v: Message with x, y, and z fields.
+    :return: The values as a length-3 numpy array.
+    """
     return np.array([v.x, v.y, v.z])
 
 
 def _quat(q) -> np.ndarray:
+    """
+    Return a Quaternion message as an xyzw numpy array.
+
+    :param q: Message with x, y, z, and w fields.
+    :return: The values as an xyzw numpy array.
+    """
     return np.array([q.x, q.y, q.z, q.w])
 
 
 def _cov(arr, n: int) -> np.ndarray:
+    """
+    Return a flat covariance field as an n-by-n numpy array.
+
+    :param arr: Flat row-major covariance values.
+    :param n: Side length of the square covariance matrix.
+    :return: The values reshaped to an n-by-n numpy array.
+    """
     return np.array(arr).reshape(n, n)
 
 
@@ -197,20 +261,50 @@ EXTRACTORS = {
 
 
 class OfflineFactorGraph:
+    """
+    Drives the coug_fgo_py factor graph with bag data instead of topics.
+
+    Queueing, keyframe triggering, and transform resolution are reimplemented
+    here to match the online node; the graph operations themselves map 1:1
+    onto the coug_fgo_py binding calls.
+
+    :author: Nelson Durrant
+    :date: July 2026
+    """
+
     # IMPORTANT! Offline, the timer relies on IMU message stamps instead of the ROS 2 clock
     SOURCE_SENSORS = {"DVL": "dvl", "Depth": "depth", "Timer": "imu"}
 
     def __init__(
-        self, config_paths: list[str], namespace: str = "", urdf: UrdfTree | None = None
+        self,
+        config_paths: list[str],
+        namespace: str = "",
+        urdf: UrdfTree | None = None,
+        verbose: bool = True,
     ):
+        """
+        Load the parameters and prepare the sensor queues.
+
+        :param config_paths: Parameter YAML files, in increasing priority.
+        :param namespace: Vehicle namespace used to select parameters.
+        :param urdf: Parsed URDF tree for transform lookups, if available.
+        :param verbose: Whether to log pipeline state changes.
+        """
         self.fg = coug_fgo_py.FactorGraphPy(config_paths, namespace)
         self.params = self.fg.get_params()
         self.urdf = urdf
+        self.verbose = verbose
 
         sensors = self.params["sensors"]
         self.loose_preint = self.params["comparison"]["enable_loose_dvl_preintegration"]
 
         def subscribed(key: str) -> bool:
+            """
+            Return whether a sensor is used for factors or initialization.
+
+            :param key: Sensor key in the parameters.
+            :return: True if the sensor is enabled in any mode.
+            """
             return sensors[key]["enable"] or sensors[key]["enable_extra_only"]
 
         self.enabled = {
@@ -249,18 +343,28 @@ class OfflineFactorGraph:
         self._reset_state()
 
     def reset(self) -> None:
+        """Clear the graph and all pipeline state for a fresh run."""
         self.fg.reset()
         self._reset_state()
 
     def _reset_state(self) -> None:
+        """Reset the queues and bookkeeping shared between graph runs."""
         self.is_initialized = False
         self.queues: dict[str, list[tuple]] = {sensor: [] for sensor in SENSORS}
+        self._using_backup = False
         self._last_target_time: float | None = None
         self._last_update_time: float | None = None
         self._last_opt_time: float | None = None
         self._last_timer_time: float | None = None
 
     def add_message(self, sensor: str, frame_id: str, sample: tuple) -> None:
+        """
+        Queue one sensor sample and trigger keyframe processing when due.
+
+        :param sensor: Sensor key from SENSORS.
+        :param frame_id: ROS frame the measurement was reported in.
+        :param sample: Extracted measurement tuple, with the stamp first.
+        """
         self._resolve_sensor_tf(sensor, frame_id)
         self.queues[sensor].append(sample)
         self._last_msg_time[sensor] = sample[0]
@@ -279,6 +383,7 @@ class OfflineFactorGraph:
                 self._process_frontend()
 
     def _process_frontend(self) -> None:
+        """Initialize the graph or run a rate-limited update and optimize."""
         if not self.is_initialized:
             self._initialize_graph()
         elif self._check_and_update_rate_limit(
@@ -288,6 +393,7 @@ class OfflineFactorGraph:
             self._optimize_graph()
 
     def _initialize_graph(self) -> None:
+        """Attempt initialization once all enabled sensor TFs are resolved."""
         for sensor in ("imu", "gps", "depth", "mag", "ahrs", "dvl"):
             if self.enabled[sensor] and sensor not in self.tfs_resolved:
                 return
@@ -306,8 +412,15 @@ class OfflineFactorGraph:
         self.queues = {sensor: [] for sensor in SENSORS}
         if self.fg.initialize(newest_stamp, **batches):
             self.is_initialized = True
+            if self.verbose:
+                logger.info("Graph initialized successfully!")
 
     def _update_graph(self) -> bool:
+        """
+        Advance the graph to the newest stamp from the active source.
+
+        :return: True if a new keyframe update was applied to the graph.
+        """
         active = self.kf_source
         if active != "Timer":
             last_received = self._last_msg_time.get(
@@ -321,6 +434,14 @@ class OfflineFactorGraph:
             )
             if (last_received is None or timed_out) and self.kf_backup != "None":
                 active = self.kf_backup
+                if self.verbose and not self._using_backup:
+                    logger.warning(
+                        f"Primary keyframe source '{self.kf_source}' timed out! "
+                        f"Using backup '{self.kf_backup}'."
+                    )
+                self._using_backup = True
+            else:
+                self._using_backup = False
 
         src = self.SOURCE_SENSORS.get(active)
         target_time = self._last_msg_time.get(src) if src and self.queues[src] else None
@@ -337,6 +458,7 @@ class OfflineFactorGraph:
         return True
 
     def _optimize_graph(self) -> None:
+        """Run a rate-limited optimization and record the result."""
         if self.is_lm:
             return  # LevenbergMarquardt uses finalize()
         if not self._check_and_update_rate_limit("_last_opt_time", "max_opt_rate_hz"):
@@ -345,12 +467,24 @@ class OfflineFactorGraph:
             self.results.append(result)
 
     def finalize(self) -> list[dict]:
+        """
+        Run the final batch optimization for LevenbergMarquardt solvers.
+
+        :return: Per-keyframe result dictionaries from the solver.
+        """
         if self.is_lm and self.is_initialized:
             result = self.fg.optimize()
             self.results = list(result.get("smoothed_path", [])) if result else []
         return self.results
 
     def _check_and_update_rate_limit(self, last_attr: str, rate_param: str) -> bool:
+        """
+        Check a rate limit against stream time, updating it when passed.
+
+        :param last_attr: Attribute holding the last accepted stream time.
+        :param rate_param: Parameter holding the maximum rate in Hz.
+        :return: True if the action is allowed at the current stream time.
+        """
         max_rate_hz = self.params[rate_param]
         if max_rate_hz <= 0.0:
             return True
@@ -361,6 +495,12 @@ class OfflineFactorGraph:
         return True
 
     def _resolve_sensor_tf(self, sensor: str, frame_id: str) -> None:
+        """
+        Resolve and register a sensor's static transform once.
+
+        :param sensor: Sensor key from SENSORS.
+        :param frame_id: Frame reported by the sensor's messages.
+        """
         if sensor in self.tfs_resolved:
             return
         cfg = self.params["sensors"]["dynamics" if sensor == "wrench" else sensor]
@@ -372,6 +512,13 @@ class OfflineFactorGraph:
     def _load_or_lookup_tf(
         self, cfg: dict, frame: str
     ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Load a transform from parameters or look it up in the URDF.
+
+        :param cfg: Sensor parameter dictionary.
+        :param frame: Source frame to look up when parameters are not used.
+        :return: Position and xyzw quaternion in the target frame.
+        """
         if cfg["use_parameter_tf"]:
             return np.array(cfg["tf_position"]), np.array(cfg["tf_orientation"])
         if self.urdf is None:
@@ -393,17 +540,29 @@ def process_bag_offline(
     urdf_path: str | None = None,
     verbose: bool = True,
 ) -> tuple[dict | None, bool]:
+    """
+    Replay a bag through the offline factor graph pipeline.
+
+    :param bag_path: Path to the ROS 2 bag directory.
+    :param config_paths: Parameter YAML files, in increasing priority.
+    :param namespace: Vehicle namespace used for topics and parameters.
+    :param urdf_path: Optional URDF path, resolved from configs if omitted.
+    :param verbose: Whether to log progress and show a progress bar.
+    :return: Result arrays keyed by state name (or None), and a crash flag.
+    """
     if urdf_path is None:
         urdf_path = resolve_urdf_path(namespace, config_paths)
-
-    urdf = UrdfTree(urdf_path) if urdf_path else None
-    pipeline = OfflineFactorGraph(config_paths, namespace, urdf)
 
     if verbose:
         cfg_str = "\n".join(f"  - {p}" for p in config_paths)
         logger.info(f"Loaded configs:\n{cfg_str}")
         if urdf_path:
             logger.info(f"Loaded URDF: {urdf_path}")
+        else:
+            logger.warning("No URDF found! Sensor TFs must come from parameters.")
+
+    urdf = UrdfTree(urdf_path) if urdf_path else None
+    pipeline = OfflineFactorGraph(config_paths, namespace, urdf, verbose)
 
     topic_to_sensors: dict[str, list[str]] = {}
     for sensor in SENSORS:
@@ -421,10 +580,14 @@ def process_bag_offline(
         matched_conns = [c for c in reader.connections if c.topic in topic_to_sensors]
 
         if verbose:
-            conn_str = "\n".join(
-                f"  - {c.topic} ({topic_to_sensors[c.topic]})" for c in matched_conns
-            )
-            logger.info(f"Matched Connections:\n{conn_str}")
+            if matched_conns:
+                conn_str = "\n".join(
+                    f"  - {c.topic} ({topic_to_sensors[c.topic]})"
+                    for c in matched_conns
+                )
+                logger.info(f"Matched connections:\n{conn_str}")
+            else:
+                logger.warning("No matching sensor topics found in the bag!")
 
         pbar = tqdm(
             reader.messages(connections=matched_conns),
@@ -440,7 +603,7 @@ def process_bag_offline(
                     pipeline.add_message(sensor, frame_id, sample)
             except Exception as e:
                 if verbose:
-                    logger.error(f"FGO Error: {e}")
+                    logger.error(f"Factor graph processing failed: {e}")
                 crashed = True
                 break
 
@@ -449,7 +612,7 @@ def process_bag_offline(
             pipeline.finalize()
         except Exception as e:
             if verbose:
-                logger.error(f"FGO Error: {e}")
+                logger.error(f"Final optimization failed: {e}")
             crashed = True
     raw_results = pipeline.results
 
@@ -459,9 +622,12 @@ def process_bag_offline(
             for s in ("imu", "gps", "depth", "mag", "ahrs", "dvl")
             if pipeline.enabled[s] and s not in pipeline.tfs_resolved
         ]
-        logger.error(
-            f"FGO never initialized! No data received for: {', '.join(missing)}"
-        )
+        if missing:
+            logger.error(
+                f"Graph never initialized! No data received for: {', '.join(missing)}"
+            )
+        else:
+            logger.error("Graph never initialized! Not enough sensor data in the bag.")
     if not raw_results:
         return None, crashed
 
@@ -491,6 +657,11 @@ def process_bag_offline(
 
 @contextmanager
 def covariance_override_file(scalars: dict[str, float]):
+    """
+    Yield a temporary params file overriding sensor covariance scalars.
+
+    :param scalars: Mapping of sensor name to covariance scalar value.
+    """
     override = {
         "/**": {
             "ros__parameters": {s: {"covariance_scalar": v} for s, v in scalars.items()}
