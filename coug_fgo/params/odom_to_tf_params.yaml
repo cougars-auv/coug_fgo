@@ -1,6 +1,6 @@
 odom_to_tf_node:
   input_topic:
     type: string
-    default_value: "odometry/dvl"
+    default_value: "dvl/odometry"
     validation:
       not_empty<>: []

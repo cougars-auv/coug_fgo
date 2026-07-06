@@ -17,7 +17,7 @@ dvl_a50_odom_node:
       not_empty<>: []
   output_topic:
     type: string
-    default_value: "odometry/dvl_ned"
+    default_value: "dvl/odometry_ned"
     validation:
       not_empty<>: []
 
