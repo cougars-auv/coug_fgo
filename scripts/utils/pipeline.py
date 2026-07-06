@@ -35,7 +35,7 @@ FGO_LIB_PATH = str(
     / "site-packages"
 )
 sys.path.insert(0, FGO_LIB_PATH)
-import pybind11fgo  # noqa: E402
+import coug_fgo_py  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +203,7 @@ class OfflineFactorGraph:
     def __init__(
         self, config_paths: list[str], namespace: str = "", urdf: UrdfTree | None = None
     ):
-        self.fg = pybind11fgo.FactorGraphPy(config_paths, namespace)
+        self.fg = coug_fgo_py.FactorGraphPy(config_paths, namespace)
         self.params = self.fg.get_params()
         self.urdf = urdf
 

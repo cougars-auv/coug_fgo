@@ -149,15 +149,15 @@ ament_auto_add_executable(seatrac_x150_imu src/seatrac_x150_imu_node.cpp)
 target_link_libraries(seatrac_x150_imu factor_graph_component)
 
 # --- Python Bindings ---
-pybind11_add_module(pybind11fgo src/factor_graph_py.cpp)
-target_include_directories(pybind11fgo PRIVATE
+pybind11_add_module(coug_fgo_py src/factor_graph_py.cpp)
+target_include_directories(coug_fgo_py PRIVATE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   ${GTSAM_EIGEN_INCLUDE_DIR}
 )
-target_link_libraries(pybind11fgo PRIVATE
+target_link_libraries(coug_fgo_py PRIVATE
   factor_graph_component
 )
-install(FILES $<TARGET_FILE:pybind11fgo>
+install(FILES $<TARGET_FILE:coug_fgo_py>
   DESTINATION "lib/python${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}/site-packages"
 )
 
