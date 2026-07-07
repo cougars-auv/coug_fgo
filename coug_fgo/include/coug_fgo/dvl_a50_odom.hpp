@@ -24,7 +24,6 @@
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 
-#include <diagnostic_updater/diagnostic_updater.hpp>
 #include <dvl_msgs/msg/dvldr.hpp>
 #include <memory>
 #include <nav_msgs/msg/odometry.hpp>
@@ -54,16 +53,9 @@ class DvlA50OdomNode : public rclcpp::Node {
    */
   void dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg);
 
-  /**
-   * @brief Diagnostic task reporting time since the last DVL DR report.
-   * @param stat The diagnostic status wrapper.
-   */
-  void checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper& stat);
-
   // --- ROS Interfaces ---
   rclcpp::Subscription<dvl_msgs::msg::DVLDR>::SharedPtr dvl_sub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
-  diagnostic_updater::Updater diagnostic_updater_;
 
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;

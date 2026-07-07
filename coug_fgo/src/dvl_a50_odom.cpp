@@ -28,7 +28,7 @@
 namespace coug_fgo {
 
 DvlA50OdomNode::DvlA50OdomNode(const rclcpp::NodeOptions& options)
-    : Node("dvl_a50_odom_node", options), diagnostic_updater_(this) {
+    : Node("dvl_a50_odom_node", options) {
   param_listener_ =
       std::make_shared<dvl_a50_odom_node::ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
@@ -43,17 +43,6 @@ DvlA50OdomNode::DvlA50OdomNode(const rclcpp::NodeOptions& options)
 
   odom_pub_ =
       create_publisher<nav_msgs::msg::Odometry>(params_.output_topic, rclcpp::SystemDefaultsQoS());
-
-  // --- ROS Diagnostics ---
-  if (params_.publish_diagnostics) {
-    std::string ns = this->get_namespace();
-    std::string clean_ns = (ns == "/") ? "" : ns;
-    diagnostic_updater_.setHardwareID(clean_ns + "/dvl_a50_odom_node");
-
-    std::string prefix = clean_ns.empty() ? "" : "[" + clean_ns + "] ";
-    std::string dvl_task = prefix + "DVL DR Status";
-    diagnostic_updater_.add(dvl_task, this, &DvlA50OdomNode::checkDvlStatus);
-  }
 
   RCLCPP_INFO(get_logger(), "Initialization complete.");
 }
@@ -115,18 +104,6 @@ void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
   odom.pose.covariance[14] = var;
 
   odom_pub_->publish(odom);
-}
-
-void DvlA50OdomNode::checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper& stat) {
-  double time_since =
-      (last_dvl_time_ > 0.0) ? (this->get_clock()->now().seconds() - last_dvl_time_) : -1.0;
-  stat.add("Time Since Last (s)", time_since);
-
-  if (time_since > params_.diagnostic_timeout_sec || last_dvl_time_ == 0.0) {
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "DVL DR is offline.");
-  } else {
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "DVL DR data acquired.");
-  }
 }
 
 }  // namespace coug_fgo

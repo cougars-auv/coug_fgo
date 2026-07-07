@@ -21,7 +21,6 @@
 
 #pragma once
 
-#include <diagnostic_updater/diagnostic_updater.hpp>
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
 #include <seatrac_interfaces/msg/modem_status.hpp>
@@ -66,17 +65,10 @@ class SeatracX150ImuNode : public rclcpp::Node {
   sensor_msgs::msg::MagneticField convertToMag(
       const seatrac_interfaces::msg::ModemStatus::SharedPtr msg);
 
-  /**
-   * @brief Diagnostic task reporting time since the last modem report.
-   * @param stat The diagnostic status wrapper.
-   */
-  void checkModemStatus(diagnostic_updater::DiagnosticStatusWrapper& stat);
-
   // --- ROS Interfaces ---
   rclcpp::Subscription<seatrac_interfaces::msg::ModemStatus>::SharedPtr modem_sub_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
   rclcpp::Publisher<sensor_msgs::msg::MagneticField>::SharedPtr mag_pub_;
-  diagnostic_updater::Updater diagnostic_updater_;
 
   // --- Parameters ---
   std::shared_ptr<seatrac_x150_imu_node::ParamListener> param_listener_;

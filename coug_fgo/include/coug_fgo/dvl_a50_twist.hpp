@@ -21,7 +21,6 @@
 
 #pragma once
 
-#include <diagnostic_updater/diagnostic_updater.hpp>
 #include <dvl_msgs/msg/dvl.hpp>
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
 #include <memory>
@@ -59,16 +58,9 @@ class DvlA50TwistNode : public rclcpp::Node {
   geometry_msgs::msg::TwistWithCovarianceStamped convertToTwist(
       const dvl_msgs::msg::DVL::SharedPtr msg);
 
-  /**
-   * @brief Diagnostic task reporting DVL data freshness and velocity validity.
-   * @param stat The diagnostic status wrapper.
-   */
-  void checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper& stat);
-
   // --- ROS Interfaces ---
   rclcpp::Subscription<dvl_msgs::msg::DVL>::SharedPtr dvl_sub_;
   rclcpp::Publisher<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr twist_pub_;
-  diagnostic_updater::Updater diagnostic_updater_;
 
   // --- Parameters ---
   std::shared_ptr<dvl_a50_twist_node::ParamListener> param_listener_;

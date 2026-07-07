@@ -27,7 +27,7 @@
 namespace coug_fgo {
 
 FluidPressureOdomNode::FluidPressureOdomNode(const rclcpp::NodeOptions& options)
-    : Node("fluid_pressure_odom_node", options), diagnostic_updater_(this) {
+    : Node("fluid_pressure_odom_node", options) {
   param_listener_ =
       std::make_shared<fluid_pressure_odom_node::ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
@@ -39,17 +39,6 @@ FluidPressureOdomNode::FluidPressureOdomNode(const rclcpp::NodeOptions& options)
 
   odom_pub_ =
       create_publisher<nav_msgs::msg::Odometry>(params_.output_topic, rclcpp::SystemDefaultsQoS());
-
-  // --- ROS Diagnostics ---
-  if (params_.publish_diagnostics) {
-    std::string ns = this->get_namespace();
-    std::string clean_ns = (ns == "/") ? "" : ns;
-    diagnostic_updater_.setHardwareID(clean_ns + "/fluid_pressure_odom_node");
-
-    std::string prefix = clean_ns.empty() ? "" : "[" + clean_ns + "] ";
-    std::string pressure_task = prefix + "Pressure Sensor Status";
-    diagnostic_updater_.add(pressure_task, this, &FluidPressureOdomNode::checkPressureStatus);
-  }
 
   RCLCPP_INFO(get_logger(), "Initialization complete.");
 }
@@ -92,20 +81,6 @@ void FluidPressureOdomNode::pressureCallback(const sensor_msgs::msg::FluidPressu
 
   last_depth_ = odom_msg.pose.pose.position.z;
   odom_pub_->publish(odom_msg);
-}
-
-void FluidPressureOdomNode::checkPressureStatus(diagnostic_updater::DiagnosticStatusWrapper& stat) {
-  double time_since = (last_pressure_time_ > 0.0)
-                          ? (this->get_clock()->now().seconds() - last_pressure_time_)
-                          : -1.0;
-  stat.add("Time Since Last (s)", time_since);
-  stat.add("Last Depth (m)", last_depth_);
-
-  if (time_since > params_.diagnostic_timeout_sec || last_pressure_time_ == 0.0) {
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Pressure sensor is offline.");
-  } else {
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Pressure data acquired.");
-  }
 }
 
 }  // namespace coug_fgo

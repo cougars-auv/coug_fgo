@@ -30,7 +30,7 @@
 namespace coug_fgo {
 
 SeatracX150ImuNode::SeatracX150ImuNode(const rclcpp::NodeOptions& options)
-    : Node("seatrac_x150_imu_node", options), diagnostic_updater_(this) {
+    : Node("seatrac_x150_imu_node", options) {
   param_listener_ =
       std::make_shared<seatrac_x150_imu_node::ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
@@ -45,16 +45,6 @@ SeatracX150ImuNode::SeatracX150ImuNode(const rclcpp::NodeOptions& options)
 
   mag_pub_ = create_publisher<sensor_msgs::msg::MagneticField>(params_.mag_output_topic,
                                                                rclcpp::SystemDefaultsQoS());
-
-  // --- ROS Diagnostics ---
-  if (params_.publish_diagnostics) {
-    std::string ns = this->get_namespace();
-    std::string clean_ns = (ns == "/") ? "" : ns;
-    diagnostic_updater_.setHardwareID(clean_ns + "/seatrac_x150_imu_node");
-
-    std::string prefix = clean_ns.empty() ? "" : "[" + clean_ns + "] ";
-    diagnostic_updater_.add(prefix + "Modem Status", this, &SeatracX150ImuNode::checkModemStatus);
-  }
 
   RCLCPP_INFO(get_logger(), "Initialization complete.");
 }
@@ -123,18 +113,6 @@ sensor_msgs::msg::MagneticField SeatracX150ImuNode::convertToMag(
   mag_msg.magnetic_field_covariance[8] = m[2] * m[2];
 
   return mag_msg;
-}
-
-void SeatracX150ImuNode::checkModemStatus(diagnostic_updater::DiagnosticStatusWrapper& stat) {
-  double time_since =
-      (last_modem_time_ > 0.0) ? (this->get_clock()->now().seconds() - last_modem_time_) : -1.0;
-  stat.add("Time Since Last (s)", time_since);
-
-  if (time_since > params_.diagnostic_timeout_sec || last_modem_time_ == 0.0) {
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Modem is offline.");
-  } else {
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Modem data acquired.");
-  }
 }
 
 }  // namespace coug_fgo

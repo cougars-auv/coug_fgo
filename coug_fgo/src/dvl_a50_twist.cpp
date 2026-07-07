@@ -27,7 +27,7 @@
 namespace coug_fgo {
 
 DvlA50TwistNode::DvlA50TwistNode(const rclcpp::NodeOptions& options)
-    : Node("dvl_a50_twist_node", options), diagnostic_updater_(this) {
+    : Node("dvl_a50_twist_node", options) {
   param_listener_ =
       std::make_shared<dvl_a50_twist_node::ParamListener>(get_node_parameters_interface());
   params_ = param_listener_->get_params();
@@ -39,17 +39,6 @@ DvlA50TwistNode::DvlA50TwistNode(const rclcpp::NodeOptions& options)
 
   twist_pub_ = create_publisher<geometry_msgs::msg::TwistWithCovarianceStamped>(
       params_.output_topic, rclcpp::SystemDefaultsQoS());
-
-  // --- ROS Diagnostics ---
-  if (params_.publish_diagnostics) {
-    std::string ns = this->get_namespace();
-    std::string clean_ns = (ns == "/") ? "" : ns;
-    diagnostic_updater_.setHardwareID(clean_ns + "/dvl_a50_twist_node");
-
-    std::string prefix = clean_ns.empty() ? "" : "[" + clean_ns + "] ";
-    std::string dvl_task = prefix + "DVL Status";
-    diagnostic_updater_.add(dvl_task, this, &DvlA50TwistNode::checkDvlStatus);
-  }
 
   RCLCPP_INFO(get_logger(), "Initialization complete.");
 }
@@ -108,22 +97,6 @@ geometry_msgs::msg::TwistWithCovarianceStamped DvlA50TwistNode::convertToTwist(
     }
   }
   return twist_msg;
-}
-
-void DvlA50TwistNode::checkDvlStatus(diagnostic_updater::DiagnosticStatusWrapper& stat) {
-  stat.add("Velocity Valid", last_velocity_valid_);
-
-  double time_since =
-      (last_dvl_time_ > 0.0) ? (this->get_clock()->now().seconds() - last_dvl_time_) : -1.0;
-  stat.add("Time Since Last (s)", time_since);
-
-  if (time_since > params_.diagnostic_timeout_sec || last_dvl_time_ == 0.0) {
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "DVL is offline.");
-  } else if (!last_velocity_valid_) {
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "DVL velocity is invalid.");
-  } else {
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "DVL data acquired.");
-  }
 }
 
 }  // namespace coug_fgo

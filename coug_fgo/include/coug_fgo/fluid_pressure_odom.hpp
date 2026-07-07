@@ -21,7 +21,6 @@
 
 #pragma once
 
-#include <diagnostic_updater/diagnostic_updater.hpp>
 #include <memory>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -51,16 +50,9 @@ class FluidPressureOdomNode : public rclcpp::Node {
    */
   void pressureCallback(const sensor_msgs::msg::FluidPressure::SharedPtr msg);
 
-  /**
-   * @brief Diagnostic task reporting pressure data freshness and the last computed depth.
-   * @param stat The diagnostic status wrapper.
-   */
-  void checkPressureStatus(diagnostic_updater::DiagnosticStatusWrapper& stat);
-
   // --- ROS Interfaces ---
   rclcpp::Subscription<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_sub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
-  diagnostic_updater::Updater diagnostic_updater_;
 
   // --- Parameters ---
   std::shared_ptr<fluid_pressure_odom_node::ParamListener> param_listener_;
