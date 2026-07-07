@@ -14,7 +14,7 @@
 
 /**
  * @file dvl_tight_preint_factor.hpp
- * @brief GTSAM factor for tightly-coupled preintegrated DVL measurements with a lever arm.
+ * @brief GTSAM factor for tightly-coupled preintegrated DVL translations with a lever arm.
  * @author Nelson Durrant
  * @date May 2026
  */

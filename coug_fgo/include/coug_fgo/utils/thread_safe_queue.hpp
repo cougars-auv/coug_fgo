@@ -31,7 +31,7 @@ namespace coug_fgo::utils {
 
 /**
  * @class ThreadSafeQueue
- * @brief Utility class for thread-safe queue operations.
+ * @brief Utility for thread-safe queue operations.
  * @tparam T Pointer-like message type exposing a `timestamp` member (e.g. a shared_ptr).
  */
 template <typename T>

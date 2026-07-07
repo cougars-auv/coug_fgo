@@ -14,7 +14,7 @@
 
 /**
  * @file imu_ned_to_enu.hpp
- * @brief ROS 2 node that converts AHRS IMU orientation from a NED to an ENU world convention.
+ * @brief ROS 2 node that converts AHRS IMU orientation from the NED to the ENU world convention.
  * @author Nelson Durrant
  * @date May 2026
  */
@@ -31,7 +31,7 @@ namespace coug_fgo {
 
 /**
  * @class ImuNedToEnuNode
- * @brief ROS 2 node that converts AHRS IMU orientation from a NED to an ENU world convention.
+ * @brief ROS 2 node that converts AHRS IMU orientation from the NED to the ENU world convention.
  */
 class ImuNedToEnuNode : public rclcpp::Node {
  public:

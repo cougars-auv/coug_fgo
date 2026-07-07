@@ -14,7 +14,7 @@
 
 /**
  * @file odom_ned_to_enu.hpp
- * @brief ROS 2 node that converts odometry pose from a NED to an ENU world convention.
+ * @brief ROS 2 node that converts an odometry pose from the NED to the ENU world convention.
  * @author Nelson Durrant
  * @date May 2026
  */
@@ -31,7 +31,7 @@ namespace coug_fgo {
 
 /**
  * @class OdomNedToEnuNode
- * @brief ROS 2 node that converts odometry pose from a NED to an ENU world convention.
+ * @brief ROS 2 node that converts an odometry pose from the NED to the ENU world convention.
  */
 class OdomNedToEnuNode : public rclcpp::Node {
  public:
