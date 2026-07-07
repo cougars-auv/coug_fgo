@@ -130,7 +130,11 @@ EXTRACTORS = {
 
 class UrdfTree:
     """
-    Resolves static transforms parsed directly from a URDF or xacro file.
+    Static-transform resolver backed by a parsed URDF or xacro description.
+
+    Reads the fixed joint tree once at construction, then resolves the transform
+    between any two links by walking that tree — a lightweight, offline stand-in
+    for a live TF buffer.
 
     :author: Nelson Durrant
     :date: July 2026
@@ -275,7 +279,12 @@ def resolve_urdf_path(namespace: str, config_paths: list[str]) -> str | None:
 
 class OfflineFactorGraph:
     """
-    Drives the offline coug_fgo_py factor graph using ROS 2 bag data.
+    Offline driver that replays logged sensor data through the coug_fgo_py factor graph.
+
+    Buffers each measurement stream, resolves sensor extrinsics from the URDF, and forms
+    keyframes from a configurable source (DVL, Depth, or an IMU-stamped timer) with backup
+    failover. Runs rate-limited graph updates and optimizations, collecting the per-keyframe
+    results for offline evaluation.
 
     :author: Nelson Durrant
     :date: July 2026
