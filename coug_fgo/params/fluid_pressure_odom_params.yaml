@@ -30,11 +30,6 @@ fluid_pressure_odom_node:
     validation:
       gt<>: [0.0]
 
-  fallback_depth_noise_sigma:
-    type: double
-    default_value: 0.02
-    validation:
-      gt<>: [0.0]
   max_pressure_delta:
     type: double
     default_value: 0.0
