@@ -207,7 +207,7 @@ def resolve_urdf_path(namespace: str, config_paths: list[str]) -> str | None:
     """
     Find the URDF file referenced by the coug_description_launch parameters.
 
-    :param namespace: Vehicle namespace used to select namespaced parameters.
+    :param namespace: AUV namespace used to select namespaced parameters.
     :param config_paths: Parameter YAML files to search for a urdf_file entry.
     :return: Absolute path to the URDF file, or None if it was not found.
     """
@@ -295,7 +295,7 @@ class OfflineFactorGraph:
         Load the parameters and prepare the sensor queues.
 
         :param config_paths: Parameter YAML files, in increasing priority.
-        :param namespace: Vehicle namespace used to select parameters.
+        :param namespace: AUV namespace used to select parameters.
         :param urdf: Parsed URDF tree for transform lookups, if available.
         :param verbose: Whether to log pipeline state changes.
         """
@@ -559,7 +559,7 @@ def process_bag_offline(
 
     :param bag_path: Path to the ROS 2 bag directory.
     :param config_paths: Parameter YAML files, in increasing priority.
-    :param namespace: Vehicle namespace used for topics and parameters.
+    :param namespace: AUV namespace used for topics and parameters.
     :param urdf_path: Optional URDF path, resolved from config files if omitted.
     :param verbose: Whether to log progress and show a progress bar.
     :return: Result arrays keyed by state name (or None), and a crash flag.

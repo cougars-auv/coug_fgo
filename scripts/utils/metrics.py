@@ -34,7 +34,7 @@ def _evo_agent_dir(bag_path: str, namespace: str) -> Path:
     Return the bag's evo output directory for one agent namespace.
 
     :param bag_path: Path to the ROS 2 bag directory.
-    :param namespace: Vehicle namespace whose outputs are stored.
+    :param namespace: AUV namespace whose outputs are stored.
     :return: The agent's evo output directory.
     """
     return Path(bag_path) / "evo" / namespace
@@ -45,7 +45,7 @@ def _find_ground_truth(bag_path: str, namespace: str) -> Path | None:
     Return the ground truth TUM file exported at the agent's evo root.
 
     :param bag_path: Path to the ROS 2 bag directory.
-    :param namespace: Vehicle namespace the ground truth was exported under.
+    :param namespace: AUV namespace the ground truth was exported under.
     :return: Path to the ground truth TUM file, or None if not found.
     """
     tum_files = sorted(_evo_agent_dir(bag_path, namespace).glob("*.tum"))
@@ -73,7 +73,7 @@ def load_ground_truth(bag_path: str, namespace: str) -> dict:
     Load the exported ground truth trajectory into state arrays.
 
     :param bag_path: Path to the ROS 2 bag directory.
-    :param namespace: Vehicle namespace the ground truth was exported under.
+    :param namespace: AUV namespace the ground truth was exported under.
     :return: Arrays keyed by state name, or an empty dict if unavailable.
     """
     tum_path = _find_ground_truth(bag_path, namespace)
@@ -181,7 +181,7 @@ def process_and_evaluate(
 
     :param bag_path: Path to the ROS 2 bag directory.
     :param config_paths: Parameter YAML files, in increasing priority.
-    :param namespace: Vehicle namespace used for topics and parameters.
+    :param namespace: AUV namespace used for topics and parameters.
     :param evo_dir_name: Subdirectory name for this run's evo outputs.
     :param evo_flags: Extra evo flags passed to the APE and RPE evaluations.
     :param urdf_path: Optional URDF path, resolved from configs if omitted.
