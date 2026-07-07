@@ -305,6 +305,22 @@ FactorGraphNode::FactorGraphNode(const rclcpp::NodeOptions& options)
 
   setupRosInterfaces();
   core_ = std::make_unique<FactorGraphCore>(params_);
+  core_->setLogCallback([this](utils::LogLevel level, const std::string& msg) {
+    switch (level) {
+      case utils::LogLevel::kDebug:
+        RCLCPP_DEBUG(get_logger(), "%s", msg.c_str());
+        break;
+      case utils::LogLevel::kInfo:
+        RCLCPP_INFO(get_logger(), "%s", msg.c_str());
+        break;
+      case utils::LogLevel::kWarn:
+        RCLCPP_WARN(get_logger(), "%s", msg.c_str());
+        break;
+      case utils::LogLevel::kError:
+        RCLCPP_ERROR(get_logger(), "%s", msg.c_str());
+        break;
+    }
+  });
   state_init_ = std::make_unique<StateInitializer>(params_);
   frontend_thread_ = std::thread(&FactorGraphNode::frontendThreadLoop, this);
   backend_thread_ = std::thread(&FactorGraphNode::backendThreadLoop, this);
@@ -679,8 +695,15 @@ void FactorGraphNode::updateGraph() {
          (*newest_stamp - *last_received) > params_.keyframe_timeout_sec)) {
       if (backup_keyframe_source_ != KeyframeSource::kNone) {
         active_source = backup_keyframe_source_;
-        RCLCPP_WARN(get_logger(), "Primary keyframe source '%s' timed out. Using backup '%s'.",
-                    params_.keyframe_source.c_str(), params_.backup_keyframe_source.c_str());
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
+                             "Primary keyframe source '%s' timed out. Using backup '%s'.",
+                             params_.keyframe_source.c_str(),
+                             params_.backup_keyframe_source.c_str());
+      } else {
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
+                             "Primary keyframe source '%s' timed out and no backup is configured. "
+                             "No new keyframes will be created.",
+                             params_.keyframe_source.c_str());
       }
     }
   }
@@ -844,6 +867,22 @@ void FactorGraphNode::resetGraph(const std_srvs::srv::Trigger::Request::SharedPt
   drainAllQueues();
 
   core_ = std::make_unique<FactorGraphCore>(params_);
+  core_->setLogCallback([this](utils::LogLevel level, const std::string& msg) {
+    switch (level) {
+      case utils::LogLevel::kDebug:
+        RCLCPP_DEBUG(get_logger(), "%s", msg.c_str());
+        break;
+      case utils::LogLevel::kInfo:
+        RCLCPP_INFO(get_logger(), "%s", msg.c_str());
+        break;
+      case utils::LogLevel::kWarn:
+        RCLCPP_WARN(get_logger(), "%s", msg.c_str());
+        break;
+      case utils::LogLevel::kError:
+        RCLCPP_ERROR(get_logger(), "%s", msg.c_str());
+        break;
+    }
+  });
   state_init_ = std::make_unique<StateInitializer>(params_);
 
   is_initialized_.store(false);

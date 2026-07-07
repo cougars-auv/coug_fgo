@@ -49,6 +49,33 @@ gtsam::Pose3 toPose3(const Eigen::Vector3d& position, const Eigen::Vector4d& qua
 }
 
 /**
+ * @brief Forwards core log messages to the Python `logging` module.
+ * @param level The core log level.
+ * @param msg The log message.
+ */
+void pyLogCallback(utils::LogLevel level, const std::string& msg) {
+  int py_level = 30;  // logging.WARNING
+  switch (level) {
+    case utils::LogLevel::kDebug:
+      py_level = 10;
+      break;
+    case utils::LogLevel::kInfo:
+      py_level = 20;
+      break;
+    case utils::LogLevel::kWarn:
+      py_level = 30;
+      break;
+    case utils::LogLevel::kError:
+      py_level = 40;
+      break;
+  }
+  pybind11::gil_scoped_acquire gil;
+  pybind11::module_::import("logging")
+      .attr("getLogger")("coug_fgo.core")
+      .attr("log")(py_level, msg);
+}
+
+/**
  * @brief Converts one optimized state into a Python dict of named scalars.
  * @param time State timestamp in seconds.
  * @param pose The optimized pose.
@@ -108,6 +135,7 @@ FactorGraphPy::FactorGraphPy(const std::vector<std::string>& config_paths, const
   params_ = param_listener.get_params();
 
   core_ = std::make_unique<FactorGraphCore>(params_);
+  core_->setLogCallback(&pyLogCallback);
   state_init_ = std::make_unique<StateInitializer>(params_);
 }
 
@@ -406,6 +434,7 @@ pybind11::dict FactorGraphPy::optimize() {
 
 void FactorGraphPy::reset() {
   core_ = std::make_unique<FactorGraphCore>(params_);
+  core_->setLogCallback(&pyLogCallback);
   state_init_ = std::make_unique<StateInitializer>(params_);
   is_initialized_ = false;
 }

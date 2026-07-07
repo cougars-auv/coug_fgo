@@ -29,15 +29,19 @@
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 
 #include <deque>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
+#include <string>
 
 #include "coug_fgo/factor_graph_parameters.hpp"
 #include "coug_fgo/utils/data_types.hpp"
 #include "coug_fgo/utils/dvl_loose_preintegrator.hpp"
 #include "coug_fgo/utils/dvl_tight_preintegrator.hpp"
+#include "coug_fgo/utils/logging.hpp"
 #include "coug_fgo/utils/state_initializer.hpp"
 
 namespace coug_fgo {
@@ -80,6 +84,12 @@ class FactorGraphCore {
   explicit FactorGraphCore(const factor_graph_node::Params& params);
 
   /**
+   * @brief Sets the sink for core log messages (e.g. rclcpp or Python logging).
+   * @param callback Receives a level and message; set before other threads use the core.
+   */
+  void setLogCallback(utils::LogCallback callback);
+
+  /**
    * @brief Initializes the graph from computed initial state.
    * @param state_init The computed initial state.
    * @param tfs GTSAM Pose3 sensor transforms.
@@ -107,6 +117,21 @@ class FactorGraphCore {
   std::map<int64_t, gtsam::Key> snapshotTimeKeys() const;
 
  private:
+  // --- Logging ---
+  /**
+   * @brief Sends a message to the configured log sink, if any.
+   * @param level The message severity.
+   * @param msg The log message.
+   */
+  void logMessage(utils::LogLevel level, const std::string& msg) const;
+
+  /**
+   * @brief Builds a warning callback for an unusable sensor message covariance.
+   * @param sensor Human-readable sensor name for the warning message.
+   * @return Callback for resolveCov/resolveVar to invoke on fallback.
+   */
+  std::function<void()> covFallbackWarning(const std::string& sensor) const;
+
   // --- Configuration ---
   /**
    * @brief Configures the GTSAM combined IMU preintegration parameters.
@@ -225,6 +250,11 @@ class FactorGraphCore {
   // --- Parameters ---
   const factor_graph_node::Params params_;
   utils::TfBundle tfs_;
+
+  // --- Logging ---
+  utils::LogCallback log_callback_;
+  mutable std::mutex log_mutex_;
+  mutable std::set<std::string> cov_warned_;
 
   // --- GTSAM Solver ---
   std::unique_ptr<gtsam::IncrementalFixedLagSmoother> inc_smoother_;

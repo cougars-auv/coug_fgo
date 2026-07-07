@@ -29,6 +29,9 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <functional>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "coug_fgo/factors/ahrs_factor.hpp"
@@ -98,12 +101,20 @@ Eigen::Matrix<double, N, N> sigmasSquaredDiag(const std::vector<double>& sigmas)
  * @param sigmas Parameter standard deviations (at least N entries).
  * @param scalar Covariance scaling factor (applied to either source).
  * @param msg_cov The covariance reported by the sensor message.
+ * @param warn_fallback Invoked when an invalid msg_cov forces the parameter fallback.
  * @return sigmasSquaredDiag(sigmas)*scalar if use_param or invalid msg_cov, else msg_cov*scalar.
  */
 template <int N>
 Eigen::Matrix<double, N, N> resolveCov(bool use_param, const std::vector<double>& sigmas,
-                                       double scalar, const Eigen::Matrix<double, N, N>& msg_cov) {
-  if (use_param || isInvalidCovDiag(msg_cov)) {
+                                       double scalar, const Eigen::Matrix<double, N, N>& msg_cov,
+                                       const std::function<void()>& warn_fallback = {}) {
+  if (use_param) {
+    return sigmasSquaredDiag<N>(sigmas) * scalar;
+  }
+  if (isInvalidCovDiag(msg_cov)) {
+    if (warn_fallback) {
+      warn_fallback();
+    }
     return sigmasSquaredDiag<N>(sigmas) * scalar;
   }
   return msg_cov * scalar;
@@ -113,8 +124,15 @@ Eigen::Matrix<double, N, N> resolveCov(bool use_param, const std::vector<double>
  * @brief Scalar-variance version of resolveCov.
  * @return sigma^2 * scalar if use_param is set or msg_var is unusable, otherwise msg_var * scalar.
  */
-double resolveVar(bool use_param, double sigma, double scalar, double msg_var) {
-  if (use_param || !std::isfinite(msg_var) || msg_var <= 0.0) {
+double resolveVar(bool use_param, double sigma, double scalar, double msg_var,
+                  const std::function<void()>& warn_fallback = {}) {
+  if (use_param) {
+    return sigma * sigma * scalar;
+  }
+  if (!std::isfinite(msg_var) || msg_var <= 0.0) {
+    if (warn_fallback) {
+      warn_fallback();
+    }
     return sigma * sigma * scalar;
   }
   return msg_var * scalar;
@@ -183,6 +201,31 @@ gtsam::Rot3 getInterpolatedOrientation(
 
 FactorGraphCore::FactorGraphCore(const factor_graph_node::Params& params) : params_(params) {}
 
+void FactorGraphCore::setLogCallback(utils::LogCallback callback) {
+  log_callback_ = std::move(callback);
+}
+
+void FactorGraphCore::logMessage(utils::LogLevel level, const std::string& msg) const {
+  if (log_callback_) {
+    log_callback_(level, msg);
+  }
+}
+
+std::function<void()> FactorGraphCore::covFallbackWarning(const std::string& sensor) const {
+  return [this, sensor] {
+    {
+      std::scoped_lock lock(log_mutex_);
+      if (!cov_warned_.insert(sensor).second) {
+        return;
+      }
+    }
+    logMessage(utils::LogLevel::kWarn,
+               sensor +
+                   " message covariance is unusable (non-finite or non-positive diagonal); "
+                   "falling back to the parameter covariance.");
+  };
+}
+
 void FactorGraphCore::initialize(const StateInitializer& state_init, const utils::TfBundle& tfs) {
   tfs_ = tfs;
 
@@ -221,7 +264,8 @@ void FactorGraphCore::initialize(const StateInitializer& state_init, const utils
       last_dvl_covariance_ = resolveCov<3>(
           params_.dvl.use_parameter_covariance,
           params_.dvl.parameter_covariance.velocity_noise_sigmas, params_.dvl.covariance_scalar,
-          state_init.getInitialDvl()->twist_covariance.topLeftCorner<3, 3>());
+          state_init.getInitialDvl()->twist_covariance.topLeftCorner<3, 3>(),
+          covFallbackWarning("DVL"));
     } else {
       last_dvl_velocity_ = gtsam::Vector3::Zero();
       last_dvl_covariance_ =
@@ -266,10 +310,12 @@ FactorGraphCore::configureImuPreintegration(const StateInitializer& state_init) 
 
   imu_params->accelerometerCovariance = resolveCov<3>(
       params_.imu.use_parameter_covariance, params_.imu.parameter_covariance.accel_noise_sigmas,
-      params_.imu.covariance_scalar, state_init.getInitialImu()->linear_acceleration_covariance);
+      params_.imu.covariance_scalar, state_init.getInitialImu()->linear_acceleration_covariance,
+      covFallbackWarning("IMU accelerometer"));
   imu_params->gyroscopeCovariance = resolveCov<3>(
       params_.imu.use_parameter_covariance, params_.imu.parameter_covariance.gyro_noise_sigmas,
-      params_.imu.covariance_scalar, state_init.getInitialImu()->angular_velocity_covariance);
+      params_.imu.covariance_scalar, state_init.getInitialImu()->angular_velocity_covariance,
+      covFallbackWarning("IMU gyroscope"));
   imu_params->biasAccCovariance = sigmasSquaredDiag(params_.imu.accel_bias_rw_sigmas);
   imu_params->biasOmegaCovariance = sigmasSquaredDiag(params_.imu.gyro_bias_rw_sigmas);
   imu_params->biasAccOmegaInt = gtsam::Matrix66::Zero();
@@ -297,7 +343,8 @@ void FactorGraphCore::addPriorFactors(const StateInitializer& state_init,
       const gtsam::Matrix2 gps_cov = resolveCov<2>(
           params_.gps.use_parameter_covariance,
           params_.gps.parameter_covariance.position_noise_sigmas, params_.gps.covariance_scalar,
-          state_init.getInitialGps()->pose_covariance.topLeftCorner<2, 2>());
+          state_init.getInitialGps()->pose_covariance.topLeftCorner<2, 2>(),
+          covFallbackWarning("GPS"));
       prior_pose_sigmas(3) = std::sqrt(gps_cov(0, 0));
       prior_pose_sigmas(4) = std::sqrt(gps_cov(1, 1));
     } else {
@@ -309,7 +356,8 @@ void FactorGraphCore::addPriorFactors(const StateInitializer& state_init,
       prior_pose_sigmas(5) = std::sqrt(resolveVar(
           params_.depth.use_parameter_covariance,
           params_.depth.parameter_covariance.position_z_noise_sigma,
-          params_.depth.covariance_scalar, state_init.getInitialDepth()->pose_covariance(2, 2)));
+          params_.depth.covariance_scalar, state_init.getInitialDepth()->pose_covariance(2, 2),
+          covFallbackWarning("Depth")));
     } else {
       prior_pose_sigmas(5) = params_.prior.parameter_priors.initial_position_sigmas[2];
     }
@@ -319,7 +367,8 @@ void FactorGraphCore::addPriorFactors(const StateInitializer& state_init,
       const gtsam::Matrix3 ahrs_cov = resolveCov<3>(
           params_.ahrs.use_parameter_covariance,
           params_.ahrs.parameter_covariance.orientation_noise_sigmas,
-          params_.ahrs.covariance_scalar, state_init.getInitialAhrs()->orientation_covariance);
+          params_.ahrs.covariance_scalar, state_init.getInitialAhrs()->orientation_covariance,
+          covFallbackWarning("AHRS"));
       prior_pose_sigmas(0) = std::sqrt(ahrs_cov(0, 0));
       prior_pose_sigmas(1) = std::sqrt(ahrs_cov(1, 1));
       prior_pose_sigmas(2) = std::sqrt(ahrs_cov(2, 2));
@@ -331,13 +380,14 @@ void FactorGraphCore::addPriorFactors(const StateInitializer& state_init,
             std::sqrt(resolveVar(params_.mag.use_parameter_covariance,
                                  params_.mag.parameter_covariance.magnetic_field_noise_sigmas[0],
                                  params_.mag.covariance_scalar,
-                                 state_init.getInitialMag()->magnetic_field_covariance(0, 0)));
+                                 state_init.getInitialMag()->magnetic_field_covariance(0, 0),
+                                 covFallbackWarning("Magnetometer")));
         prior_pose_sigmas(2) = mag_sigma_norm / h_mag;
       }
       const gtsam::Matrix3 accel_cov = resolveCov<3>(
           params_.imu.use_parameter_covariance, params_.imu.parameter_covariance.accel_noise_sigmas,
-          params_.imu.covariance_scalar,
-          state_init.getInitialImu()->linear_acceleration_covariance);
+          params_.imu.covariance_scalar, state_init.getInitialImu()->linear_acceleration_covariance,
+          covFallbackWarning("IMU accelerometer"));
       const double g_norm =
           std::max(Eigen::Map<const Eigen::Vector3d>(params_.imu.gravity.data()).norm(), 1e-6);
       const auto& bias_sig = params_.prior.initial_accel_bias_sigmas;
@@ -357,7 +407,8 @@ void FactorGraphCore::addPriorFactors(const StateInitializer& state_init,
     gtsam::Matrix33 dvl_cov = resolveCov<3>(
         params_.dvl.use_parameter_covariance,
         params_.dvl.parameter_covariance.velocity_noise_sigmas, params_.dvl.covariance_scalar,
-        state_init.getInitialDvl()->twist_covariance.topLeftCorner<3, 3>());
+        state_init.getInitialDvl()->twist_covariance.topLeftCorner<3, 3>(),
+        covFallbackWarning("DVL"));
     gtsam::Matrix33 map_R_dvl = (prev_pose_.rotation() * tfs_.target_T_dvl.rotation()).matrix();
     prior_vel_noise =
         gtsam::noiseModel::Gaussian::Covariance(map_R_dvl * dvl_cov * map_R_dvl.transpose());
@@ -396,7 +447,8 @@ void FactorGraphCore::addGpsFactor(
 
   gtsam::SharedNoiseModel gps_noise = gtsam::noiseModel::Gaussian::Covariance(resolveCov<2>(
       params_.gps.use_parameter_covariance, params_.gps.parameter_covariance.position_noise_sigmas,
-      params_.gps.covariance_scalar, gps_msg->pose_covariance.topLeftCorner<2, 2>()));
+      params_.gps.covariance_scalar, gps_msg->pose_covariance.topLeftCorner<2, 2>(),
+      covFallbackWarning("GPS")));
 
   gps_noise = applyRobustKernel(gps_noise, params_.gps.robust_kernel, params_.gps.robust_k);
 
@@ -413,10 +465,10 @@ void FactorGraphCore::addDepthFactor(
 
   const auto& depth_msg = depth_msgs.back();
 
-  const double depth_sigma =
-      std::sqrt(resolveVar(params_.depth.use_parameter_covariance,
-                           params_.depth.parameter_covariance.position_z_noise_sigma,
-                           params_.depth.covariance_scalar, depth_msg->pose_covariance(2, 2)));
+  const double depth_sigma = std::sqrt(resolveVar(
+      params_.depth.use_parameter_covariance,
+      params_.depth.parameter_covariance.position_z_noise_sigma, params_.depth.covariance_scalar,
+      depth_msg->pose_covariance(2, 2), covFallbackWarning("Depth")));
   gtsam::SharedNoiseModel depth_noise = gtsam::noiseModel::Isotropic::Sigma(1, depth_sigma);
 
   depth_noise = applyRobustKernel(depth_noise, params_.depth.robust_kernel, params_.depth.robust_k);
@@ -433,10 +485,10 @@ void FactorGraphCore::addAhrsFactor(gtsam::NonlinearFactorGraph& graph,
 
   const auto& ahrs_msg = ahrs_msgs.back();
 
-  gtsam::SharedNoiseModel ahrs_noise = gtsam::noiseModel::Gaussian::Covariance(
-      resolveCov<3>(params_.ahrs.use_parameter_covariance,
-                    params_.ahrs.parameter_covariance.orientation_noise_sigmas,
-                    params_.ahrs.covariance_scalar, ahrs_msg->orientation_covariance));
+  gtsam::SharedNoiseModel ahrs_noise = gtsam::noiseModel::Gaussian::Covariance(resolveCov<3>(
+      params_.ahrs.use_parameter_covariance,
+      params_.ahrs.parameter_covariance.orientation_noise_sigmas, params_.ahrs.covariance_scalar,
+      ahrs_msg->orientation_covariance, covFallbackWarning("AHRS")));
 
   ahrs_noise = applyRobustKernel(ahrs_noise, params_.ahrs.robust_kernel, params_.ahrs.robust_k);
 
@@ -458,10 +510,10 @@ void FactorGraphCore::addMagFactor(
   gtsam::Point3 ref_vec(params_.mag.reference_field[0], params_.mag.reference_field[1],
                         params_.mag.reference_field[2]);
 
-  gtsam::SharedNoiseModel mag_noise = gtsam::noiseModel::Gaussian::Covariance(
-      resolveCov<3>(params_.mag.use_parameter_covariance,
-                    params_.mag.parameter_covariance.magnetic_field_noise_sigmas,
-                    params_.mag.covariance_scalar, mag_msg->magnetic_field_covariance));
+  gtsam::SharedNoiseModel mag_noise = gtsam::noiseModel::Gaussian::Covariance(resolveCov<3>(
+      params_.mag.use_parameter_covariance,
+      params_.mag.parameter_covariance.magnetic_field_noise_sigmas, params_.mag.covariance_scalar,
+      mag_msg->magnetic_field_covariance, covFallbackWarning("Magnetometer")));
 
   mag_noise = applyRobustKernel(mag_noise, params_.mag.robust_kernel, params_.mag.robust_k);
 
@@ -480,7 +532,8 @@ void FactorGraphCore::addDvlFactor(gtsam::NonlinearFactorGraph& graph,
 
   gtsam::SharedNoiseModel dvl_noise = gtsam::noiseModel::Gaussian::Covariance(resolveCov<3>(
       params_.dvl.use_parameter_covariance, params_.dvl.parameter_covariance.velocity_noise_sigmas,
-      params_.dvl.covariance_scalar, dvl_msg->twist_covariance.topLeftCorner<3, 3>()));
+      params_.dvl.covariance_scalar, dvl_msg->twist_covariance.topLeftCorner<3, 3>(),
+      covFallbackWarning("DVL")));
 
   dvl_noise = applyRobustKernel(dvl_noise, params_.dvl.robust_kernel, params_.dvl.robust_k);
 
@@ -595,10 +648,10 @@ void FactorGraphCore::addDvlLoosePreintFactor(
   gtsam::Rot3 target_R_dvl = tfs_.target_T_dvl.rotation();
 
   // Propagate AHRS orientation uncertainty into the preintegrated translation covariance
-  gtsam::Matrix3 ahrs_cov =
-      resolveCov<3>(params_.ahrs.use_parameter_covariance,
-                    params_.ahrs.parameter_covariance.orientation_noise_sigmas,
-                    params_.ahrs.covariance_scalar, ahrs_msgs.back()->orientation_covariance);
+  gtsam::Matrix3 ahrs_cov = resolveCov<3>(
+      params_.ahrs.use_parameter_covariance,
+      params_.ahrs.parameter_covariance.orientation_noise_sigmas, params_.ahrs.covariance_scalar,
+      ahrs_msgs.back()->orientation_covariance, covFallbackWarning("AHRS"));
 
   gtsam::Rot3 map_R_ahrs_prev = getInterpolatedOrientation(ahrs_msgs, prev_time_);
   gtsam::Rot3 map_R_target_prev = map_R_ahrs_prev * ahrs_R_target;
@@ -623,10 +676,10 @@ void FactorGraphCore::addDvlLoosePreintFactor(
 
       last_dvl_velocity_ = dvl_msg->linear_velocity;
 
-      last_dvl_covariance_ = resolveCov<3>(params_.dvl.use_parameter_covariance,
-                                           params_.dvl.parameter_covariance.velocity_noise_sigmas,
-                                           params_.dvl.covariance_scalar,
-                                           dvl_msg->twist_covariance.topLeftCorner<3, 3>());
+      last_dvl_covariance_ = resolveCov<3>(
+          params_.dvl.use_parameter_covariance,
+          params_.dvl.parameter_covariance.velocity_noise_sigmas, params_.dvl.covariance_scalar,
+          dvl_msg->twist_covariance.topLeftCorner<3, 3>(), covFallbackWarning("DVL"));
     }
     last_dvl_time = current_dvl_time;
   }
@@ -725,10 +778,10 @@ void FactorGraphCore::addDvlTightPreintFactor(
       integrateDvlMeasurement(0.5 * (last_dvl_time + current_dvl_time), dt);
 
       last_dvl_velocity_ = dvl_msg->linear_velocity;
-      last_dvl_covariance_ = resolveCov<3>(params_.dvl.use_parameter_covariance,
-                                           params_.dvl.parameter_covariance.velocity_noise_sigmas,
-                                           params_.dvl.covariance_scalar,
-                                           dvl_msg->twist_covariance.topLeftCorner<3, 3>());
+      last_dvl_covariance_ = resolveCov<3>(
+          params_.dvl.use_parameter_covariance,
+          params_.dvl.parameter_covariance.velocity_noise_sigmas, params_.dvl.covariance_scalar,
+          dvl_msg->twist_covariance.topLeftCorner<3, 3>(), covFallbackWarning("DVL"));
     }
     last_dvl_time = current_dvl_time;
   }
@@ -766,6 +819,8 @@ std::optional<utils::QueueBundle> FactorGraphCore::update(double target_time,
   std::sort(queues.wrench.begin(), queues.wrench.end(), by_time);
 
   if (queues.imu.empty() || queues.imu.front()->timestamp > target_time) {
+    logMessage(utils::LogLevel::kWarn,
+               "Keyframe rejected: no IMU measurements at or before the keyframe time.");
     return std::nullopt;
   }
 
