@@ -44,8 +44,6 @@ FluidPressureOdomNode::FluidPressureOdomNode(const rclcpp::NodeOptions& options)
 }
 
 void FluidPressureOdomNode::pressureCallback(const sensor_msgs::msg::FluidPressure::SharedPtr msg) {
-  last_pressure_time_ = this->get_clock()->now().seconds();
-
   double pressure = msg->fluid_pressure * params_.pressure_scale;
 
   if (params_.max_pressure_delta > 0.0 && last_pressure_ >= 0.0 &&
@@ -79,7 +77,6 @@ void FluidPressureOdomNode::pressureCallback(const sensor_msgs::msg::FluidPressu
   double var_depth = var_pressure * pressure_to_depth * pressure_to_depth;
   odom_msg.pose.covariance[14] = var_depth;
 
-  last_depth_ = odom_msg.pose.pose.position.z;
   odom_pub_->publish(odom_msg);
 }
 

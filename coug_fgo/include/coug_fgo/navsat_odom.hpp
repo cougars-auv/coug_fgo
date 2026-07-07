@@ -70,12 +70,6 @@ class NavsatOdomNode : public rclcpp::Node {
    */
   void checkOriginStatus(diagnostic_updater::DiagnosticStatusWrapper& stat);
 
-  /**
-   * @brief Diagnostic task reporting GPS data freshness and fix status.
-   * @param stat The diagnostic status wrapper.
-   */
-  void checkNavSatFix(diagnostic_updater::DiagnosticStatusWrapper& stat);
-
   // --- ROS Interfaces ---
   rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr navsat_sub_;
   rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr origin_sub_;
@@ -92,8 +86,6 @@ class NavsatOdomNode : public rclcpp::Node {
   GeographicLib::LocalCartesian local_cartesian_;
   sensor_msgs::msg::NavSatFix origin_navsat_;
   bool origin_set_{false};
-  double last_navsat_time_{0.0};
-  int last_fix_status_{sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX};
 };
 
 }  // namespace coug_fgo

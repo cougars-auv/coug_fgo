@@ -79,9 +79,6 @@ NavsatOdomNode::NavsatOdomNode(const rclcpp::NodeOptions& options)
 
     std::string origin_task = prefix + "GPS Origin";
     diagnostic_updater_.add(origin_task, this, &NavsatOdomNode::checkOriginStatus);
-
-    std::string fix_task = prefix + "GPS Fix";
-    diagnostic_updater_.add(fix_task, this, &NavsatOdomNode::checkNavSatFix);
   }
 
   RCLCPP_INFO(get_logger(), "Initialization complete.");
@@ -105,9 +102,6 @@ void NavsatOdomNode::originCallback(const sensor_msgs::msg::NavSatFix::SharedPtr
 }
 
 void NavsatOdomNode::navsatCallback(const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
-  last_navsat_time_ = this->get_clock()->now().seconds();
-  last_fix_status_ = msg->status.status;
-
   if (msg->status.status == sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX) {
     RCLCPP_WARN(get_logger(), "Received NavSatFix with no fix.");
     return;
@@ -166,22 +160,6 @@ void NavsatOdomNode::checkOriginStatus(diagnostic_updater::DiagnosticStatusWrapp
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Origin successfully set.");
   } else {
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "Waiting for origin.");
-  }
-}
-
-void NavsatOdomNode::checkNavSatFix(diagnostic_updater::DiagnosticStatusWrapper& stat) {
-  stat.add("Fix Status", last_fix_status_);
-
-  double time_since =
-      (last_navsat_time_ > 0.0) ? (this->get_clock()->now().seconds() - last_navsat_time_) : -1.0;
-  stat.add("Time Since Last (s)", time_since);
-
-  if (time_since > params_.diagnostic_timeout_sec || last_navsat_time_ == 0.0) {
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "GPS is offline.");
-  } else if (last_fix_status_ == sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX) {
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "Waiting for GPS fix.");
-  } else {
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "GPS fix acquired.");
   }
 }
 

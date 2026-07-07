@@ -49,7 +49,6 @@ DvlA50OdomNode::DvlA50OdomNode(const rclcpp::NodeOptions& options)
 
 void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
   const auto stamp = this->get_clock()->now();
-  last_dvl_time_ = stamp.seconds();
 
   std::string current_dvl_frame =
       params_.use_parameter_frame ? params_.parameter_frame : msg->header.frame_id;

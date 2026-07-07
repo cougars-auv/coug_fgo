@@ -63,9 +63,6 @@ class DvlA50OdomNode : public rclcpp::Node {
   // --- Parameters ---
   std::shared_ptr<dvl_a50_odom_node::ParamListener> param_listener_;
   dvl_a50_odom_node::Params params_;
-
-  // --- State ---
-  double last_dvl_time_{0.0};
 };
 
 }  // namespace coug_fgo

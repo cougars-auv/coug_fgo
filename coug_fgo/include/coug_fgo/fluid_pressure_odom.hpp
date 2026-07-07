@@ -59,8 +59,6 @@ class FluidPressureOdomNode : public rclcpp::Node {
   fluid_pressure_odom_node::Params params_;
 
   // --- State ---
-  double last_pressure_time_{0.0};
-  double last_depth_{0.0};
   double last_pressure_{-1.0};
   int rejected_count_{0};
 };

@@ -46,7 +46,6 @@ DvlA50TwistNode::DvlA50TwistNode(const rclcpp::NodeOptions& options)
 void DvlA50TwistNode::dvlCallback(const dvl_msgs::msg::DVL::SharedPtr msg) {
   const auto now = this->get_clock()->now();
   last_dvl_time_ = now.seconds();
-  last_velocity_valid_ = msg->velocity_valid;
 
   if (params_.simulate_dropout && params_.dropout_frequency_hz > 0.0) {
     double cycle_period = 1.0 / params_.dropout_frequency_hz;

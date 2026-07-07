@@ -73,9 +73,6 @@ class SeatracX150ImuNode : public rclcpp::Node {
   // --- Parameters ---
   std::shared_ptr<seatrac_x150_imu_node::ParamListener> param_listener_;
   seatrac_x150_imu_node::Params params_;
-
-  // --- State ---
-  double last_modem_time_{0.0};
 };
 
 }  // namespace coug_fgo

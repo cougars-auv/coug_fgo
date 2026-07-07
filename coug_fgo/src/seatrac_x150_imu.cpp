@@ -51,8 +51,6 @@ SeatracX150ImuNode::SeatracX150ImuNode(const rclcpp::NodeOptions& options)
 
 void SeatracX150ImuNode::modemStatusCallback(
     const seatrac_interfaces::msg::ModemStatus::SharedPtr msg) {
-  last_modem_time_ = this->get_clock()->now().seconds();
-
   if (msg->includes_local_attitude || msg->includes_comp_ahrs) {
     imu_pub_->publish(convertToImu(msg));
   }
