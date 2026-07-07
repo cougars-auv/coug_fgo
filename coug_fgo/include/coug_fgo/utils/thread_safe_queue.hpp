@@ -14,7 +14,7 @@
 
 /**
  * @file thread_safe_queue.hpp
- * @brief Utility for thread-safe queue operations.
+ * @brief Thread-safe queue for concurrent producer/consumer access.
  * @author Nelson Durrant
  * @date May 2026
  */
@@ -31,7 +31,7 @@ namespace coug_fgo::utils {
 
 /**
  * @class ThreadSafeQueue
- * @brief Utility for thread-safe queue operations.
+ * @brief Thread-safe queue for concurrent producer/consumer access.
  * @tparam T Pointer-like message type exposing a `timestamp` member (e.g. a shared_ptr).
  */
 template <typename T>

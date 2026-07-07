@@ -14,7 +14,7 @@
 
 /**
  * @file dvl_tight_preintegrator.hpp
- * @brief Utility for preintegrating tightly-coupled DVL velocities into relative translation.
+ * @brief Preintegrator that accumulates tightly-coupled DVL velocities into relative translation.
  * @author Nelson Durrant
  * @date May 2026
  */
@@ -29,7 +29,7 @@ namespace coug_fgo::utils {
 
 /**
  * @class DvlTightPreintegrator
- * @brief Utility for preintegrating tightly-coupled DVL velocities into relative translation.
+ * @brief Preintegrator that accumulates tightly-coupled DVL velocities into relative translation.
  */
 class DvlTightPreintegrator {
  public:

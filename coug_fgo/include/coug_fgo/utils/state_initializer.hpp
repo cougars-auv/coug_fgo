@@ -14,7 +14,7 @@
 
 /**
  * @file state_initializer.hpp
- * @brief Utility for initializing state priors from sensor data.
+ * @brief Initializer for state priors from sensor data.
  * @author Nelson Durrant
  * @date May 2026
  */
@@ -34,7 +34,7 @@ namespace coug_fgo::utils {
 
 /**
  * @class StateInitializer
- * @brief Utility for initializing state priors from sensor data.
+ * @brief Initializer for state priors from sensor data.
  */
 class StateInitializer {
  public:
