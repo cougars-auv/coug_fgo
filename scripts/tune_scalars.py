@@ -106,7 +106,7 @@ def main() -> None:
             n_trials=N_OPTUNA_TRIALS,
             show_progress_bar=True,
         )
-    logger.info(f"Best scalars: {study.best_params}")
+    print(f"Best scalars: {study.best_params}")
 
     plot_args = []
     with logging_redirect_tqdm():
