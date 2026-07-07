@@ -90,8 +90,7 @@ class FactorGraphPy {
   /**
    * @brief Builds factors for one keyframe from the given measurement batches.
    * @param target_time Keyframe timestamp in seconds.
-   * @return Dict of leftover batches to re-queue, or None if the keyframe was
-   *         rejected (the caller should keep all queued measurements).
+   * @return Dict of batches to re-queue, or None if the keyframe was rejected (keep all queued).
    */
   pybind11::object update(double target_time, const ImuBatch& imu, const OdomBatch& gps,
                           const DepthBatch& depth, const MagBatch& mag, const AhrsBatch& ahrs,
