@@ -3,7 +3,7 @@
 <package format="3">
   <name>coug_fgo</name>
   <version>0.0.0</version>
-  <description>FGO localization and odometry for the CougUV</description>
+  <description>CoUGARs FGO odometry and localization.</description>
   <maintainer email="snelsond@byu.edu">snelsondurrant</maintainer>
   <license>Apache-2.0</license>
 
