@@ -77,7 +77,7 @@ NavsatOdomNode::NavsatOdomNode(const rclcpp::NodeOptions& options)
 
     std::string prefix = clean_ns.empty() ? "" : "[" + clean_ns + "] ";
 
-    std::string origin_task = prefix + "GPS Origin";
+    std::string origin_task = prefix + "Origin Status";
     diagnostic_updater_.add(origin_task, this, &NavsatOdomNode::checkOriginStatus);
   }
 

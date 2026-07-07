@@ -211,19 +211,13 @@ class FactorGraphNode : public rclcpp::Node {
    * @brief Checks sensor inputs for queue sizes and data freshness.
    * @param stat The diagnostic status wrapper.
    */
-  void checkSensorInputs(diagnostic_updater::DiagnosticStatusWrapper& stat);
+  void checkSensorStatus(diagnostic_updater::DiagnosticStatusWrapper& stat);
 
   /**
-   * @brief Checks the overall graph lifecycle state.
+   * @brief Checks the overall graph lifecycle state and processing times.
    * @param stat The diagnostic status wrapper.
    */
-  void checkGraphState(diagnostic_updater::DiagnosticStatusWrapper& stat);
-
-  /**
-   * @brief Checks optimization times for processing overflow.
-   * @param stat The diagnostic status wrapper.
-   */
-  void checkProcessingOverflow(diagnostic_updater::DiagnosticStatusWrapper& stat);
+  void checkGraphStatus(diagnostic_updater::DiagnosticStatusWrapper& stat);
 
   // --- Parameters ---
   std::shared_ptr<factor_graph_node::ParamListener> param_listener_;

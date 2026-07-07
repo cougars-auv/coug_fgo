@@ -265,14 +265,11 @@ void FactorGraphNode::setupRosInterfaces() {
       suffix = "";
     }
 
-    std::string sensor_task = prefix + "Sensor Inputs" + suffix;
-    diagnostic_updater_.add(sensor_task, this, &FactorGraphNode::checkSensorInputs);
+    std::string sensor_task = prefix + "Sensor Status" + suffix;
+    diagnostic_updater_.add(sensor_task, this, &FactorGraphNode::checkSensorStatus);
 
-    std::string state_task = prefix + "Graph State" + suffix;
-    diagnostic_updater_.add(state_task, this, &FactorGraphNode::checkGraphState);
-
-    std::string overflow_task = prefix + "Processing Overflow" + suffix;
-    diagnostic_updater_.add(overflow_task, this, &FactorGraphNode::checkProcessingOverflow);
+    std::string status_task = prefix + "Graph Status" + suffix;
+    diagnostic_updater_.add(status_task, this, &FactorGraphNode::checkGraphStatus);
   }
 }
 
@@ -781,7 +778,7 @@ void FactorGraphNode::optimizeGraph() {
   }
 }
 
-void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrapper& stat) {
+void FactorGraphNode::checkSensorStatus(diagnostic_updater::DiagnosticStatusWrapper& stat) {
   bool any_critical_offline = false;
   std::vector<std::string> offline_sensors;
 
@@ -797,7 +794,7 @@ void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrap
     stat.add(name + " Time Since Last (s)", time_since);
 
     if (time_since > timeout || (!since_arrival.has_value() && size == 0)) {
-      offline_sensors.push_back(name + " is offline.");
+      offline_sensors.push_back(name);
       if (is_critical) {
         any_critical_offline = true;
       }
@@ -821,32 +818,29 @@ void FactorGraphNode::checkSensorInputs(diagnostic_updater::DiagnosticStatusWrap
               params_.dynamics.enable_dynamics, false, params_.dynamics.diagnostic_timeout_sec);
 
   if (!offline_sensors.empty()) {
-    std::string msg = "";
+    std::string msg = "Sensor data unavailable: ";
     for (size_t i = 0; i < offline_sensors.size(); ++i) {
-      msg += (i > 0 ? " " : "") + offline_sensors[i];
+      msg += offline_sensors[i];
+      if (i < offline_sensors.size() - 1) {
+        msg += ", ";
+      }
     }
     auto level = any_critical_offline ? diagnostic_msgs::msg::DiagnosticStatus::ERROR
                                       : diagnostic_msgs::msg::DiagnosticStatus::WARN;
     stat.summary(level, msg);
   } else {
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "All requested sensors online.");
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "All requested sensor data acquired.");
   }
 }
 
-void FactorGraphNode::checkGraphState(diagnostic_updater::DiagnosticStatusWrapper& stat) {
-  if (is_initialized_.load()) {
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Optimizing factor graph.");
-  } else {
+void FactorGraphNode::checkGraphStatus(diagnostic_updater::DiagnosticStatusWrapper& stat) {
+  if (!is_initialized_.load()) {
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "Waiting for sensor data.");
-  }
-}
-
-void FactorGraphNode::checkProcessingOverflow(diagnostic_updater::DiagnosticStatusWrapper& stat) {
-  if (processing_overflow_.load()) {
+  } else if (processing_overflow_.load()) {
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN,
                  "Processing overflow detected. Batching keyframes.");
   } else {
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "No processing overflow detected.");
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Optimizing factor graph.");
   }
   stat.add("Total Duration (s)", last_total_duration_.load());
   stat.add("Smoother Duration (s)", last_smoother_duration_.load());
