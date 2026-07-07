@@ -167,7 +167,7 @@ def run_evo_evaluations(
                 logger.error(f"{metric} ({mode}):\n{result.stderr.strip()}")
 
 
-def evaluate_and_save(
+def process_and_evaluate(
     bag_path: str,
     config_paths: list[str],
     namespace: str,

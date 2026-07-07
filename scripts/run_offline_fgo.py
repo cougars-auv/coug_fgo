@@ -64,7 +64,7 @@ def main() -> None:
     plot_args = []
     with logging_redirect_tqdm():
         for bag in BAG_PATHS:
-            results, pose_gt = metrics.evaluate_and_save(
+            results, pose_gt = metrics.process_and_evaluate(
                 bag, CONFIG_PATHS, NAMESPACE, "offline", EVO_FLAGS
             )
             if results:

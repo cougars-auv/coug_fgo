@@ -114,7 +114,7 @@ def main() -> None:
             study.best_params
         ) as best_override_path:
             for bag in BAG_PATHS:
-                results, pose_gt = metrics.evaluate_and_save(
+                results, pose_gt = metrics.process_and_evaluate(
                     bag,
                     CONFIG_PATHS + [best_override_path],
                     NAMESPACE,
