@@ -20,45 +20,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import scienceplots  # noqa: F401
 import seaborn as sns
+from common import ALGORITHMS, COLORS, NAME_MAPPING
 
 plt.style.use(["science", "ieee"])
-
-ALGORITHMS = [
-    "FL-B",
-    "iS2-B",
-    "FL-LPI",
-    "FL-TPI",
-    "IEKF",
-    # "UKF",
-    # "EKF",
-    "TM",
-    "SBG",
-    "DVL",
-]
-COLORS = {
-    "FL-B": "#55A868",
-    "iS2-B": "#DD8452",
-    "FL-LPI": "#4C72B0",
-    "FL-TPI": "#C44E52",
-    "IEKF": "#8172B2",
-    "UKF": "#937860",
-    "EKF": "#DA8BC3",
-    "TM": "#8C8C8C",
-    "SBG": "#CCB974",
-    "DVL": "#64B5CD",
-}
-NAME_MAPPING = {
-    "global": "FL-B",
-    "global_isam2": "iS2-B",
-    "global_lpi": "FL-LPI",
-    "global_tpi": "FL-TPI",
-    "global_iekf": "IEKF",
-    "global_ukf": "UKF",
-    "global_ekf": "EKF",
-    "global_tm": "TM",
-    "imu": "SBG",
-    "dvl": "DVL",
-}
 
 METRICS_CONFIG = [
     ("benchmark_ape_trans.csv", "APE Translation RMSE (m)", "ape_trans"),

@@ -20,17 +20,12 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import scienceplots  # noqa: F401
 import seaborn as sns
+from common import COLORS
 from rosbags.highlevel import AnyReader
 
 plt.style.use(["science", "ieee"])
 
 ALGORITHMS = ["FL-B", "iS2-B", "FL-LPI", "FL-TPI"]
-COLORS = {
-    "FL-B": "#55A868",
-    "iS2-B": "#DD8452",
-    "FL-LPI": "#4C72B0",
-    "FL-TPI": "#C44E52",
-}
 NAME_MAPPING = {
     "factor_graph_node": "FL-B",
     "factor_graph_node_isam2": "iS2-B",

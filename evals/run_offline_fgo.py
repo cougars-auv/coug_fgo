@@ -20,7 +20,9 @@ import colorlog
 import matplotlib.pyplot as plt
 from tqdm.contrib.logging import logging_redirect_tqdm
 
-from utils import metrics
+from utils import pipeline, plotting
+
+logger = logging.getLogger(__name__)
 
 NAMESPACE = "turtlmap"
 BAG_PATHS = [
@@ -64,14 +66,14 @@ def main() -> None:
     plot_args = []
     with logging_redirect_tqdm():
         for bag in BAG_PATHS:
-            results, pose_gt = metrics.process_and_evaluate(
+            result = pipeline.process_and_evaluate(
                 bag, CONFIG_PATHS, NAMESPACE, "offline", EVO_FLAGS
             )
-            if results:
-                plot_args.append((results, pose_gt, Path(bag).name))
+            if result is not None:
+                plot_args.append(result)
 
     for results, pose_gt, label in plot_args:
-        metrics.plot_results(results, pose_gt, label)
+        plotting.plot_results(results, pose_gt, label)
     plt.show()
 
 

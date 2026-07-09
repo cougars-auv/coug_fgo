@@ -697,10 +697,10 @@ void FactorGraphNode::updateGraph() {
                              params_.keyframe_source.c_str(),
                              params_.backup_keyframe_source.c_str());
       } else {
-        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
-                             "Primary keyframe source '%s' timed out and no backup is configured. "
-                             "No new keyframes will be created.",
-                             params_.keyframe_source.c_str());
+        RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 1000,
+                              "Primary keyframe source '%s' timed out and no backup is configured. "
+                              "No new keyframes will be created.",
+                              params_.keyframe_source.c_str());
       }
     }
   }

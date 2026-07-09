@@ -20,51 +20,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scienceplots  # noqa: F401
 import seaborn as sns
-from evo.core import lie_algebra as lie
-from evo.core import sync
+from common import ALGORITHMS as ALGORITHMS_ASC
+from common import COLORS, NAME_MAPPING
 from evo.core.trajectory import PoseTrajectory3D
 from evo.tools import file_interface, plot
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.evo_tools import align_to_ref  # noqa: E402
+from utils.plotting import gap_indices  # noqa: E402
 
 sns.reset_orig()
 plt.style.use(["science", "ieee"])
 
-ALGORITHMS = [
-    "DVL",
-    "SBG",
-    "TM",
-    # "EKF",
-    # "UKF",
-    "IEKF",
-    "FL-TPI",
-    "FL-LPI",
-    "iS2-B",
-    "FL-B",
-]
-COLORS = {
-    "FL-B": "#55A868",
-    "iS2-B": "#DD8452",
-    "FL-LPI": "#4C72B0",
-    "FL-TPI": "#C44E52",
-    "IEKF": "#8172B2",
-    "UKF": "#937860",
-    "EKF": "#DA8BC3",
-    "TM": "#8C8C8C",
-    "SBG": "#CCB974",
-    "DVL": "#64B5CD",
-    "GT": "#000000",
-}
-NAME_MAPPING = {
-    "global": "FL-B",
-    "global_isam2": "iS2-B",
-    "global_lpi": "FL-LPI",
-    "global_tpi": "FL-TPI",
-    "global_iekf": "IEKF",
-    "global_ukf": "UKF",
-    "global_ekf": "EKF",
-    "global_tm": "TM",
-    "imu": "SBG",
-    "dvl": "DVL",
-}
+ALGORITHMS = ALGORITHMS_ASC[::-1]
 
 
 def add_start_end_markers(
@@ -120,32 +88,6 @@ def load_data(
     return est_trajs, gt_traj
 
 
-def align_to_ref(
-    est: PoseTrajectory3D,
-    ref: PoseTrajectory3D,
-    do_align: bool,
-    do_align_origin: bool,
-) -> None:
-    """
-    Align an estimated trajectory to the reference in place.
-
-    :param est: Estimated trajectory to modify.
-    :param ref: Reference (ground truth) trajectory.
-    :param do_align: Whether to apply an Umeyama alignment.
-    :param do_align_origin: Whether to align the first pose to the reference.
-    """
-    if do_align_origin:
-        est.align_origin(ref)
-    if not do_align:
-        return
-    ref_sync, est_sync = sync.associate_trajectories(ref, est, max_diff=0.05)
-    if est_sync.num_poses < 2:
-        return
-    r, t, s = est_sync.align(ref_sync, correct_scale=False)
-    est.scale(s)
-    est.transform(lie.se3(r, t))
-
-
 def positions_with_gaps(traj: PoseTrajectory3D) -> np.ndarray:
     """
     Return positions with NaN breaks inserted at large timestamp gaps.
@@ -154,12 +96,7 @@ def positions_with_gaps(traj: PoseTrajectory3D) -> np.ndarray:
     :return: Positions with NaN rows inserted where the timestamps jump.
     """
     pos = traj.positions_xyz
-    ts = traj.timestamps
-    if len(ts) < 2:
-        return pos
-    dts = np.diff(ts)
-    threshold = max(float(np.median(dts)) * 5.0, 0.5)
-    gap_idx = np.where(dts > threshold)[0] + 1
+    gap_idx = gap_indices(traj.timestamps)
     return np.insert(pos, gap_idx, np.nan, axis=0) if len(gap_idx) else pos
 
 

@@ -15,6 +15,7 @@
 
 import logging
 import math
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -23,15 +24,20 @@ import matplotlib.pyplot as plt
 import optuna
 from tqdm.contrib.logging import logging_redirect_tqdm
 
-from utils import metrics
-from utils import pipeline as fgo_pipeline
+from utils import evo_tools, pipeline, plotting
 
 logger = logging.getLogger(__name__)
 
 NAMESPACE = "turtlmap"
 BAG_PATHS = [
-    str(Path.home() / "cougars-dev/bags/turtlmap_batch/log1_batch_2026-05-05-11-16-18"),
-    str(Path.home() / "cougars-dev/bags/turtlmap_batch/log2_batch_2026-05-05-11-22-42"),
+    str(
+        Path.home()
+        / "cougars-dev/bags/turtlmap_offline/log1_offline_2026-07-06-16-08-28"
+    ),
+    str(
+        Path.home()
+        / "cougars-dev/bags/turtlmap_offline/log2_offline_2026-07-06-16-15-19"
+    ),
 ]
 CONFIG_PATHS = [
     str(Path.home() / "cougars-dev/config/fleet/coug_fgo_params.yaml"),
@@ -43,9 +49,35 @@ DB_URL = f"sqlite:///{Path(__file__).parent.resolve()}/scalar_tuning.db"
 STUDY_NAME = f"{NAMESPACE}_scalar_sweep_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}"
 
 SCALARS_TO_TUNE = ["ahrs", "depth", "dvl"]
-N_OPTUNA_TRIALS = 1
+N_OPTUNA_TRIALS = 100
 MIN_SCALAR = 0.01
 MAX_SCALAR = 100
+
+QUIET_LOGGERS = (
+    "utils.pipeline",
+    "utils.factor_graph",
+    "utils.urdf",
+    # "utils.evo_tools",
+    "coug_fgo.core",
+)
+
+
+@contextmanager
+def quiet_loggers(level: int = logging.ERROR):
+    """
+    Temporarily raise the level of the noisy per-run loggers.
+
+    :param level: Level to hold the loggers at while the context is active.
+    """
+    loggers = [logging.getLogger(name) for name in QUIET_LOGGERS]
+    previous = [lg.level for lg in loggers]
+    for lg in loggers:
+        lg.setLevel(level)
+    try:
+        yield
+    finally:
+        for lg, lvl in zip(loggers, previous):
+            lg.setLevel(lvl)
 
 
 def setup_logging() -> None:
@@ -79,12 +111,12 @@ def objective(trial: optuna.Trial, ground_truths: list[dict]) -> float:
         for s in SCALARS_TO_TUNE
     }
     rmses = []
-    with fgo_pipeline.covariance_override_file(scalars) as override_path:
+    with pipeline.covariance_override_file(scalars) as override_path:
         for bag, pose_gt in zip(BAG_PATHS, ground_truths):
-            results, crashed = fgo_pipeline.process_bag_offline(
-                bag, CONFIG_PATHS + [override_path], NAMESPACE, verbose=False
+            results, crashed = pipeline.process_bag_offline(
+                bag, CONFIG_PATHS + [override_path], NAMESPACE
             )
-            rmses.append(metrics.compute_ape_rmse(pose_gt, results, crashed))
+            rmses.append(evo_tools.compute_ape_rmse(pose_gt, results, crashed))
 
     if not rmses:
         return float("inf")
@@ -94,13 +126,13 @@ def objective(trial: optuna.Trial, ground_truths: list[dict]) -> float:
 def main() -> None:
     setup_logging()
 
-    ground_truths = [metrics.load_ground_truth(bag, NAMESPACE) for bag in BAG_PATHS]
+    ground_truths = [evo_tools.load_ground_truth(bag, NAMESPACE) for bag in BAG_PATHS]
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(
         study_name=STUDY_NAME, storage=DB_URL, direction="minimize"
     )
-    with logging_redirect_tqdm():
+    with logging_redirect_tqdm(), quiet_loggers():
         study.optimize(
             lambda trial: objective(trial, ground_truths),
             n_trials=N_OPTUNA_TRIALS,
@@ -110,22 +142,20 @@ def main() -> None:
 
     plot_args = []
     with logging_redirect_tqdm():
-        with fgo_pipeline.covariance_override_file(
-            study.best_params
-        ) as best_override_path:
+        with pipeline.covariance_override_file(study.best_params) as best_override_path:
             for bag in BAG_PATHS:
-                results, pose_gt = metrics.process_and_evaluate(
+                result = pipeline.process_and_evaluate(
                     bag,
                     CONFIG_PATHS + [best_override_path],
                     NAMESPACE,
                     "tuned",
                     EVO_FLAGS,
                 )
-                if results:
-                    plot_args.append((results, pose_gt, Path(bag).name))
+                if result is not None:
+                    plot_args.append(result)
 
     for results, pose_gt, label in plot_args:
-        metrics.plot_results(results, pose_gt, label)
+        plotting.plot_results(results, pose_gt, label)
     plt.show()
 
 
