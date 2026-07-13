@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright (c) 2026 BYU FROST Lab
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
+import logging
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -23,10 +22,15 @@ import seaborn as sns
 import yaml
 from rosbags.highlevel import AnyReader
 
+from utils import estimators, evo_tools
+
+logger = logging.getLogger(__name__)
+
 plt.style.use(["science", "ieee"])
 
-FGO_COLOR = "#55A868"
-FGO_TOPIC = "factor_graph_node/metrics"
+_FGO = estimators.timed_estimators()[0]
+FGO_COLOR = _FGO.color
+FGO_TOPIC = f"{_FGO.node}/metrics"
 
 
 def get_smoother_lag(bag_dir: Path, agent_name: str) -> float | None:
@@ -43,24 +47,22 @@ def get_smoother_lag(bag_dir: Path, agent_name: str) -> float | None:
     ]
 
     params: dict = {}
-    found_any = False
     for path in config_paths:
         try:
             with open(path) as f:
                 config = yaml.safe_load(f)
-            try:
-                params.update(config["/**"]["ros__parameters"])
-            except (KeyError, TypeError):
-                pass
-            try:
-                params.update(config[f"/{agent_name}"]["**"]["ros__parameters"])
-            except (KeyError, TypeError):
-                pass
-            found_any = True
         except (OSError, yaml.YAMLError):
             continue
+        try:
+            params.update(config["/**"]["ros__parameters"])
+        except (KeyError, TypeError):
+            pass
+        try:
+            params.update(config[f"/{agent_name}"]["**"]["ros__parameters"])
+        except (KeyError, TypeError):
+            pass
 
-    if not found_any or "smoother_lag" not in params:
+    if "smoother_lag" not in params:
         return None
     return float(params["smoother_lag"])
 
@@ -80,15 +82,15 @@ def read_bag_durations(bag_dir: Path, agent_name: str) -> list[float]:
             if not connections:
                 return []
             return [
-                float(reader.deserialize(rawdata, c.msgtype).total_duration)  # type: ignore[union-attr]
+                float(reader.deserialize(rawdata, c.msgtype).total_duration)
                 for c, _, rawdata in reader.messages(connections=connections)
             ]
     except Exception as e:
-        print(f"Error reading bag {bag_dir}: {e}")
+        logger.warning(f"Could not read {bag_dir}: {e}")
         return []
 
 
-def load_data(target_dir: Path) -> pd.DataFrame:
+def collect_durations_by_lag(target_dir: Path) -> pd.DataFrame:
     """
     Collect solver durations and smoother lags from all evaluated bags.
 
@@ -97,36 +99,32 @@ def load_data(target_dir: Path) -> pd.DataFrame:
     """
     timing_data = []
 
-    for evo_dir in target_dir.rglob("evo"):
-        bag_dir = evo_dir.parent
-        if not (bag_dir / "metadata.yaml").exists():
+    for bag_dir, agent_dir in evo_tools.iter_evaluated_agents(target_dir):
+        lag = get_smoother_lag(bag_dir, agent_dir.name)
+        if lag is None:
+            logger.warning(
+                f"No smoother_lag found in {bag_dir} for {agent_dir.name}, skipping."
+            )
             continue
-        for agent_dir in filter(Path.is_dir, evo_dir.iterdir()):
-            lag = get_smoother_lag(bag_dir, agent_dir.name)
-            if lag is None:
-                print(
-                    f"No smoother_lag found in {bag_dir} for {agent_dir.name}, skipping."
-                )
-                continue
 
-            for duration in read_bag_durations(bag_dir, agent_dir.name):
-                timing_data.append(
-                    {
-                        "Smoother Lag (s)": lag,
-                        "Duration (s)": duration,
-                    }
-                )
+        for duration in read_bag_durations(bag_dir, agent_dir.name):
+            timing_data.append(
+                {
+                    "Smoother Lag (s)": lag,
+                    "Duration (s)": duration,
+                }
+            )
 
     return pd.DataFrame(timing_data)
 
 
-def generate_plots(df: pd.DataFrame, output_dir: Path) -> None:
+def render(target_dir: Path) -> None:
     """
     Save violin and box plots of solver duration by smoother lag.
 
-    :param df: DataFrame pairing durations with smoother lag values.
-    :param output_dir: Directory to save the figures in.
+    :param target_dir: A bag or directory of bags that has been evaluated.
     """
+    df = collect_durations_by_lag(target_dir)
     if df.empty:
         return
 
@@ -156,25 +154,5 @@ def generate_plots(df: pd.DataFrame, output_dir: Path) -> None:
         )
 
         ax.set(title="", xlabel="Smoother Lag (s)", ylabel="Duration (s)")
-
-        save_path = output_dir / f"lag_{plot_type}.png"
-        fig.savefig(save_path, dpi=300, bbox_inches="tight")
+        fig.savefig(target_dir / f"lag_{plot_type}.png", dpi=300, bbox_inches="tight")
         plt.close(fig)
-
-
-def main() -> None:
-    if len(sys.argv) < 2:
-        print("Usage: lag_plot.py <target_dir>")
-        return
-
-    target_dir = Path(sys.argv[1])
-    if not target_dir.exists():
-        print(f"Error: {target_dir} does not exist.")
-        return
-
-    generate_plots(load_data(target_dir), target_dir)
-    print(f"Plots saved to {target_dir}")
-
-
-if __name__ == "__main__":
-    main()

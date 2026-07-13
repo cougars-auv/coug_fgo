@@ -39,7 +39,7 @@ class OfflineFactorGraph:
     """
     Offline factor graph using the FactorGraphPy Python wrapper.
 
-    Should match the ROS 2 framework in factor_graph.cpp as closely as possible.
+    Should match the ROS 2 framework in ``factor_graph.cpp`` as closely as possible.
 
     :author: Nelson Durrant
     :date: July 2026

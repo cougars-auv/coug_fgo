@@ -48,7 +48,7 @@ EVO_FLAGS = ["--align"]  # , "--project_to_plane", "xy"]
 DB_URL = f"sqlite:///{Path(__file__).parent.resolve()}/scalar_tuning.db"
 STUDY_NAME = f"{NAMESPACE}_scalar_sweep_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}"
 
-SCALARS_TO_TUNE = ["ahrs", "depth", "dvl"]
+SCALARS_TO_TUNE = ["const_vel"]
 N_OPTUNA_TRIALS = 100
 MIN_SCALAR = 0.01
 MAX_SCALAR = 100

@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+# TODO: Does this really need to be broken out?
 def gap_indices(t: np.ndarray) -> np.ndarray:
     """
     Find the indices where NaN breaks belong to split large timestamp gaps.

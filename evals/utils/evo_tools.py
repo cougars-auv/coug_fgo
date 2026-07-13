@@ -14,6 +14,7 @@
 
 import logging
 import subprocess
+from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
@@ -21,6 +22,8 @@ from evo.core import lie_algebra as lie
 from evo.core import metrics, sync
 from evo.core.trajectory import PoseTrajectory3D
 from scipy.spatial.transform import Rotation
+
+from utils import estimators
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +50,7 @@ def _run_logged(
     return result
 
 
+# TODO: Should this really be broken out?
 def evo_agent_dir(bag_path: str, namespace: str) -> Path:
     """
     Return the bag's evo output directory for one agent namespace.
@@ -58,6 +62,33 @@ def evo_agent_dir(bag_path: str, namespace: str) -> Path:
     return Path(bag_path) / "evo" / namespace
 
 
+def iter_evaluated_agents(target_dir: Path) -> Iterator[tuple[Path, Path]]:
+    """
+    Yield each evaluated agent directory under a target directory.
+
+    :param target_dir: A bag or directory of bags that has been evaluated.
+    :return: ``(bag_dir, agent_dir)`` pairs found under every ``evo`` folder.
+    """
+    for evo_dir in target_dir.rglob("evo"):
+        bag_dir = evo_dir.parent
+        if not (bag_dir / "metadata.yaml").exists():
+            continue
+        for agent_dir in filter(Path.is_dir, evo_dir.iterdir()):
+            yield bag_dir, agent_dir
+
+
+def latest_tum(directory: Path) -> Path | None:
+    """
+    Return the most recently modified TUM file in a directory, if any.
+
+    :param directory: Directory to search for ``*.tum`` files.
+    :return: The newest TUM file by modification time, or None if none exist.
+    """
+    tum_files = sorted(directory.glob("*.tum"), key=lambda p: p.stat().st_mtime)
+    return tum_files[-1] if tum_files else None
+
+
+# TODO: Why are there 3 of these ground truth functions?
 def find_ground_truth(bag_path: str, namespace: str) -> Path | None:
     """
     Return the ground truth TUM file exported at the agent's evo root.
@@ -66,8 +97,26 @@ def find_ground_truth(bag_path: str, namespace: str) -> Path | None:
     :param namespace: AUV namespace the ground truth was exported under.
     :return: Path to the ground truth TUM file, or None if not found.
     """
-    tum_files = sorted(evo_agent_dir(bag_path, namespace).glob("*.tum"))
-    return tum_files[0] if tum_files else None
+    return latest_tum(evo_agent_dir(bag_path, namespace))
+
+
+def ensure_ground_truth(bag_path: str, namespace: str) -> Path | None:
+    """
+    Return the agent's ground truth TUM file, exporting it from the bag if needed.
+
+    :param bag_path: Path to the ROS 2 bag directory.
+    :param namespace: AUV namespace the ground truth belongs to.
+    :return: Path to the ground truth TUM file, or None if it could not be produced.
+    """
+    tum_path = find_ground_truth(bag_path, namespace)
+    if tum_path is None:
+        agent_dir = evo_agent_dir(bag_path, namespace)
+        logger.warning(
+            f"No ground truth TUM found in {agent_dir}; attempting export..."
+        )
+        truth_topic = f"/{namespace}/{estimators.TRUTH_TOPIC}"
+        tum_path = export_bag_tum(bag_path, truth_topic, agent_dir)
+    return tum_path
 
 
 def load_ground_truth(bag_path: str, namespace: str) -> dict:
@@ -78,25 +127,20 @@ def load_ground_truth(bag_path: str, namespace: str) -> dict:
     :param namespace: AUV namespace the ground truth was exported under.
     :return: Arrays keyed by state name, or an empty dict if unavailable.
     """
-    tum_path = find_ground_truth(bag_path, namespace)
+    tum_path = ensure_ground_truth(bag_path, namespace)
     if tum_path is None:
-        agent_dir = evo_agent_dir(bag_path, namespace)
-        logger.info(f"No ground truth TUM found in {agent_dir}; attempting export...")
-        truth_topic = f"/{namespace}/odometry/truth"
-        tum_path = export_bag_tum(bag_path, truth_topic, agent_dir)
-    if tum_path is None:
-        logger.warning(f"Could not find or export ground truth for {namespace}")
+        logger.error(f"Could not find or export ground truth for {namespace}")
         return {}
     try:
         data = np.loadtxt(tum_path, comments="#", ndmin=2)
     except (OSError, ValueError):
-        logger.warning(f"Could not load ground truth from {tum_path}")
+        logger.error(f"Could not load ground truth from {tum_path}")
         return {}
     if data.size == 0:
-        logger.warning(f"Ground truth file is empty: {tum_path}")
+        logger.error(f"Ground truth file is empty: {tum_path}")
         return {}
     if data.shape[1] < len(TUM_KEYS):
-        logger.warning(f"Ground truth file has too few columns: {tum_path}")
+        logger.error(f"Ground truth file has too few columns: {tum_path}")
         return {}
 
     pose = {k: data[:, i] for i, k in enumerate(TUM_KEYS)}
@@ -136,8 +180,7 @@ def export_bag_tum(bag_path: str, topic: str, out_dir: Path) -> Path | None:
     if _run_logged(args, cwd=out_dir).returncode != 0:
         return None
 
-    tum_files = sorted(out_dir.glob("*.tum"), key=lambda p: p.stat().st_mtime)
-    return tum_files[-1] if tum_files else None
+    return latest_tum(out_dir)
 
 
 def run_evo_evaluations(
@@ -199,28 +242,17 @@ def compute_ape_rmse(
         ape.process_data((gt_sync, est_sync))
         return ape.get_statistic(metrics.StatisticsType.rmse)
     except Exception as e:
-        logger.warning(f"Could not compute APE RMSE: {e}")
+        logger.error(f"Could not compute APE RMSE: {e}")
         return float("inf")
 
 
-def align_to_ref(
-    est: PoseTrajectory3D,
-    ref: PoseTrajectory3D,
-    do_align: bool,
-    do_align_origin: bool,
-) -> None:
+def umeyama_align(est: PoseTrajectory3D, ref: PoseTrajectory3D) -> None:
     """
-    Align an estimated trajectory to the reference in place.
+    Umeyama-align an estimated trajectory to the reference in place.
 
     :param est: Estimated trajectory to modify.
     :param ref: Reference (ground truth) trajectory.
-    :param do_align: Whether to apply an Umeyama alignment.
-    :param do_align_origin: Whether to align the first pose to the reference.
     """
-    if do_align_origin:
-        est.align_origin(ref)
-    if not do_align:
-        return
     ref_sync, est_sync = sync.associate_trajectories(ref, est, max_diff=0.05)
     if est_sync.num_poses < 2:
         return

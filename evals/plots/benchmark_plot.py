@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright (c) 2026 BYU FROST Lab
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,16 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
+import logging
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import scienceplots  # noqa: F401
 import seaborn as sns
-from common import ALGORITHMS, COLORS, NAME_MAPPING
+
+from utils import estimators
+
+logger = logging.getLogger(__name__)
 
 plt.style.use(["science", "ieee"])
+
+COLORS = estimators.color_map()
+ALGORITHMS = estimators.labels()
 
 METRICS_CONFIG = [
     ("benchmark_ape_trans.csv", "APE Translation RMSE (m)", "ape_trans"),
@@ -32,7 +37,7 @@ METRICS_CONFIG = [
 ]
 
 
-def load_data(bags_dir: Path) -> dict[str, pd.DataFrame]:
+def load_benchmark_rmse(bags_dir: Path) -> dict[str, pd.DataFrame]:
     """
     Collect benchmark CSV rows from all bags into per-metric DataFrames.
 
@@ -40,7 +45,6 @@ def load_data(bags_dir: Path) -> dict[str, pd.DataFrame]:
     :return: DataFrames of algorithm RMSE values keyed by CSV file name.
     """
     data_store = {cfg[0]: [] for cfg in METRICS_CONFIG}
-    sorted_mapping = sorted(NAME_MAPPING.items(), key=lambda x: len(x[0]), reverse=True)
 
     for path in sorted(bags_dir.rglob("benchmark_*.csv")):
         if path.name not in data_store:
@@ -48,29 +52,25 @@ def load_data(bags_dir: Path) -> dict[str, pd.DataFrame]:
         try:
             df = pd.read_csv(path, index_col=0)
             for algo_key, row in df.iterrows():
-                label = algo_key
-                for key, val in sorted_mapping:
-                    if key in str(algo_key):
-                        label = val
-                        break
-
+                label = estimators.label_for_row(algo_key)
                 if label in ALGORITHMS:
                     data_store[path.name].append(
                         {"Algorithm": label, "RMSE": row["rmse"]}
                     )
         except Exception as e:
-            print(f"Error reading {path}: {e}")
+            logger.warning(f"Could not read {path}: {e}")
 
     return {k: pd.DataFrame(v) for k, v in data_store.items() if v}
 
 
-def generate_plots(data_map: dict[str, pd.DataFrame], output_dir: Path) -> None:
+def render(target_dir: Path) -> None:
     """
     Save violin, box, and strip plots for each benchmark metric.
 
-    :param data_map: DataFrames of algorithm RMSE values keyed by CSV name.
-    :param output_dir: Directory to save the figures in.
+    :param target_dir: A bag or directory of bags that has been evaluated.
     """
+    data_map = load_benchmark_rmse(target_dir)
+
     for filename, label, prefix in METRICS_CONFIG:
         if filename not in data_map or data_map[filename].empty:
             continue
@@ -122,24 +122,9 @@ def generate_plots(data_map: dict[str, pd.DataFrame], output_dir: Path) -> None:
                 )
 
             ax.set(title="", xlabel="", ylabel=label)
-            save_path = output_dir / f"{prefix}_{plot_type}.png"
-            fig.savefig(save_path, dpi=300, bbox_inches="tight")
+            fig.savefig(
+                target_dir / f"{prefix}_{plot_type}.png",
+                dpi=300,
+                bbox_inches="tight",
+            )
             plt.close(fig)
-
-
-def main() -> None:
-    if len(sys.argv) < 2:
-        print("Usage: benchmark_plot.py <target_dir>")
-        return
-
-    target_dir = Path(sys.argv[1])
-    if not target_dir.exists():
-        print(f"Error: {target_dir} does not exist.")
-        return
-
-    generate_plots(load_data(target_dir), target_dir)
-    print(f"Plots saved to {target_dir}")
-
-
-if __name__ == "__main__":
-    main()

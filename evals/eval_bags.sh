@@ -25,13 +25,11 @@ fi
 # --- Options ---
 options=$(gum choose --no-limit --header "Select evo options:" -- \
   "--align (Umeyama)" \
-  "--align_origin" \
-  "--project_to_plane xy ")
+  "--project_to_plane xy")
 
 eval_flags=()
 [[ "${options}" == *"--align (Umeyama)"* ]] && eval_flags+=("--align")
-[[ "${options}" == *"--align_origin"* ]] && eval_flags+=("--align_origin")
 [[ "${options}" == *"--project_to_plane"* ]] && eval_flags+=("--project_to_plane")
 
 # --- Evaluation ---
-python3 "$(dirname "$0")/evaluate.py" "${target_dir}" "${eval_flags[@]}"
+python3 "$(dirname "$0")/evaluate_bags.py" "${target_dir}" "${eval_flags[@]}"

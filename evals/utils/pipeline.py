@@ -151,7 +151,7 @@ def process_bag_offline(
             )
             logger.info(f"Matched sensor topics:\n{conn_str}")
         else:
-            logger.warning("No matching sensor topics found in the bag.")
+            logger.error("No matching sensor topics found in the bag.")
 
         pbar = tqdm(
             reader.messages(connections=matched_conns),

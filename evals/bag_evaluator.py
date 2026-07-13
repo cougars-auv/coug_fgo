@@ -15,47 +15,17 @@
 
 import argparse
 import logging
-import subprocess
 from pathlib import Path
 
-import colorlog
 import yaml
 
-from utils import evo_tools
+from utils import estimators, evo_tools
+from utils.logging import setup_logging
 
 logger = logging.getLogger(__name__)
 
-# Estimator topics to look for under each discovered agent namespace.
-TRUTH_SUFFIX = "odometry/truth"
-SUFFIXES = (
-    "odometry/global",
-    "odometry/global_isam2",
-    "odometry/global_lpi",
-    "odometry/global_tpi",
-    "odometry/global_tm",
-    "dvl/odometry",
-    "imu/odometry",
-)
+CONFIG_SUFFIX = "_params.yaml"
 BENCHMARK_METRICS = ("ape_trans", "ape_rot", "rpe_trans", "rpe_rot")
-PLOTS_DIR = Path(__file__).resolve().parent / "plots"
-
-
-def setup_logging() -> None:
-    """Configure colored console logging for the script."""
-    handler = colorlog.StreamHandler()
-    handler.setFormatter(
-        colorlog.ColoredFormatter(
-            "%(log_color)s[%(levelname)s] %(message)s",
-            log_colors={
-                "DEBUG": "cyan",
-                "INFO": "white",
-                "WARNING": "yellow",
-                "ERROR": "red",
-                "CRITICAL": "red,bg_white",
-            },
-        )
-    )
-    logging.basicConfig(level=logging.INFO, handlers=[handler])
 
 
 def find_bags(target_dir: Path) -> list[Path]:
@@ -63,7 +33,7 @@ def find_bags(target_dir: Path) -> list[Path]:
     Return every bag directory at or beneath a target directory.
 
     :param target_dir: A bag directory or a directory containing bags.
-    :return: The bag directories, identified by their metadata.yaml files.
+    :return: The bag directories, identified by their ``metadata.yaml`` files.
     """
     return sorted(meta.parent for meta in target_dir.rglob("metadata.yaml"))
 
@@ -85,26 +55,23 @@ def bag_message_counts(bag_path: Path) -> dict[str, int]:
     return counts
 
 
-def discover_agents(counts: dict[str, int]) -> list[str]:
+def discover_agents(bag_path: Path) -> list[str]:
     """
-    Find agent namespaces in a bag, auto-detected from ``/{agent}/odometry/truth`` topics.
+    List agent namespaces from the config snapshot copied into the bag.
 
-    :param counts: Message count keyed by topic name for the bag.
-    :return: Sorted, de-duplicated agent namespaces.
+    Namespaces come from the per-agent ``<namespace>_params.yaml`` files at the top
+    level of the bag's ``config`` directory, the same files the launch scripts load
+    to resolve each agent's parameters. The snapshot is a full copy of the repo
+    config, so it may name agents that were not actually recorded; those are skipped
+    later when no ground truth is found.
+
+    :param bag_path: Path to the ROS 2 bag directory.
+    :return: Sorted agent namespaces.
     """
-    agents = set()
-    for topic in counts:
-        parts = topic.split("/")
-        # Match "/{agent}/odometry/truth" -> ["", agent, "odometry", "truth"].
-        if topic.endswith(f"/{TRUTH_SUFFIX}") and len(parts) == 4:
-            agents.add(parts[1])
-    return sorted(agents)
-
-
-def _existing_tum(out_dir: Path) -> Path | None:
-    """Return the first exported TUM file in a directory, if any."""
-    tum_files = sorted(out_dir.glob("*.tum"))
-    return tum_files[0] if tum_files else None
+    config_dir = bag_path / "config"
+    return sorted(
+        p.name.removesuffix(CONFIG_SUFFIX) for p in config_dir.glob(f"*{CONFIG_SUFFIX}")
+    )
 
 
 def evaluate_agent(
@@ -118,25 +85,26 @@ def evaluate_agent(
     :param counts: Message count keyed by topic name for this bag.
     :param evo_flags: Extra evo flags passed to the APE and RPE evaluations.
     """
-    agent_dir = bag_path / "evo" / agent
-    truth_topic = f"/{agent}/{TRUTH_SUFFIX}"
+    agent_dir = evo_tools.evo_agent_dir(bag_path, agent)
+    truth_topic = f"/{agent}/{estimators.TRUTH_TOPIC}"
 
-    # Export the ground truth once, reusing it across every estimator topic.
-    gt_tum = _existing_tum(agent_dir)
-    if gt_tum is None:
-        logger.info(f"Exporting ground truth for {agent}...")
-        gt_tum = evo_tools.export_bag_tum(str(bag_path), truth_topic, agent_dir)
+    # Config lists every possible agent; skip those absent from this bag before
+    # attempting an export that we already know would fail.
+    if evo_tools.latest_tum(agent_dir) is None and counts.get(truth_topic, 0) == 0:
+        return
+
+    # Resolve the ground truth once, reusing it across every estimator topic.
+    gt_tum = evo_tools.ensure_ground_truth(bag_path, agent)
     if gt_tum is None:
         logger.warning(f"No ground truth found for {agent}; skipping.")
         return
 
-    for suffix in SUFFIXES:
-        topic = f"/{agent}/{suffix}"
-        # Name the output folder after the non-odometry topic segment.
-        name = suffix.removeprefix("odometry/").removesuffix("/odometry")
-        out_dir = agent_dir / name
+    for est in estimators.exported_estimators():
+        topic = f"/{agent}/{est.topic}"
+        # Each estimator's outputs live in a folder named after its registry key.
+        out_dir = agent_dir / est.key
 
-        est_tum = _existing_tum(out_dir)
+        est_tum = evo_tools.latest_tum(out_dir)
         # Skip topics that were never recorded (and not already exported).
         if est_tum is None and counts.get(topic, 0) == 0:
             continue
@@ -148,8 +116,7 @@ def evaluate_agent(
             continue
 
         logger.info(f"Evaluating {topic}...")
-        if est_tum is None:
-            est_tum = evo_tools.export_bag_tum(str(bag_path), topic, out_dir)
+        est_tum = est_tum or evo_tools.export_bag_tum(str(bag_path), topic, out_dir)
         if est_tum is None:
             logger.warning(f"Could not export {topic}; skipping.")
             continue
@@ -164,27 +131,29 @@ def render_plots(target_dir: Path, evo_flags: list[str]) -> None:
     Render the trajectory, timing, benchmark, and lag summary plots.
 
     :param target_dir: The bag or directory of bags that was evaluated.
-    :param evo_flags: Evo flags; alignment flags are forwarded to the plotter.
+    :param evo_flags: Evo flags; alignment is forwarded to the trajectory plot.
     """
-    align_flags = [f for f in evo_flags if f in ("--align", "--align_origin")]
-    subprocess.run(
-        [
-            "python3",
-            str(PLOTS_DIR / "trajectory_plot.py"),
-            str(target_dir),
-            *align_flags,
-        ]
-    )
-    for script in ("timing_plot.py", "benchmark_plot.py", "lag_plot.py"):
-        subprocess.run(["python3", str(PLOTS_DIR / script), str(target_dir)])
+    # Imported here so the plotting stack is only loaded once evaluation succeeds.
+    from plots import benchmark_plot, lag_plot, timing_plot, trajectory_plot
+
+    do_align = "--align" in evo_flags
+    plotters = [
+        ("trajectory", lambda: trajectory_plot.render(target_dir, do_align=do_align)),
+        ("timing", lambda: timing_plot.render(target_dir)),
+        ("benchmark", lambda: benchmark_plot.render(target_dir)),
+        ("lag", lambda: lag_plot.render(target_dir)),
+    ]
+    for name, render in plotters:
+        try:
+            render()
+        except Exception:
+            logger.exception(f"{name} plot failed")
 
 
 def main() -> None:
-    """Evaluate the selected bags and render the summary plots."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target_dir", help="A bag directory or a directory of bags.")
     parser.add_argument("--align", action="store_true", help="Umeyama alignment.")
-    parser.add_argument("--align_origin", action="store_true", help="Align origins.")
     parser.add_argument(
         "--project_to_plane", action="store_true", help="Project to the xy plane."
     )
@@ -195,8 +164,6 @@ def main() -> None:
     evo_flags: list[str] = []
     if args.align:
         evo_flags.append("--align")
-    if args.align_origin:
-        evo_flags.append("--align_origin")
     if args.project_to_plane:
         evo_flags += ["--project_to_plane", "xy"]
 
@@ -209,7 +176,7 @@ def main() -> None:
     for bag_path in bags:
         logger.info(f"Processing {bag_path}...")
         counts = bag_message_counts(bag_path)
-        for agent in discover_agents(counts):
+        for agent in discover_agents(bag_path):
             evaluate_agent(bag_path, agent, counts, evo_flags)
 
     render_plots(target_dir, evo_flags)

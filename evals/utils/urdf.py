@@ -122,7 +122,7 @@ def resolve_urdf_path(namespace: str, config_paths: list[str]) -> str | None:
         except OSError:
             return None
         except yaml.YAMLError as e:
-            logger.warning(f"Could not parse params file {yaml_path}: {e}")
+            logger.error(f"Could not parse params file {yaml_path}: {e}")
             return None
         for top_key in top_keys:
             try:
@@ -142,7 +142,7 @@ def resolve_urdf_path(namespace: str, config_paths: list[str]) -> str | None:
                 fleet_path = config_dir / "coug_description_params.yaml"
                 urdf_file = urdf_file or read_urdf_file(fleet_path, ["/**"])
     if urdf_file is None:
-        logger.warning("No urdf_file parameter found in any config.")
+        logger.error("No urdf_file parameter found in any config.")
         return None
 
     urdf_dirs = [
@@ -162,5 +162,5 @@ def resolve_urdf_path(namespace: str, config_paths: list[str]) -> str | None:
     for urdf_dir in urdf_dirs:
         if (urdf_dir / urdf_file).is_file():
             return str(urdf_dir / urdf_file)
-    logger.warning(f"Could not locate urdf_file '{urdf_file}' in any URDF directory.")
+    logger.error(f"Could not locate urdf_file '{urdf_file}' in any URDF directory.")
     return None
