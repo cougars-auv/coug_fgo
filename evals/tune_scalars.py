@@ -19,12 +19,12 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
-import colorlog
 import matplotlib.pyplot as plt
 import optuna
 from tqdm.contrib.logging import logging_redirect_tqdm
 
 from utils import evo_tools, pipeline, plotting
+from utils.logging import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -78,24 +78,6 @@ def quiet_loggers(level: int = logging.ERROR):
     finally:
         for lg, lvl in zip(loggers, previous):
             lg.setLevel(lvl)
-
-
-def setup_logging() -> None:
-    """Configure colored console logging for the script."""
-    handler = colorlog.StreamHandler()
-    handler.setFormatter(
-        colorlog.ColoredFormatter(
-            "%(log_color)s[%(levelname)s] %(message)s",
-            log_colors={
-                "DEBUG": "cyan",
-                "INFO": "white",
-                "WARNING": "yellow",
-                "ERROR": "red",
-                "CRITICAL": "red,bg_white",
-            },
-        )
-    )
-    logging.basicConfig(level=logging.INFO, handlers=[handler])
 
 
 def objective(trial: optuna.Trial, ground_truths: list[dict]) -> float:
