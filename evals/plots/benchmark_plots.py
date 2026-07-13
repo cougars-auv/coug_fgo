@@ -37,7 +37,7 @@ METRICS_CONFIG = [
 ]
 
 
-def load_benchmark_rmse(bags_dir: Path) -> dict[str, pd.DataFrame]:
+def _load_benchmark_rmse(bags_dir: Path) -> dict[str, pd.DataFrame]:
     """
     Collect benchmark CSV rows from all bags into per-metric DataFrames.
 
@@ -69,7 +69,7 @@ def render(target_dir: Path) -> None:
 
     :param target_dir: A bag or directory of bags that has been evaluated.
     """
-    data_map = load_benchmark_rmse(target_dir)
+    data_map = _load_benchmark_rmse(target_dir)
 
     for filename, label, prefix in METRICS_CONFIG:
         if filename not in data_map or data_map[filename].empty:

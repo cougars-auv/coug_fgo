@@ -64,7 +64,7 @@ QUIET_LOGGERS = (
 
 
 @contextmanager
-def quiet_loggers(level: int = logging.ERROR):
+def _quiet_loggers(level: int = logging.ERROR):
     """
     Temporarily raise the level of the noisy per-run loggers.
 
@@ -81,7 +81,7 @@ def quiet_loggers(level: int = logging.ERROR):
             lg.setLevel(lvl)
 
 
-def objective(trial: optuna.Trial, ground_truths: list[dict]) -> float:
+def _objective(trial: optuna.Trial, ground_truths: list[dict]) -> float:
     """
     Score one set of covariance scalars across all configured bags.
 
@@ -115,9 +115,9 @@ def main() -> None:
     study = optuna.create_study(
         study_name=STUDY_NAME, storage=DB_URL, direction="minimize"
     )
-    with logging_redirect_tqdm(), quiet_loggers():
+    with logging_redirect_tqdm(), _quiet_loggers():
         study.optimize(
-            lambda trial: objective(trial, ground_truths),
+            lambda trial: _objective(trial, ground_truths),
             n_trials=N_OPTUNA_TRIALS,
             show_progress_bar=True,
         )

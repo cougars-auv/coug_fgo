@@ -33,7 +33,7 @@ FGO_COLOR = _FGO.color
 FGO_TOPIC = f"{_FGO.node}/metrics"
 
 
-def get_smoother_lag(bag_dir: Path, agent_name: str) -> float | None:
+def _get_smoother_lag(bag_dir: Path, agent_name: str) -> float | None:
     """
     Read the smoother lag parameter from a bag's saved config files.
 
@@ -67,7 +67,7 @@ def get_smoother_lag(bag_dir: Path, agent_name: str) -> float | None:
     return float(params["smoother_lag"])
 
 
-def read_bag_durations(bag_dir: Path, agent_name: str) -> list[float]:
+def _read_bag_durations(bag_dir: Path, agent_name: str) -> list[float]:
     """
     Read the total solver durations from a bag's metrics topic.
 
@@ -90,7 +90,7 @@ def read_bag_durations(bag_dir: Path, agent_name: str) -> list[float]:
         return []
 
 
-def collect_durations_by_lag(target_dir: Path) -> pd.DataFrame:
+def _collect_durations_by_lag(target_dir: Path) -> pd.DataFrame:
     """
     Collect solver durations and smoother lags from all evaluated bags.
 
@@ -100,14 +100,14 @@ def collect_durations_by_lag(target_dir: Path) -> pd.DataFrame:
     timing_data = []
 
     for bag_dir, agent_dir in evo_tools.iter_evaluated_agents(target_dir):
-        lag = get_smoother_lag(bag_dir, agent_dir.name)
+        lag = _get_smoother_lag(bag_dir, agent_dir.name)
         if lag is None:
             logger.warning(
                 f"No smoother_lag found in {bag_dir} for {agent_dir.name}, skipping."
             )
             continue
 
-        for duration in read_bag_durations(bag_dir, agent_dir.name):
+        for duration in _read_bag_durations(bag_dir, agent_dir.name):
             timing_data.append(
                 {
                     "Smoother Lag (s)": lag,
@@ -124,7 +124,7 @@ def render(target_dir: Path) -> None:
 
     :param target_dir: A bag or directory of bags that has been evaluated.
     """
-    df = collect_durations_by_lag(target_dir)
+    df = _collect_durations_by_lag(target_dir)
     if df.empty:
         return
 

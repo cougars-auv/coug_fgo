@@ -28,7 +28,7 @@ CONFIG_SUFFIX = "_params.yaml"
 BENCHMARK_METRICS = ("ape_trans", "ape_rot", "rpe_trans", "rpe_rot")
 
 
-def find_bags(target_dir: Path) -> list[Path]:
+def _find_bags(target_dir: Path) -> list[Path]:
     """
     Return every bag directory at or beneath a target directory.
 
@@ -38,7 +38,7 @@ def find_bags(target_dir: Path) -> list[Path]:
     return sorted(meta.parent for meta in target_dir.rglob("metadata.yaml"))
 
 
-def bag_message_counts(bag_path: Path) -> dict[str, int]:
+def _bag_message_counts(bag_path: Path) -> dict[str, int]:
     """
     Map each recorded topic in a bag to its message count.
 
@@ -55,7 +55,7 @@ def bag_message_counts(bag_path: Path) -> dict[str, int]:
     return counts
 
 
-def discover_agents(bag_path: Path) -> list[str]:
+def _discover_agents(bag_path: Path) -> list[str]:
     """
     List agent namespaces from the config snapshot copied into the bag.
 
@@ -74,7 +74,7 @@ def discover_agents(bag_path: Path) -> list[str]:
     )
 
 
-def evaluate_agent(
+def _evaluate_agent(
     bag_path: Path, agent: str, counts: dict[str, int], evo_flags: list[str]
 ) -> None:
     """
@@ -126,7 +126,7 @@ def evaluate_agent(
     evo_tools.build_benchmark_tables(agent_dir, BENCHMARK_METRICS)
 
 
-def render_plots(target_dir: Path, evo_flags: list[str]) -> None:
+def _render_plots(target_dir: Path, evo_flags: list[str]) -> None:
     """
     Render the trajectory, timing, benchmark, and lag summary plots.
 
@@ -168,18 +168,18 @@ def main() -> None:
         evo_flags += ["--project_to_plane", "xy"]
 
     target_dir = Path(args.target_dir)
-    bags = find_bags(target_dir)
+    bags = _find_bags(target_dir)
     if not bags:
         logger.error(f"No bags found in {target_dir}")
         return
 
     for bag_path in bags:
         logger.info(f"Processing {bag_path}...")
-        counts = bag_message_counts(bag_path)
-        for agent in discover_agents(bag_path):
-            evaluate_agent(bag_path, agent, counts, evo_flags)
+        counts = _bag_message_counts(bag_path)
+        for agent in _discover_agents(bag_path):
+            _evaluate_agent(bag_path, agent, counts, evo_flags)
 
-    render_plots(target_dir, evo_flags)
+    _render_plots(target_dir, evo_flags)
 
 
 if __name__ == "__main__":

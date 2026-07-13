@@ -34,7 +34,7 @@ COLORS = estimators.color_map()
 ALGORITHMS = estimators.labels()[::-1]
 
 
-def add_start_end_markers(
+def _add_start_end_markers(
     ax: plt.Axes,
     traj: PoseTrajectory3D,
     color: str,
@@ -60,7 +60,7 @@ def add_start_end_markers(
         ax.scatter(end[0], end[1], marker=end_symbol, color=color, zorder=10, s=size)
 
 
-def load_trajectories(
+def _load_trajectories(
     evo_agent_dir: Path,
 ) -> tuple[dict[str, PoseTrajectory3D], PoseTrajectory3D | None]:
     """
@@ -81,7 +81,7 @@ def load_trajectories(
     return est_trajs, gt_traj
 
 
-def positions_with_gaps(traj: PoseTrajectory3D) -> np.ndarray:
+def _positions_with_gaps(traj: PoseTrajectory3D) -> np.ndarray:
     """
     Return positions with NaN breaks inserted at large timestamp gaps.
 
@@ -101,7 +101,7 @@ def render(target_dir: Path, do_align: bool = False) -> None:
     :param do_align: Whether to Umeyama-align estimates to the ground truth.
     """
     for bag_dir, agent_dir in evo_tools.iter_evaluated_agents(target_dir):
-        est_trajs, gt_traj = load_trajectories(agent_dir)
+        est_trajs, gt_traj = _load_trajectories(agent_dir)
 
         if not est_trajs and gt_traj is None:
             continue
@@ -127,12 +127,12 @@ def render(target_dir: Path, do_align: bool = False) -> None:
                     color=COLORS[algo],
                     label=algo,
                 )
-                add_start_end_markers(ax, est_trajs[algo], COLORS[algo])
+                _add_start_end_markers(ax, est_trajs[algo], COLORS[algo])
 
         if gt_traj:
-            gt_pos = positions_with_gaps(gt_traj)
+            gt_pos = _positions_with_gaps(gt_traj)
             ax.plot(gt_pos[:, 0], gt_pos[:, 1], "--", color=COLORS["GT"], label="GT")
-            add_start_end_markers(ax, gt_traj, COLORS["GT"])
+            _add_start_end_markers(ax, gt_traj, COLORS["GT"])
 
         legend = plt.legend(frameon=True)
         legend.set_zorder(100)

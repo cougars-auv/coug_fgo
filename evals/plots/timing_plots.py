@@ -32,7 +32,7 @@ ALGORITHMS = [e.label for e in estimators.timed_estimators()]
 NAME_MAPPING = {e.node: e.label for e in estimators.timed_estimators()}
 
 
-def read_timing_metrics(bag_dir: Path, agent_name: str) -> pd.DataFrame:
+def _read_timing_metrics(bag_dir: Path, agent_name: str) -> pd.DataFrame:
     """
     Read the solver timing metrics for one agent from a bag.
 
@@ -76,7 +76,7 @@ def render(target_dir: Path) -> None:
     :param target_dir: A bag or directory of bags that has been evaluated.
     """
     for bag_dir, agent_dir in evo_tools.iter_evaluated_agents(target_dir):
-        df = read_timing_metrics(bag_dir, agent_dir.name)
+        df = _read_timing_metrics(bag_dir, agent_dir.name)
         if df.empty:
             continue
 
