@@ -204,7 +204,7 @@ def process_and_evaluate(
     **kwargs,
 ) -> tuple[dict, dict, str] | None:
     """
-    Run the full offline pipeline for one bag: load truth, process, save the estimate, evaluate.
+    Run the full offline pipeline for one bag: load truth, process, save, evaluate.
 
     :param bag_path: Path to the ROS 2 bag directory.
     :param config_paths: Parameter YAML files, in increasing priority.
@@ -225,9 +225,9 @@ def process_and_evaluate(
     est_path = evo_dir / f"{namespace}_{tag}.tum"
     evo_tools.save_tum(est_path, results)
 
-    gt_path = evo_tools.find_ground_truth(bag_path, namespace)
+    gt_path = evo_tools.ensure_ground_truth(bag_path, namespace)
     if pose_gt and gt_path is not None:
-        evo_tools.run_evo_evaluations(str(gt_path), str(est_path), evo_dir, evo_flags)
+        evo_tools.run_evo_evaluations(gt_path, est_path, evo_dir, evo_flags)
 
     return results, pose_gt, Path(bag_path).name
 

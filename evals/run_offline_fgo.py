@@ -19,8 +19,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from tqdm.contrib.logging import logging_redirect_tqdm
 
-from utils import pipeline, plotting
-from utils.logging import setup_logging
+from plots import state_plots
+from utils import pipeline
+from utils.log_setup import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ def main() -> None:
                 plot_args.append(result)
 
     for results, pose_gt, label in plot_args:
-        plotting.plot_results(results, pose_gt, label)
+        state_plots.plot_results(results, pose_gt, label)
     plt.show()
 
 

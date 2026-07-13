@@ -34,7 +34,7 @@ def _run_logged(
     args: list[str], cwd: Path | None = None, log_stdout: bool = True
 ) -> subprocess.CompletedProcess:
     """
-    Run a subprocess, logging stdout at info and stderr at error on failure (warning otherwise).
+    Run a subprocess, logging stdout at info and stderr at error (warning on success).
 
     :param args: Command and arguments to execute.
     :param cwd: Working directory to run the command in, if any.
@@ -50,8 +50,7 @@ def _run_logged(
     return result
 
 
-# TODO: Should this really be broken out?
-def evo_agent_dir(bag_path: str, namespace: str) -> Path:
+def evo_agent_dir(bag_path: str | Path, namespace: str) -> Path:
     """
     Return the bag's evo output directory for one agent namespace.
 
@@ -88,19 +87,7 @@ def latest_tum(directory: Path) -> Path | None:
     return tum_files[-1] if tum_files else None
 
 
-# TODO: Why are there 3 of these ground truth functions?
-def find_ground_truth(bag_path: str, namespace: str) -> Path | None:
-    """
-    Return the ground truth TUM file exported at the agent's evo root.
-
-    :param bag_path: Path to the ROS 2 bag directory.
-    :param namespace: AUV namespace the ground truth was exported under.
-    :return: Path to the ground truth TUM file, or None if not found.
-    """
-    return latest_tum(evo_agent_dir(bag_path, namespace))
-
-
-def ensure_ground_truth(bag_path: str, namespace: str) -> Path | None:
+def ensure_ground_truth(bag_path: str | Path, namespace: str) -> Path | None:
     """
     Return the agent's ground truth TUM file, exporting it from the bag if needed.
 
@@ -108,9 +95,9 @@ def ensure_ground_truth(bag_path: str, namespace: str) -> Path | None:
     :param namespace: AUV namespace the ground truth belongs to.
     :return: Path to the ground truth TUM file, or None if it could not be produced.
     """
-    tum_path = find_ground_truth(bag_path, namespace)
+    agent_dir = evo_agent_dir(bag_path, namespace)
+    tum_path = latest_tum(agent_dir)
     if tum_path is None:
-        agent_dir = evo_agent_dir(bag_path, namespace)
         logger.warning(
             f"No ground truth TUM found in {agent_dir}; attempting export..."
         )
@@ -119,9 +106,9 @@ def ensure_ground_truth(bag_path: str, namespace: str) -> Path | None:
     return tum_path
 
 
-def load_ground_truth(bag_path: str, namespace: str) -> dict:
+def load_ground_truth(bag_path: str | Path, namespace: str) -> dict:
     """
-    Load the ground truth into state arrays, exporting from the bag's truth topic first if needed.
+    Load the ground truth into state arrays, exporting it from the bag first if needed.
 
     :param bag_path: Path to the ROS 2 bag directory.
     :param namespace: AUV namespace the ground truth was exported under.
@@ -166,7 +153,7 @@ def save_tum(path: Path, results: dict) -> None:
     logger.info(f"Saved TUM trajectory: {path}")
 
 
-def export_bag_tum(bag_path: str, topic: str, out_dir: Path) -> Path | None:
+def export_bag_tum(bag_path: str | Path, topic: str, out_dir: Path) -> Path | None:
     """
     Export a recorded trajectory topic from a bag to a TUM file with evo.
 
@@ -184,7 +171,7 @@ def export_bag_tum(bag_path: str, topic: str, out_dir: Path) -> Path | None:
 
 
 def run_evo_evaluations(
-    gt_file: str, est_file: str, evo_dir: Path, evo_flags: list[str]
+    gt_file: str | Path, est_file: str | Path, evo_dir: Path, evo_flags: list[str]
 ) -> None:
     """
     Run the evo APE and RPE evaluations and save the result archives.
@@ -198,7 +185,7 @@ def run_evo_evaluations(
 
     for metric, cmd in [("APE", "evo_ape"), ("RPE", "evo_rpe")]:
         for pose_relation, suffix in [("trans_part", "trans"), ("angle_deg", "rot")]:
-            args = [cmd, "tum", gt_file, est_file, "-r", pose_relation]
+            args = [cmd, "tum", str(gt_file), str(est_file), "-r", pose_relation]
             args += base_flags + evo_flags
             args += ["--save_results", str(evo_dir / f"{metric.lower()}_{suffix}.zip")]
             if metric == "RPE":

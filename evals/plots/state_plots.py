@@ -15,11 +15,15 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+from utils import estimators
 
-# TODO: Does this really need to be broken out?
+GT_COLOR = estimators.GROUND_TRUTH_COLOR
+FGO_COLOR = estimators.timed_estimators()[0].color
+
+
 def gap_indices(t: np.ndarray) -> np.ndarray:
     """
-    Find the indices where NaN breaks belong to split large timestamp gaps.
+    Find the insertion indices where NaN breaks should split large timestamp gaps.
 
     :param t: Sample timestamps.
     :return: Insertion indices where the timestamps jump (empty if none).
@@ -73,15 +77,15 @@ def plot_results(results: dict, pose_gt: dict, label: str = "") -> None:
         ),
     ]
 
-    _, axes = plt.subplots(len(layout), 3, figsize=(12, 10), num=label or None)
+    _, axes = plt.subplots(len(layout), 3, figsize=(15, 8), num=label or None)
     for row, (keys, labels, gt_data) in enumerate(layout):
         for col, (key, axis_label) in enumerate(zip(keys, labels)):
             ax = axes[row, col]
             if gt_data:
                 gt_t, gt_vals = _mask_gaps(gt_data["time"] - t0, gt_data[key])
-                ax.plot(gt_t, gt_vals, "-k", label="GT")
+                ax.plot(gt_t, gt_vals, "-", color=GT_COLOR, label="GT")
             if key in results:
-                ax.plot(t_fgo, results[key], "-r", label="FGO")
+                ax.plot(t_fgo, results[key], "-", color=FGO_COLOR, label="FGO")
             ax.set_ylabel(axis_label)
             if row == len(layout) - 1:
                 ax.set_xlabel("Time (s)")

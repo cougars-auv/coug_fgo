@@ -22,7 +22,8 @@ import seaborn as sns
 from evo.core.trajectory import PoseTrajectory3D
 from evo.tools import file_interface, plot
 
-from utils import estimators, evo_tools, plotting
+from plots import state_plots
+from utils import estimators, evo_tools
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +89,7 @@ def positions_with_gaps(traj: PoseTrajectory3D) -> np.ndarray:
     :return: Positions with NaN rows inserted where the timestamps jump.
     """
     pos = traj.positions_xyz
-    gap_idx = plotting.gap_indices(traj.timestamps)
+    gap_idx = state_plots.gap_indices(traj.timestamps)
     return np.insert(pos, gap_idx, np.nan, axis=0) if len(gap_idx) else pos
 
 

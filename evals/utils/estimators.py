@@ -17,14 +17,13 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Estimator:
-    # TODO: make this description better
     """
-    One trajectory estimator and every name it is known by across the pipeline.
+    Registry entry linking one estimator's folder, label, color, and topics.
 
     :param key: Evo output folder name, and the key plots look estimates up by.
     :param label: Short algorithm name shown in plot legends and tables.
     :param color: Hex color used for this estimator in every plot.
-    :param topic: Odometry topic suffix exported by ``evaluate_bags.py``, or None if not exported.
+    :param topic: Odometry topic suffix exported by ``bag_evaluator.py``, or None.
     :param node: Metrics node base name for solver timing/lag, or None if not published.
     """
 
@@ -73,7 +72,7 @@ ESTIMATORS: list[Estimator] = [
 
 
 def exported_estimators() -> list[Estimator]:
-    """Return the estimators that ``evaluate_bags.py`` exports from bags (have a topic)."""
+    """Return the estimators that ``bag_evaluator.py`` exports from bags (have a topic)."""
     return [e for e in ESTIMATORS if e.topic is not None]
 
 
@@ -82,14 +81,9 @@ def timed_estimators() -> list[Estimator]:
     return [e for e in ESTIMATORS if e.node is not None]
 
 
-def name_mapping() -> dict[str, str]:
-    """Map each evo output folder name to its short algorithm label."""
-    return {e.key: e.label for e in ESTIMATORS}
-
-
 def label_for_folder(folder: str) -> str | None:
     """Return the algorithm label for an evo output folder name, or None."""
-    return name_mapping().get(folder)
+    return next((e.label for e in ESTIMATORS if e.key == folder), None)
 
 
 def label_for_row(row_key: str) -> str | None:

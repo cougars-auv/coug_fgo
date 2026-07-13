@@ -23,8 +23,9 @@ import matplotlib.pyplot as plt
 import optuna
 from tqdm.contrib.logging import logging_redirect_tqdm
 
-from utils import evo_tools, pipeline, plotting
-from utils.logging import setup_logging
+from plots import state_plots
+from utils import evo_tools, pipeline
+from utils.log_setup import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +138,7 @@ def main() -> None:
                     plot_args.append(result)
 
     for results, pose_gt, label in plot_args:
-        plotting.plot_results(results, pose_gt, label)
+        state_plots.plot_results(results, pose_gt, label)
     plt.show()
 
 

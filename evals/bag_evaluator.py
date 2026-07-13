@@ -20,7 +20,7 @@ from pathlib import Path
 import yaml
 
 from utils import estimators, evo_tools
-from utils.logging import setup_logging
+from utils.log_setup import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -116,12 +116,12 @@ def evaluate_agent(
             continue
 
         logger.info(f"Evaluating {topic}...")
-        est_tum = est_tum or evo_tools.export_bag_tum(str(bag_path), topic, out_dir)
+        est_tum = est_tum or evo_tools.export_bag_tum(bag_path, topic, out_dir)
         if est_tum is None:
             logger.warning(f"Could not export {topic}; skipping.")
             continue
 
-        evo_tools.run_evo_evaluations(str(gt_tum), str(est_tum), out_dir, evo_flags)
+        evo_tools.run_evo_evaluations(gt_tum, est_tum, out_dir, evo_flags)
 
     evo_tools.build_benchmark_tables(agent_dir, BENCHMARK_METRICS)
 
@@ -134,14 +134,14 @@ def render_plots(target_dir: Path, evo_flags: list[str]) -> None:
     :param evo_flags: Evo flags; alignment is forwarded to the trajectory plot.
     """
     # Imported here so the plotting stack is only loaded once evaluation succeeds.
-    from plots import benchmark_plot, lag_plot, timing_plot, trajectory_plot
+    from plots import benchmark_plots, lag_plots, timing_plots, trajectory_plots
 
     do_align = "--align" in evo_flags
     plotters = [
-        ("trajectory", lambda: trajectory_plot.render(target_dir, do_align=do_align)),
-        ("timing", lambda: timing_plot.render(target_dir)),
-        ("benchmark", lambda: benchmark_plot.render(target_dir)),
-        ("lag", lambda: lag_plot.render(target_dir)),
+        ("trajectory", lambda: trajectory_plots.render(target_dir, do_align=do_align)),
+        ("timing", lambda: timing_plots.render(target_dir)),
+        ("benchmark", lambda: benchmark_plots.render(target_dir)),
+        ("lag", lambda: lag_plots.render(target_dir)),
     ]
     for name, render in plotters:
         try:

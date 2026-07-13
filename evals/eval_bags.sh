@@ -32,4 +32,4 @@ eval_flags=()
 [[ "${options}" == *"--project_to_plane"* ]] && eval_flags+=("--project_to_plane")
 
 # --- Evaluation ---
-python3 "$(dirname "$0")/evaluate_bags.py" "${target_dir}" "${eval_flags[@]}"
+python3 "$(dirname "$0")/bag_evaluator.py" "${target_dir}" "${eval_flags[@]}"
