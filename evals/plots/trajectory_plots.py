@@ -100,6 +100,7 @@ def render(target_dir: Path, do_align: bool = False) -> None:
     :param target_dir: A bag or directory of bags that has been evaluated.
     :param do_align: Whether to Umeyama-align estimates to the ground truth.
     """
+    logger.info("Rendering trajectory plots...")
     for bag_dir, agent_dir in evo_tools.iter_evaluated_agents(target_dir):
         est_trajs, gt_traj = _load_trajectories(agent_dir)
 
@@ -140,9 +141,7 @@ def render(target_dir: Path, do_align: bool = False) -> None:
         legend = plt.legend(frameon=True)
         legend.set_zorder(100)
 
-        fig.savefig(
-            bag_dir / f"{agent_dir.name}_trajectories.png",
-            dpi=300,
-            bbox_inches="tight",
-        )
+        out_path = bag_dir / f"{agent_dir.name}_trajectories.png"
+        fig.savefig(out_path, dpi=300, bbox_inches="tight")
         plt.close(fig)
+        logger.info(f"Saved plot: {out_path}")

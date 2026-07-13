@@ -124,6 +124,7 @@ def render(target_dir: Path) -> None:
 
     :param target_dir: A bag or directory of bags that has been evaluated.
     """
+    logger.info("Rendering lag plots...")
     df = _collect_durations_by_lag(target_dir)
     if df.empty:
         logger.error(f"No solver durations with smoother lags found for {target_dir}.")
@@ -155,5 +156,7 @@ def render(target_dir: Path) -> None:
         )
 
         ax.set(title="", xlabel="Smoother Lag (s)", ylabel="Duration (s)")
-        fig.savefig(target_dir / f"lag_{plot_type}.png", dpi=300, bbox_inches="tight")
+        out_path = target_dir / f"lag_{plot_type}.png"
+        fig.savefig(out_path, dpi=300, bbox_inches="tight")
         plt.close(fig)
+        logger.info(f"Saved plot: {out_path}")

@@ -30,7 +30,7 @@ def _find_bags(target_dir: Path) -> list[Path]:
     Return every bag directory at or beneath a target directory.
 
     :param target_dir: A bag directory or a directory containing bags.
-    :return: The bag directories, identified by their ``metadata.yaml`` files.
+    :return: Bag directories, identified by their ``metadata.yaml`` files.
     """
     return sorted(meta.parent for meta in target_dir.rglob("metadata.yaml"))
 
@@ -44,12 +44,56 @@ def _bag_message_counts(bag_path: Path) -> dict[str, int]:
     """
     meta = yaml.safe_load((bag_path / "metadata.yaml").read_text())
     info = meta.get("rosbag2_bagfile_information", {})
-    counts: dict[str, int] = {}
-    for entry in info.get("topics_with_message_count", []):
-        name = entry.get("topic_metadata", {}).get("name")
-        if name is not None:
-            counts[name] = entry.get("message_count", 0)
-    return counts
+    return {
+        entry["topic_metadata"]["name"]: entry.get("message_count", 0)
+        for entry in info.get("topics_with_message_count", [])
+        if "topic_metadata" in entry and "name" in entry.get("topic_metadata", {})
+    }
+
+
+def _evaluate_estimator(
+    bag_path: Path,
+    est: estimators.Estimator,
+    agent: str,
+    agent_dir: Path,
+    gt_tum: Path | None,
+    counts: dict[str, int],
+    evo_flags: list[str],
+) -> None:
+    """
+    Export and benchmark a single estimator topic against ground truth.
+
+    :param bag_path: Path to the ROS 2 bag directory.
+    :param est: Estimator registry entry to evaluate.
+    :param agent: AUV namespace being evaluated.
+    :param agent_dir: The agent's evo output directory.
+    :param gt_tum: Ground truth TUM path, or None if unavailable.
+    :param counts: Message counts keyed by topic name for this bag.
+    :param evo_flags: Extra evo flags forwarded to APE and RPE runs.
+    """
+    topic = f"/{agent}/{est.topic}"
+    out_dir = agent_dir / est.key
+    est_tum = evo_tools.latest_tum(out_dir)
+
+    if est_tum is None and counts.get(topic, 0) == 0:
+        return
+
+    if est_tum is not None:
+        if gt_tum is None:
+            logger.warning(f"Skipping {topic}, no ground truth available.")
+            return
+        if all((out_dir / f"{m}.zip").exists() for m in BENCHMARK_METRICS):
+            logger.info(f"Skipping {topic}, results already exist.")
+            return
+
+    logger.info(f"Evaluating {topic}...")
+    est_tum = est_tum or evo_tools.export_bag_tum(bag_path, topic, out_dir)
+    if est_tum is None:
+        logger.error(f"Could not export {topic}.")
+        return
+
+    if gt_tum is not None:
+        evo_tools.run_evo_evaluations(gt_tum, est_tum, out_dir, evo_flags)
 
 
 def _evaluate_agent(
@@ -61,12 +105,11 @@ def _evaluate_agent(
     :param bag_path: Path to the ROS 2 bag directory.
     :param agent: AUV namespace to evaluate.
     :param counts: Message count keyed by topic name for this bag.
-    :param evo_flags: Extra evo flags passed to the APE and RPE evaluations.
+    :param evo_flags: Extra evo flags forwarded to APE and RPE runs.
     """
     agent_dir = evo_tools.evo_agent_dir(bag_path, agent)
     truth_topic = f"/{agent}/{estimators.TRUTH_TOPIC}"
 
-    # Check if this agent is present at all (either already exported or in the bag)
     has_gt = (
         evo_tools.latest_tum(agent_dir) is not None or counts.get(truth_topic, 0) > 0
     )
@@ -75,96 +118,26 @@ def _evaluate_agent(
         or counts.get(f"/{agent}/{est.topic}", 0) > 0
         for est in estimators.exported_estimators()
     )
-
-    # The agent list may name agents that were not recorded in this bag; skip them
-    # before attempting an export that we already know would fail.
     if not has_gt and not has_est:
         return
 
-    # Resolve the ground truth once, reusing it across every estimator topic.
-    # Only try to export it if we know it was recorded.
-    if has_gt:
-        gt_tum = evo_tools.ensure_ground_truth(bag_path, agent)
-    else:
-        gt_tum = None
-
+    gt_tum = evo_tools.ensure_ground_truth(bag_path, agent) if has_gt else None
     if gt_tum is None:
-        logger.warning(f"No ground truth found for {agent}; metrics will be skipped.")
+        logger.warning(f"No ground truth found for {agent}.")
 
     for est in estimators.exported_estimators():
-        topic = f"/{agent}/{est.topic}"
-        # Each estimator's outputs live in a folder named after its registry key.
-        out_dir = agent_dir / est.key
-
-        est_tum = evo_tools.latest_tum(out_dir)
-        # Skip topics that were never recorded (and not already exported).
-        if est_tum is None and counts.get(topic, 0) == 0:
-            continue
-
-        if est_tum is not None:
-            if gt_tum is None:
-                logger.info(f"Skipping {topic} (exported, but no GT to run metrics).")
-                continue
-            elif all((out_dir / f"{m}.zip").exists() for m in BENCHMARK_METRICS):
-                logger.info(f"Skipping {topic} (results already exist).")
-                continue
-
-        logger.info(f"Evaluating {topic}...")
-        est_tum = est_tum or evo_tools.export_bag_tum(bag_path, topic, out_dir)
-        if est_tum is None:
-            logger.warning(f"Could not export {topic}; skipping.")
-            continue
-
-        if gt_tum is not None:
-            evo_tools.run_evo_evaluations(gt_tum, est_tum, out_dir, evo_flags)
+        _evaluate_estimator(bag_path, est, agent, agent_dir, gt_tum, counts, evo_flags)
 
     evo_tools.build_benchmark_tables(agent_dir, BENCHMARK_METRICS)
-
-
-def _render_plots(target_dir: Path, evo_flags: list[str]) -> None:
-    """
-    Render the trajectory, timing, benchmark, and lag summary plots.
-
-    :param target_dir: The bag or directory of bags that was evaluated.
-    :param evo_flags: Evo flags; alignment is forwarded to the trajectory plot.
-    """
-
-    do_align = "--align" in evo_flags
-    plotters = [
-        ("trajectory", lambda: trajectory_plots.render(target_dir, do_align=do_align)),
-        ("timing", lambda: timing_plots.render(target_dir)),
-        ("benchmark", lambda: benchmark_plots.render(target_dir)),
-        ("lag", lambda: lag_plots.render(target_dir)),
-    ]
-    failed = []
-    for name, render in plotters:
-        logger.info(f"Rendering {name} plot...")
-        try:
-            render()
-        except Exception as e:
-            # Keep rendering the remaining plots; report the traceback and collect
-            # the failure for a summary once every plot has been attempted.
-            failed.append(name)
-            logger.exception(f"Failed to render {name} plot for {target_dir}: {e}")
-
-    if failed:
-        logger.error(
-            f"{len(failed)}/{len(plotters)} plots failed: {', '.join(failed)}."
-        )
 
 
 def evaluate_bags(target_dir: Path, agents: list[str], evo_flags: list[str]) -> None:
     """
     Evaluate every bag at or beneath a target directory and render summary plots.
 
-    For each bag, exports and benchmarks every recorded estimator topic against
-    ground truth, then renders the trajectory, timing, benchmark, and lag plots
-    across the whole target.
-
     :param target_dir: A bag directory or a directory of bags to evaluate.
-    :param agents: AUV namespaces to evaluate; those absent from a given bag (no
-        recorded ground truth) are skipped.
-    :param evo_flags: Extra evo flags passed to the APE and RPE evaluations.
+    :param agents: AUV namespaces to evaluate; absent agents are skipped.
+    :param evo_flags: Extra evo flags forwarded to APE and RPE runs.
     """
     bags = _find_bags(target_dir)
     if not bags:
@@ -177,4 +150,8 @@ def evaluate_bags(target_dir: Path, agents: list[str], evo_flags: list[str]) -> 
         for agent in agents:
             _evaluate_agent(bag_path, agent, counts, evo_flags)
 
-    _render_plots(target_dir, evo_flags)
+    do_align = "--align" in evo_flags
+    trajectory_plots.render(target_dir, do_align=do_align)
+    timing_plots.render(target_dir)
+    benchmark_plots.render(target_dir)
+    lag_plots.render(target_dir)

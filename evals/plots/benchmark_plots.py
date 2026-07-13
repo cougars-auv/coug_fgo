@@ -69,6 +69,7 @@ def render(target_dir: Path) -> None:
 
     :param target_dir: A bag or directory of bags that has been evaluated.
     """
+    logger.info("Rendering benchmark plots...")
     data_map = _load_benchmark_rmse(target_dir)
     if not data_map:
         logger.error(f"No benchmark data found for {target_dir}.")
@@ -125,9 +126,7 @@ def render(target_dir: Path) -> None:
                 )
 
             ax.set(title="", xlabel="", ylabel=label)
-            fig.savefig(
-                target_dir / f"{prefix}_{plot_type}.png",
-                dpi=300,
-                bbox_inches="tight",
-            )
+            out_path = target_dir / f"{prefix}_{plot_type}.png"
+            fig.savefig(out_path, dpi=300, bbox_inches="tight")
             plt.close(fig)
+            logger.info(f"Saved plot: {out_path}")

@@ -75,6 +75,7 @@ def render(target_dir: Path) -> None:
 
     :param target_dir: A bag or directory of bags that has been evaluated.
     """
+    logger.info("Rendering timing plots...")
     for bag_dir, agent_dir in evo_tools.iter_evaluated_agents(target_dir):
         df = _read_timing_metrics(bag_dir, agent_dir.name)
         if df.empty:
@@ -120,9 +121,7 @@ def render(target_dir: Path) -> None:
 
             ax.set(title="", xlabel="", ylabel="Duration (s)")
             ax.legend(title=None)
-            fig.savefig(
-                bag_dir / f"{agent_dir.name}_timing_{plot_type}.png",
-                dpi=300,
-                bbox_inches="tight",
-            )
+            out_path = bag_dir / f"{agent_dir.name}_timing_{plot_type}.png"
+            fig.savefig(out_path, dpi=300, bbox_inches="tight")
             plt.close(fig)
+            logger.info(f"Saved plot: {out_path}")
