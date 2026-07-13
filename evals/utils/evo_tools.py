@@ -101,36 +101,36 @@ def ensure_ground_truth(bag_path: str | Path, namespace: str) -> Path | None:
     return tum_path
 
 
-def load_ground_truth(bag_path: str | Path, namespace: str) -> dict:
+def load_ground_truth(bag_path: str | Path, namespace: str) -> tuple[dict, Path | None]:
     """
     Load the ground truth into state arrays, exporting it from the bag first if needed.
 
     :param bag_path: Path to the ROS 2 bag directory.
     :param namespace: AUV namespace the ground truth was exported under.
-    :return: Arrays keyed by state name, or an empty dict if unavailable.
+    :return: Tuple of arrays keyed by state name, and the path to the TUM file.
     """
     tum_path = ensure_ground_truth(bag_path, namespace)
     if tum_path is None:
         logger.error(f"Could not find or export ground truth for {namespace}.")
-        return {}
+        return {}, None
     try:
         data = np.loadtxt(tum_path, comments="#", ndmin=2)
     except (OSError, ValueError):
         logger.error(f"Could not load ground truth from {tum_path}")
-        return {}
+        return {}, None
     if data.size == 0:
         logger.error(f"Ground truth file is empty: {tum_path}")
-        return {}
+        return {}, None
     if data.shape[1] < len(TUM_KEYS):
         logger.error(f"Ground truth file has too few columns: {tum_path}")
-        return {}
+        return {}, None
 
     pose = {k: data[:, i] for i, k in enumerate(TUM_KEYS)}
     roll, pitch, yaw = Rotation.from_quat(data[:, 4:8]).as_euler("xyz").T
     pose.update({"roll": roll, "pitch": pitch, "yaw": yaw})
 
     logger.info(f"Loaded ground truth: {tum_path}")
-    return pose
+    return pose, tum_path
 
 
 def save_tum(path: Path, results: dict) -> None:

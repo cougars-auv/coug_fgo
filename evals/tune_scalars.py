@@ -109,7 +109,9 @@ def _objective(trial: optuna.Trial, ground_truths: list[dict]) -> float:
 def main() -> None:
     setup_logging()
 
-    ground_truths = [evo_tools.load_ground_truth(bag, NAMESPACE) for bag in BAG_PATHS]
+    ground_truths = [
+        evo_tools.load_ground_truth(bag, NAMESPACE)[0] for bag in BAG_PATHS
+    ]
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(

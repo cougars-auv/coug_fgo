@@ -215,7 +215,7 @@ def process_and_evaluate(
     :return: ``(results, pose_gt, label)`` tuple, or None if no results.
     """
     logger.info(f"Processing bag: {bag_path}")
-    pose_gt = evo_tools.load_ground_truth(bag_path, namespace)
+    pose_gt, gt_path = evo_tools.load_ground_truth(bag_path, namespace)
     results, _ = process_bag_offline(bag_path, config_paths, namespace, **kwargs)
     if not results:
         return None
@@ -225,7 +225,6 @@ def process_and_evaluate(
     est_path = evo_dir / f"{namespace}_{tag}.tum"
     evo_tools.save_tum(est_path, results)
 
-    gt_path = evo_tools.ensure_ground_truth(bag_path, namespace)
     if pose_gt and gt_path is not None:
         evo_tools.run_evo_evaluations(gt_path, est_path, evo_dir, evo_flags)
 
