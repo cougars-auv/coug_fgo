@@ -70,6 +70,9 @@ def render(target_dir: Path) -> None:
     :param target_dir: A bag or directory of bags that has been evaluated.
     """
     data_map = _load_benchmark_rmse(target_dir)
+    if not data_map:
+        logger.error(f"No benchmark data found for {target_dir}.")
+        return
 
     for filename, label, prefix in METRICS_CONFIG:
         if filename not in data_map or data_map[filename].empty:

@@ -104,6 +104,9 @@ def render(target_dir: Path, do_align: bool = False) -> None:
         est_trajs, gt_traj = _load_trajectories(agent_dir)
 
         if not est_trajs and gt_traj is None:
+            logger.warning(
+                f"No trajectories found for {agent_dir.name} in {bag_dir.name}."
+            )
             continue
 
         if gt_traj is not None and do_align:

@@ -23,9 +23,9 @@ from rosbags.highlevel import AnyReader
 from rosbags.typesys import Stores, get_typestore
 from tqdm import tqdm
 
-from . import evo_tools
-from .factor_graph import OfflineFactorGraph
-from .urdf import UrdfTree, resolve_urdf_path
+from utils import evo_tools
+from utils.factor_graph import OfflineFactorGraph
+from utils.urdf import UrdfTree, resolve_urdf_path
 
 logger = logging.getLogger(__name__)
 

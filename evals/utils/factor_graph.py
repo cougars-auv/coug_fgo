@@ -19,7 +19,7 @@ from pathlib import Path
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from .urdf import UrdfTree
+from utils.urdf import UrdfTree
 
 FGO_LIB_PATH = str(
     Path.home()

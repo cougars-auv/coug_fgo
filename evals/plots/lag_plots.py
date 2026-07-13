@@ -126,6 +126,7 @@ def render(target_dir: Path) -> None:
     """
     df = _collect_durations_by_lag(target_dir)
     if df.empty:
+        logger.error(f"No solver durations with smoother lags found for {target_dir}.")
         return
 
     lag_values = sorted(df["Smoother Lag (s)"].unique())

@@ -23,7 +23,7 @@ class Estimator:
     :param key: Evo output folder name, and the key plots look estimates up by.
     :param label: Short algorithm name shown in plot legends and tables.
     :param color: Hex color used for this estimator in every plot.
-    :param topic: Odometry topic suffix exported by ``bag_evaluator.py``, or None.
+    :param topic: Odometry topic suffix exported by ``eval_bags.py``, or None.
     :param node: Metrics node base name for solver timing/lag, or None if not published.
     """
 
@@ -72,7 +72,7 @@ ESTIMATORS: list[Estimator] = [
 
 
 def exported_estimators() -> list[Estimator]:
-    """Return the estimators that ``bag_evaluator.py`` exports from bags (have a topic)."""
+    """Return the estimators that ``eval_bags.py`` exports from bags (have a topic)."""
     return [e for e in ESTIMATORS if e.topic is not None]
 
 

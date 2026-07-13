@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright (c) 2026 BYU FROST Lab
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,18 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import logging
 from pathlib import Path
 
 import yaml
 
 from utils import estimators, evo_tools
-from utils.log_setup import setup_logging
 
 logger = logging.getLogger(__name__)
 
-CONFIG_SUFFIX = "_params.yaml"
 BENCHMARK_METRICS = ("ape_trans", "ape_rot", "rpe_trans", "rpe_rot")
 
 
@@ -55,25 +51,6 @@ def _bag_message_counts(bag_path: Path) -> dict[str, int]:
     return counts
 
 
-def _discover_agents(bag_path: Path) -> list[str]:
-    """
-    List agent namespaces from the config snapshot copied into the bag.
-
-    Namespaces come from the per-agent ``<namespace>_params.yaml`` files at the top
-    level of the bag's ``config`` directory, the same files the launch scripts load
-    to resolve each agent's parameters. The snapshot is a full copy of the repo
-    config, so it may name agents that were not actually recorded; those are skipped
-    later when no ground truth is found.
-
-    :param bag_path: Path to the ROS 2 bag directory.
-    :return: Sorted agent namespaces.
-    """
-    config_dir = bag_path / "config"
-    return sorted(
-        p.name.removesuffix(CONFIG_SUFFIX) for p in config_dir.glob(f"*{CONFIG_SUFFIX}")
-    )
-
-
 def _evaluate_agent(
     bag_path: Path, agent: str, counts: dict[str, int], evo_flags: list[str]
 ) -> None:
@@ -88,8 +65,8 @@ def _evaluate_agent(
     agent_dir = evo_tools.evo_agent_dir(bag_path, agent)
     truth_topic = f"/{agent}/{estimators.TRUTH_TOPIC}"
 
-    # Config lists every possible agent; skip those absent from this bag before
-    # attempting an export that we already know would fail.
+    # The agent list may name agents that were not recorded in this bag; skip them
+    # before attempting an export that we already know would fail.
     if evo_tools.latest_tum(agent_dir) is None and counts.get(truth_topic, 0) == 0:
         return
 
@@ -143,31 +120,34 @@ def _render_plots(target_dir: Path, evo_flags: list[str]) -> None:
         ("benchmark", lambda: benchmark_plots.render(target_dir)),
         ("lag", lambda: lag_plots.render(target_dir)),
     ]
+    failed = []
     for name, render in plotters:
+        logger.info(f"Rendering {name} plot...")
         try:
             render()
-        except Exception:
-            logger.exception(f"{name} plot failed")
+        except Exception as e:
+            # Keep rendering the remaining plots; report the traceback and collect
+            # the failure for a summary once every plot has been attempted.
+            failed.append(name)
+            logger.exception(f"Failed to render {name} plot for {target_dir}: {e}")
+
+    if failed:
+        logger.error(f"{len(failed)}/{len(plotters)} plots failed: {', '.join(failed)}")
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("target_dir", help="A bag directory or a directory of bags.")
-    parser.add_argument("--align", action="store_true", help="Umeyama alignment.")
-    parser.add_argument(
-        "--project_to_plane", action="store_true", help="Project to the xy plane."
-    )
-    args = parser.parse_args()
+def evaluate_bags(target_dir: Path, agents: list[str], evo_flags: list[str]) -> None:
+    """
+    Evaluate every bag at or beneath a target directory and render summary plots.
 
-    setup_logging()
+    For each bag, exports and benchmarks every recorded estimator topic against
+    ground truth, then renders the trajectory, timing, benchmark, and lag plots
+    across the whole target.
 
-    evo_flags: list[str] = []
-    if args.align:
-        evo_flags.append("--align")
-    if args.project_to_plane:
-        evo_flags += ["--project_to_plane", "xy"]
-
-    target_dir = Path(args.target_dir)
+    :param target_dir: A bag directory or a directory of bags to evaluate.
+    :param agents: AUV namespaces to evaluate; those absent from a given bag (no
+        recorded ground truth) are skipped.
+    :param evo_flags: Extra evo flags passed to the APE and RPE evaluations.
+    """
     bags = _find_bags(target_dir)
     if not bags:
         logger.error(f"No bags found in {target_dir}")
@@ -176,11 +156,7 @@ def main() -> None:
     for bag_path in bags:
         logger.info(f"Processing {bag_path}...")
         counts = _bag_message_counts(bag_path)
-        for agent in _discover_agents(bag_path):
+        for agent in agents:
             _evaluate_agent(bag_path, agent, counts, evo_flags)
 
     _render_plots(target_dir, evo_flags)
-
-
-if __name__ == "__main__":
-    main()

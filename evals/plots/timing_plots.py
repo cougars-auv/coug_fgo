@@ -78,6 +78,9 @@ def render(target_dir: Path) -> None:
     for bag_dir, agent_dir in evo_tools.iter_evaluated_agents(target_dir):
         df = _read_timing_metrics(bag_dir, agent_dir.name)
         if df.empty:
+            logger.warning(
+                f"No timing metrics found for {agent_dir.name} in {bag_dir.name}."
+            )
             continue
 
         present_algos = [
