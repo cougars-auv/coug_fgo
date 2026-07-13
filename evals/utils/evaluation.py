@@ -65,16 +65,30 @@ def _evaluate_agent(
     agent_dir = evo_tools.evo_agent_dir(bag_path, agent)
     truth_topic = f"/{agent}/{estimators.TRUTH_TOPIC}"
 
+    # Check if this agent is present at all (either already exported or in the bag)
+    has_gt = (
+        evo_tools.latest_tum(agent_dir) is not None or counts.get(truth_topic, 0) > 0
+    )
+    has_est = any(
+        evo_tools.latest_tum(agent_dir / est.key) is not None
+        or counts.get(f"/{agent}/{est.topic}", 0) > 0
+        for est in estimators.exported_estimators()
+    )
+
     # The agent list may name agents that were not recorded in this bag; skip them
     # before attempting an export that we already know would fail.
-    if evo_tools.latest_tum(agent_dir) is None and counts.get(truth_topic, 0) == 0:
+    if not has_gt and not has_est:
         return
 
     # Resolve the ground truth once, reusing it across every estimator topic.
-    gt_tum = evo_tools.ensure_ground_truth(bag_path, agent)
+    # Only try to export it if we know it was recorded.
+    if has_gt:
+        gt_tum = evo_tools.ensure_ground_truth(bag_path, agent)
+    else:
+        gt_tum = None
+
     if gt_tum is None:
-        logger.warning(f"No ground truth found for {agent}; skipping.")
-        return
+        logger.warning(f"No ground truth found for {agent}; metrics will be skipped.")
 
     for est in estimators.exported_estimators():
         topic = f"/{agent}/{est.topic}"
@@ -86,11 +100,13 @@ def _evaluate_agent(
         if est_tum is None and counts.get(topic, 0) == 0:
             continue
 
-        if est_tum is not None and all(
-            (out_dir / f"{m}.zip").exists() for m in BENCHMARK_METRICS
-        ):
-            logger.info(f"Skipping {topic} (results already exist)")
-            continue
+        if est_tum is not None:
+            if gt_tum is None:
+                logger.info(f"Skipping {topic} (exported, but no GT to run metrics)")
+                continue
+            elif all((out_dir / f"{m}.zip").exists() for m in BENCHMARK_METRICS):
+                logger.info(f"Skipping {topic} (results already exist)")
+                continue
 
         logger.info(f"Evaluating {topic}...")
         est_tum = est_tum or evo_tools.export_bag_tum(bag_path, topic, out_dir)
@@ -98,7 +114,8 @@ def _evaluate_agent(
             logger.warning(f"Could not export {topic}; skipping.")
             continue
 
-        evo_tools.run_evo_evaluations(gt_tum, est_tum, out_dir, evo_flags)
+        if gt_tum is not None:
+            evo_tools.run_evo_evaluations(gt_tum, est_tum, out_dir, evo_flags)
 
     evo_tools.build_benchmark_tables(agent_dir, BENCHMARK_METRICS)
 
