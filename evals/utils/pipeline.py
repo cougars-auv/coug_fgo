@@ -183,7 +183,7 @@ def process_bag_offline(
             missing = graph.pending_init_sensors()
             if missing:
                 logger.error(
-                    f"Graph never initialized. No data received for: {', '.join(missing)}"
+                    f"Graph never initialized. No data received for: {', '.join(missing)}."
                 )
             else:
                 logger.error(

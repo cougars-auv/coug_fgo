@@ -14,6 +14,7 @@
 
 import logging
 import subprocess
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -31,22 +32,16 @@ TUM_KEYS = ("time", "x", "y", "z", "qx", "qy", "qz", "qw")
 
 
 def _run_logged(
-    args: list[str], cwd: Path | None = None, log_stdout: bool = True
+    args: list[str], cwd: Path | None = None
 ) -> subprocess.CompletedProcess:
     """
-    Run a subprocess, logging stdout at info and stderr at error (warning on success).
+    Run a subprocess. It will write directly to the terminal.
 
     :param args: Command and arguments to execute.
     :param cwd: Working directory to run the command in, if any.
-    :param log_stdout: Whether to log captured stdout.
     :return: The completed process.
     """
-    result = subprocess.run(args, cwd=cwd, capture_output=True, text=True)
-    if log_stdout and result.stdout:
-        logger.info(result.stdout.strip())
-    if result.stderr:
-        log = logger.error if result.returncode != 0 else logger.warning
-        log(result.stderr.strip())
+    result = subprocess.run(args, cwd=cwd, stdout=sys.stdout, stderr=sys.stderr)
     return result
 
 
@@ -116,7 +111,7 @@ def load_ground_truth(bag_path: str | Path, namespace: str) -> dict:
     """
     tum_path = ensure_ground_truth(bag_path, namespace)
     if tum_path is None:
-        logger.error(f"Could not find or export ground truth for {namespace}")
+        logger.error(f"Could not find or export ground truth for {namespace}.")
         return {}
     try:
         data = np.loadtxt(tum_path, comments="#", ndmin=2)
@@ -267,4 +262,4 @@ def build_benchmark_tables(agent_dir: Path, metrics_names: tuple[str, ...]) -> N
             continue
         args = ["evo_res", *map(str, metric_zips)]
         args += ["--save_table", str(agent_dir / f"benchmark_{metric}.csv")]
-        _run_logged(args, log_stdout=False)
+        _run_logged(args)

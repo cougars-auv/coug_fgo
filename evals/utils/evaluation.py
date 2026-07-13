@@ -16,6 +16,7 @@ import logging
 from pathlib import Path
 
 import yaml
+from plots import benchmark_plots, lag_plots, timing_plots, trajectory_plots
 
 from utils import estimators, evo_tools
 
@@ -102,10 +103,10 @@ def _evaluate_agent(
 
         if est_tum is not None:
             if gt_tum is None:
-                logger.info(f"Skipping {topic} (exported, but no GT to run metrics)")
+                logger.info(f"Skipping {topic} (exported, but no GT to run metrics).")
                 continue
             elif all((out_dir / f"{m}.zip").exists() for m in BENCHMARK_METRICS):
-                logger.info(f"Skipping {topic} (results already exist)")
+                logger.info(f"Skipping {topic} (results already exist).")
                 continue
 
         logger.info(f"Evaluating {topic}...")
@@ -127,8 +128,6 @@ def _render_plots(target_dir: Path, evo_flags: list[str]) -> None:
     :param target_dir: The bag or directory of bags that was evaluated.
     :param evo_flags: Evo flags; alignment is forwarded to the trajectory plot.
     """
-    # Imported here so the plotting stack is only loaded once evaluation succeeds.
-    from plots import benchmark_plots, lag_plots, timing_plots, trajectory_plots
 
     do_align = "--align" in evo_flags
     plotters = [
@@ -149,7 +148,9 @@ def _render_plots(target_dir: Path, evo_flags: list[str]) -> None:
             logger.exception(f"Failed to render {name} plot for {target_dir}: {e}")
 
     if failed:
-        logger.error(f"{len(failed)}/{len(plotters)} plots failed: {', '.join(failed)}")
+        logger.error(
+            f"{len(failed)}/{len(plotters)} plots failed: {', '.join(failed)}."
+        )
 
 
 def evaluate_bags(target_dir: Path, agents: list[str], evo_flags: list[str]) -> None:
