@@ -26,6 +26,7 @@
 #include <gtsam/navigation/ImuBias.h>
 
 #include <memory>
+#include <optional>
 
 #include "coug_fgo/factor_graph_parameters.hpp"
 #include "coug_fgo/utils/data_types.hpp"
@@ -45,34 +46,31 @@ class StateInitializer {
   explicit StateInitializer(const factor_graph_node::Params& params);
 
   /**
-   * @brief Updates the running averages with new data from sensor queues.
+   * @brief Accumulates sensor data and computes the initial state once ready.
    * @param current_time Current time in seconds.
    * @param queues Bundle of drained sensor message deques.
-   * @return True once ready: averaging window elapsed, or parameter priors with samples in hand.
+   * @param tfs Bundle of core sensor transformations.
+   * @return The computed initial state once ready, or nullopt while collecting.
    */
-  bool update(double current_time, utils::QueueBundle& queues);
+  std::optional<InitialState> update(double current_time, utils::QueueBundle& queues,
+                                     const utils::TfBundle& tfs);
+
+ private:
+  /**
+   * @brief Collects sensor samples until enough data is in hand.
+   * @param current_time Current time in seconds.
+   * @param queues Bundle of drained sensor message deques to process.
+   * @return True once the collected samples can seed the initial state.
+   */
+  bool accumulate(double current_time, utils::QueueBundle& queues);
 
   /**
    * @brief Computes the initial pose, velocity, bias, and start time from the collected data.
    * @param tfs Bundle of core sensor transformations.
+   * @return The computed initial state and the averaged samples behind it.
    */
-  void compute(const utils::TfBundle& tfs);
+  InitialState compute(const utils::TfBundle& tfs) const;
 
-  // Computed initial state (valid after compute())
-  const gtsam::Pose3& getPose() const { return pose_; }
-  const gtsam::Vector3& getVelocity() const { return velocity_; }
-  const gtsam::imuBias::ConstantBias& getBias() const { return bias_; }
-  double getTime() const { return time_; }
-
-  // Averaged initial sensor samples (null if the sensor was never required)
-  const std::shared_ptr<utils::ImuData>& getInitialImu() const { return initial_imu_; }
-  const std::shared_ptr<utils::OdometryData>& getInitialGps() const { return initial_gps_; }
-  const std::shared_ptr<utils::OdometryData>& getInitialDepth() const { return initial_depth_; }
-  const std::shared_ptr<utils::AhrsData>& getInitialAhrs() const { return initial_ahrs_; }
-  const std::shared_ptr<utils::MagneticFieldData>& getInitialMag() const { return initial_mag_; }
-  const std::shared_ptr<utils::TwistData>& getInitialDvl() const { return initial_dvl_; }
-
- private:
   /**
    * @brief Accumulates running averages from drained sensor message deques.
    * @param queues Bundle of drained sensor message deques to process.
@@ -84,7 +82,7 @@ class StateInitializer {
    * @param tfs SE(3) sensor transforms for lever arm compensation.
    * @return Initial rotation of the target frame in the map frame.
    */
-  gtsam::Rot3 computeInitialOrientation(const utils::TfBundle& tfs);
+  gtsam::Rot3 computeInitialOrientation(const utils::TfBundle& tfs) const;
 
   /**
    * @brief Computes initial position using GPS and depth with lever arm compensation.
@@ -92,7 +90,8 @@ class StateInitializer {
    * @param tfs SE(3) sensor transforms for lever arm compensation.
    * @return Initial position of the target frame in the map frame.
    */
-  gtsam::Point3 computeInitialPosition(const gtsam::Rot3& map_R_target, const utils::TfBundle& tfs);
+  gtsam::Point3 computeInitialPosition(const gtsam::Rot3& map_R_target,
+                                       const utils::TfBundle& tfs) const;
 
   /**
    * @brief Computes initial map-frame velocity from DVL body-frame measurements.
@@ -101,13 +100,13 @@ class StateInitializer {
    * @return Initial velocity of the target frame in the map frame.
    */
   gtsam::Vector3 computeInitialVelocity(const gtsam::Rot3& map_R_target,
-                                        const utils::TfBundle& tfs);
+                                        const utils::TfBundle& tfs) const;
 
   /**
    * @brief Computes initial IMU bias from averaged gyroscope readings.
    * @return Initial accelerometer and gyroscope bias estimate.
    */
-  gtsam::imuBias::ConstantBias computeInitialBias();
+  gtsam::imuBias::ConstantBias computeInitialBias() const;
 
   const factor_graph_node::Params& params_;
   double start_avg_time_{0.0};
@@ -115,11 +114,6 @@ class StateInitializer {
          dvl_count_ = 0;
   gtsam::Rot3 ahrs_ref_;
   gtsam::Vector3 ahrs_log_sum_ = gtsam::Vector3::Zero();
-
-  gtsam::Pose3 pose_;
-  gtsam::Vector3 velocity_;
-  gtsam::imuBias::ConstantBias bias_;
-  double time_{0.0};
 
   std::shared_ptr<utils::ImuData> initial_imu_;
   std::shared_ptr<utils::OdometryData> initial_gps_;

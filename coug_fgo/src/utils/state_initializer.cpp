@@ -31,7 +31,15 @@ namespace coug_fgo::utils {
 
 StateInitializer::StateInitializer(const factor_graph_node::Params& params) : params_(params) {}
 
-bool StateInitializer::update(double current_time, QueueBundle& queues) {
+std::optional<InitialState> StateInitializer::update(double current_time, QueueBundle& queues,
+                                                     const TfBundle& tfs) {
+  if (!accumulate(current_time, queues)) {
+    return std::nullopt;
+  }
+  return compute(tfs);
+}
+
+bool StateInitializer::accumulate(double current_time, QueueBundle& queues) {
   const bool gps_req = params_.gps.enable_gps || params_.gps.enable_gps_init_only;
   const bool depth_req = params_.depth.enable_depth || params_.depth.enable_depth_init_only;
   const bool mag_req = params_.mag.enable_mag || params_.mag.enable_mag_init_only;
@@ -86,23 +94,32 @@ bool StateInitializer::update(double current_time, QueueBundle& queues) {
   return (current_time - start_avg_time_) >= params_.prior.initialization_duration_sec;
 }
 
-void StateInitializer::compute(const TfBundle& tfs) {
+InitialState StateInitializer::compute(const TfBundle& tfs) const {
+  InitialState state;
   gtsam::Rot3 map_R_target = computeInitialOrientation(tfs);
-  pose_ = gtsam::Pose3(map_R_target, computeInitialPosition(map_R_target, tfs));
-  velocity_ = computeInitialVelocity(map_R_target, tfs);
-  bias_ = computeInitialBias();
+  state.pose = gtsam::Pose3(map_R_target, computeInitialPosition(map_R_target, tfs));
+  state.velocity = computeInitialVelocity(map_R_target, tfs);
+  state.bias = computeInitialBias();
   switch (parseKeyframeSource(params_.keyframe_source)) {
     case KeyframeSource::kDvl:
-      time_ = initial_dvl_->timestamp;
+      state.time = initial_dvl_->timestamp;
       break;
     case KeyframeSource::kDepth:
-      time_ = initial_depth_->timestamp;
+      state.time = initial_depth_->timestamp;
       break;
     case KeyframeSource::kTimer:
     case KeyframeSource::kNone:
-      time_ = initial_imu_->timestamp;
+      state.time = initial_imu_->timestamp;
       break;
   }
+
+  state.imu = initial_imu_;
+  state.gps = initial_gps_;
+  state.depth = initial_depth_;
+  state.ahrs = initial_ahrs_;
+  state.mag = initial_mag_;
+  state.dvl = initial_dvl_;
+  return state;
 }
 
 void StateInitializer::incrementAverages(QueueBundle& queues) {
@@ -169,7 +186,7 @@ void StateInitializer::incrementAverages(QueueBundle& queues) {
   }
 }
 
-gtsam::Rot3 StateInitializer::computeInitialOrientation(const TfBundle& tfs) {
+gtsam::Rot3 StateInitializer::computeInitialOrientation(const TfBundle& tfs) const {
   double roll = params_.prior.parameter_priors.initial_orientation[0];
   double pitch = params_.prior.parameter_priors.initial_orientation[1];
   double yaw = params_.prior.parameter_priors.initial_orientation[2];
@@ -214,7 +231,7 @@ gtsam::Rot3 StateInitializer::computeInitialOrientation(const TfBundle& tfs) {
 }
 
 gtsam::Point3 StateInitializer::computeInitialPosition(const gtsam::Rot3& map_R_target,
-                                                       const TfBundle& tfs) {
+                                                       const TfBundle& tfs) const {
   gtsam::Point3 map_p_base(params_.prior.parameter_priors.initial_position[0],
                            params_.prior.parameter_priors.initial_position[1],
                            params_.prior.parameter_priors.initial_position[2]);
@@ -241,7 +258,7 @@ gtsam::Point3 StateInitializer::computeInitialPosition(const gtsam::Rot3& map_R_
 }
 
 gtsam::Vector3 StateInitializer::computeInitialVelocity(const gtsam::Rot3& map_R_target,
-                                                        const TfBundle& tfs) {
+                                                        const TfBundle& tfs) const {
   if (params_.prior.use_parameter_priors) {
     gtsam::Vector3 base_v_base =
         Eigen::Map<const Eigen::Vector3d>(params_.prior.parameter_priors.initial_velocity.data());
@@ -258,7 +275,7 @@ gtsam::Vector3 StateInitializer::computeInitialVelocity(const gtsam::Rot3& map_R
   return gtsam::Vector3::Zero();
 }
 
-gtsam::imuBias::ConstantBias StateInitializer::computeInitialBias() {
+gtsam::imuBias::ConstantBias StateInitializer::computeInitialBias() const {
   gtsam::Vector3 init_gyro_bias;
   if (params_.prior.use_parameter_priors) {
     init_gyro_bias =

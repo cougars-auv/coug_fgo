@@ -365,9 +365,8 @@ bool FactorGraphPy::initialize(double current_time, const ImuBatch& imu, const O
 
   utils::QueueBundle queues = to_bundle(imu, gps, depth, mag, ahrs, dvl, wrench);
 
-  if (state_init_->update(current_time, queues)) {
-    state_init_->compute(tfs_);
-    core_->initialize(*state_init_, tfs_);
+  if (auto init_state = state_init_->update(current_time, queues, tfs_)) {
+    core_->initialize(*init_state, tfs_);
     is_initialized_ = true;
   }
   return is_initialized_;

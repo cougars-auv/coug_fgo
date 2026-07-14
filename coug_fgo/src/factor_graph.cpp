@@ -660,7 +660,7 @@ void FactorGraphNode::initializeGraph() {
                                   back_time(init_queues.depth), back_time(init_queues.mag),
                                   back_time(init_queues.ahrs), back_time(init_queues.dvl),
                                   back_time(init_queues.wrench)});
-  if (newest_stamp <= 0.0 || !state_init_->update(newest_stamp, init_queues)) {
+  if (newest_stamp <= 0.0) {
     return;
   }
 
@@ -672,8 +672,13 @@ void FactorGraphNode::initializeGraph() {
            toGtsam(target_T_ahrs_tf_.transform),  toGtsam(target_T_dvl_tf_.transform),
            toGtsam(target_T_base_tf_.transform),  toGtsam(target_T_com_tf_.transform)};
   }
-  state_init_->compute(tfs);
-  core_->initialize(*state_init_, tfs);
+
+  std::optional<utils::InitialState> init_state =
+      state_init_->update(newest_stamp, init_queues, tfs);
+  if (!init_state) {
+    return;
+  }
+  core_->initialize(*init_state, tfs);
 
   is_initialized_.store(true);
   RCLCPP_INFO(get_logger(), "Graph initialized successfully.");

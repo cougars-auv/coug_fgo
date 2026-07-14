@@ -133,7 +133,7 @@ def render(target_dir: Path, do_align: bool = False) -> None:
                 )
                 _add_start_end_markers(ax, est_trajs[algo], COLORS[algo])
 
-        if gt_traj:
+        if gt_traj is not None:
             gt_pos = _positions_with_gaps(gt_traj)
             ax.plot(gt_pos[:, 0], gt_pos[:, 1], "--", color=COLORS["GT"], label="GT")
             _add_start_end_markers(ax, gt_traj, COLORS["GT"])

@@ -18,12 +18,12 @@
   <exec_depend>rviz2</exec_depend>
   <exec_depend>topic_tools</exec_depend>
 
+  <!-- GTSAM (and its bundled Eigen) is not declared here: no rosdep key provides
+       the required version, so it is built from source in .docker/Dockerfile.gtsam -->
   <depend>coug_interfaces</depend>
   <depend>diagnostic_updater</depend>
   <depend>dvl_msgs</depend>
-  <!-- <depend>eigen</depend> -->
   <depend>geometry_msgs</depend>
-  <!-- <depend>gtsam</depend> -->
   <depend>libgeographiclib-dev</depend>
   <depend>nav_msgs</depend>
   <depend>pybind11_vendor</depend>

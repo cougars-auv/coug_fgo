@@ -42,7 +42,6 @@
 #include "coug_fgo/utils/dvl_loose_preintegrator.hpp"
 #include "coug_fgo/utils/dvl_tight_preintegrator.hpp"
 #include "coug_fgo/utils/logging.hpp"
-#include "coug_fgo/utils/state_initializer.hpp"
 
 namespace coug_fgo {
 
@@ -90,11 +89,11 @@ class FactorGraphCore {
   void setLogCallback(utils::LogCallback callback);
 
   /**
-   * @brief Initializes the graph from computed initial state.
-   * @param state_init The computed initial state.
+   * @brief Initializes the graph from the computed initial state.
+   * @param init_state The computed initial state and averaged initial sensor samples.
    * @param tfs GTSAM Pose3 sensor transforms.
    */
-  void initialize(const utils::StateInitializer& state_init, const utils::TfBundle& tfs);
+  void initialize(const utils::InitialState& init_state, const utils::TfBundle& tfs);
 
   /**
    * @brief Builds factors for one keyframe and writes the graph to the buffer.
@@ -135,21 +134,21 @@ class FactorGraphCore {
   // --- Configuration ---
   /**
    * @brief Configures the GTSAM combined IMU preintegration parameters.
-   * @param state_init Provides computed initial IMU values.
+   * @param init_state Provides the averaged initial IMU sample.
    * @return Shared pointer to the configured preintegration parameters.
    */
   std::shared_ptr<gtsam::PreintegratedCombinedMeasurements::Params> configureImuPreintegration(
-      const utils::StateInitializer& state_init) const;
+      const utils::InitialState& init_state) const;
 
   // --- Factor Construction ---
   /**
    * @brief Adds pose, velocity, and IMU bias prior factors to the initial graph.
-   * @param state_init Provides computed initial state values.
+   * @param init_state Provides the computed initial state values.
    * @param graph The factor graph to add priors to.
    * @param values The initial variable estimates.
    */
-  void addPriorFactors(const utils::StateInitializer& state_init,
-                       gtsam::NonlinearFactorGraph& graph, gtsam::Values& values);
+  void addPriorFactors(const utils::InitialState& init_state, gtsam::NonlinearFactorGraph& graph,
+                       gtsam::Values& values);
 
   /**
    * @brief Adds a 2D GPS position factor with lever arm compensation.
