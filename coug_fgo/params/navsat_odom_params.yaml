@@ -9,6 +9,12 @@ navsat_odom_node:
     validation:
       gt<>: [0.0]
 
+  position_covariance_threshold:
+    type: double
+    default_value: 0.0
+    validation:
+      gt_eq<>: [0.0]
+
   set_origin:
     type: bool
     default_value: true

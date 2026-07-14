@@ -21,6 +21,7 @@
 
 #include "coug_fgo/navsat_odom.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <rclcpp_components/register_node_macro.hpp>
 
@@ -119,6 +120,14 @@ void NavsatOdomNode::navsatCallback(const sensor_msgs::msg::NavSatFix::SharedPtr
 
   if (msg->position_covariance_type == sensor_msgs::msg::NavSatFix::COVARIANCE_TYPE_UNKNOWN) {
     RCLCPP_ERROR(get_logger(), "Unknown covariance type.");
+    return;
+  }
+
+  // Reject degraded fixes (e.g. when using GPS as ground truth)
+  if (params_.position_covariance_threshold > 0.0 &&
+      std::max(msg->position_covariance[0], msg->position_covariance[4]) >
+          params_.position_covariance_threshold) {
+    RCLCPP_WARN(get_logger(), "Rejected high-covariance fix.");
     return;
   }
 
