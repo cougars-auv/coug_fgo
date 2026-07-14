@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import logging
 from pathlib import Path
 
@@ -27,8 +28,29 @@ EVO_FLAGS = ["--align"]  # , "--project_to_plane", "xy"]
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--target-dir",
+        type=Path,
+        default=TARGET_DIR,
+        help="A bag directory or a directory of bags to evaluate",
+    )
+    parser.add_argument(
+        "--agents",
+        nargs="+",
+        default=AGENTS,
+        help="AUV namespaces to evaluate",
+    )
+    parser.add_argument(
+        "--evo-flags",
+        default=" ".join(EVO_FLAGS),
+        help="Extra evo flags forwarded to APE and RPE runs, e.g. "
+        "--evo-flags='--align --project_to_plane xy'",
+    )
+    args = parser.parse_args()
+
     setup_logging()
-    evaluation.evaluate_bags(TARGET_DIR, AGENTS, EVO_FLAGS)
+    evaluation.evaluate_bags(args.target_dir, args.agents, args.evo_flags.split())
 
 
 if __name__ == "__main__":
