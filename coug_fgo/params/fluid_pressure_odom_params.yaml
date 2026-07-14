@@ -53,6 +53,12 @@ fluid_pressure_odom_node:
     validation:
       not_empty<>: []
 
+  calibrate_service:
+    type: string
+    default_value: "depth/calibrate"
+    validation:
+      not_empty<>: []
+
   map_frame:
     type: string
     default_value: "map"

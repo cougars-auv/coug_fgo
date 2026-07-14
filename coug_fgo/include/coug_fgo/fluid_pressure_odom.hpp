@@ -25,6 +25,7 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/fluid_pressure.hpp>
+#include <std_srvs/srv/trigger.hpp>
 #include <string>
 
 #include "coug_fgo/fluid_pressure_odom_parameters.hpp"
@@ -50,9 +51,18 @@ class FluidPressureOdomNode : public rclcpp::Node {
    */
   void pressureCallback(const sensor_msgs::msg::FluidPressure::SharedPtr msg);
 
+  /**
+   * @brief Captures the most recent pressure reading as the zero-depth reference.
+   * @param request Unused Trigger request.
+   * @param response Trigger response reporting whether the calibration was applied.
+   */
+  void calibrateCallback(const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                         std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+
   // --- ROS Interfaces ---
   rclcpp::Subscription<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_sub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr calibrate_srv_;
 
   // --- Parameters ---
   std::shared_ptr<fluid_pressure_odom_node::ParamListener> param_listener_;
@@ -61,6 +71,8 @@ class FluidPressureOdomNode : public rclcpp::Node {
   // --- State ---
   double last_pressure_{-1.0};
   int rejected_count_{0};
+  bool calibrated_{false};
+  double calibrated_pressure_{0.0};
 };
 
 }  // namespace coug_fgo

@@ -40,7 +40,32 @@ FluidPressureOdomNode::FluidPressureOdomNode(const rclcpp::NodeOptions& options)
   odom_pub_ =
       create_publisher<nav_msgs::msg::Odometry>(params_.output_topic, rclcpp::SystemDefaultsQoS());
 
+  calibrate_srv_ = create_service<std_srvs::srv::Trigger>(
+      params_.calibrate_service, std::bind(&FluidPressureOdomNode::calibrateCallback, this,
+                                           std::placeholders::_1, std::placeholders::_2));
+
   RCLCPP_INFO(get_logger(), "Initialization complete.");
+}
+
+void FluidPressureOdomNode::calibrateCallback(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+  (void)request;
+
+  if (last_pressure_ < 0.0) {
+    response->success = false;
+    response->message = "No pressure data.";
+    return;
+  }
+
+  calibrated_pressure_ = last_pressure_;
+  calibrated_ = true;
+  rejected_count_ = 0;
+
+  response->success = true;
+  response->message = "Depth calibrated.";
+  RCLCPP_INFO(get_logger(), "Depth calibrated: zero reference set to %.1f Pa.",
+              calibrated_pressure_);
 }
 
 void FluidPressureOdomNode::pressureCallback(const sensor_msgs::msg::FluidPressure::SharedPtr msg) {
@@ -66,9 +91,10 @@ void FluidPressureOdomNode::pressureCallback(const sensor_msgs::msg::FluidPressu
   odom_msg.child_frame_id =
       params_.use_parameter_child_frame ? params_.parameter_child_frame : msg->header.frame_id;
 
-  // depth [m] = (pressure [Pa] - atmospheric_pressure [Pa]) / (water_density [kg/m^3] * g [m/s^2])
+  // depth [m] = (pressure [Pa] - reference_pressure [Pa]) / (water_density [kg/m^3] * g [m/s^2])
+  double reference_pressure = calibrated_ ? calibrated_pressure_ : params_.atmospheric_pressure;
   double pressure_to_depth = 1.0 / (params_.water_density * params_.gravity);
-  double gauge_pressure = pressure - params_.atmospheric_pressure;
+  double gauge_pressure = pressure - reference_pressure;
   odom_msg.pose.pose.position.z = -gauge_pressure * pressure_to_depth;
   odom_msg.pose.pose.orientation.w = 1.0;
 
