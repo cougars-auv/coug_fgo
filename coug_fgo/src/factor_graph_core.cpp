@@ -30,6 +30,8 @@
 #include <chrono>
 #include <cmath>
 #include <functional>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -399,6 +401,7 @@ void FactorGraphCore::addPriorFactors(const utils::InitialState& init_state,
 
   // Add initial velocity prior
   gtsam::SharedNoiseModel prior_vel_noise;
+  gtsam::Vector3 prior_vel_sigmas;
   if (!params_.prior.use_parameter_priors && params_.dvl.enable_dvl) {
     // Rotate DVL covariance into the map frame
     gtsam::Matrix33 dvl_cov = resolveCov<3>(
@@ -406,12 +409,13 @@ void FactorGraphCore::addPriorFactors(const utils::InitialState& init_state,
         params_.dvl.parameter_covariance.velocity_noise_sigmas, params_.dvl.covariance_scalar,
         init_state.dvl->twist_covariance.topLeftCorner<3, 3>(), covFallbackWarning("DVL"));
     gtsam::Matrix33 map_R_dvl = (prev_pose_.rotation() * tfs_.target_T_dvl.rotation()).matrix();
-    prior_vel_noise =
-        gtsam::noiseModel::Gaussian::Covariance(map_R_dvl * dvl_cov * map_R_dvl.transpose());
+    gtsam::Matrix33 map_cov = map_R_dvl * dvl_cov * map_R_dvl.transpose();
+    prior_vel_noise = gtsam::noiseModel::Gaussian::Covariance(map_cov);
+    prior_vel_sigmas = map_cov.diagonal().cwiseSqrt();
   } else {
     const auto& sigmas = params_.prior.parameter_priors.initial_velocity_sigmas;
-    prior_vel_noise =
-        gtsam::noiseModel::Diagonal::Sigmas(Eigen::Map<const Eigen::Vector3d>(sigmas.data()));
+    prior_vel_sigmas = Eigen::Map<const Eigen::Vector3d>(sigmas.data());
+    prior_vel_noise = gtsam::noiseModel::Diagonal::Sigmas(prior_vel_sigmas);
   }
 
   graph.emplace_shared<gtsam::PriorFactor<gtsam::Vector3>>(V(0), prev_vel_, prior_vel_noise);
@@ -430,6 +434,23 @@ void FactorGraphCore::addPriorFactors(const utils::InitialState& init_state,
   graph.emplace_shared<gtsam::PriorFactor<gtsam::imuBias::ConstantBias>>(B(0), prev_imu_bias_,
                                                                          prior_imu_bias_noise);
   values.insert(B(0), prev_imu_bias_);
+
+  // Log the initial state and priors (target frame in the map frame, bias in the IMU frame)
+  std::ostringstream oss;
+  oss << "Initial state (t=" << init_state.time << "):\n";
+  oss << std::scientific << std::setprecision(4);
+  oss << "  Position [m]        : " << init_state.pose.translation().transpose() << "\n"
+      << "  Orientation [rad]   : " << init_state.pose.rotation().rpy().transpose() << " (RPY)\n"
+      << "  Velocity [m/s]      : " << init_state.velocity.transpose() << "\n"
+      << "  Accel bias [m/s^2]  : " << init_state.bias.accelerometer().transpose() << "\n"
+      << "  Gyro bias [rad/s]   : " << init_state.bias.gyroscope().transpose() << "\n"
+      << "Prior sigmas:\n"
+      << "  Position [m]        : " << prior_pose_sigmas.tail<3>().transpose() << "\n"
+      << "  Orientation [rad]   : " << prior_pose_sigmas.head<3>().transpose() << " (RPY)\n"
+      << "  Velocity [m/s]      : " << prior_vel_sigmas.transpose() << "\n"
+      << "  Accel bias [m/s^2]  : " << prior_imu_bias_sigmas.head<3>().transpose() << "\n"
+      << "  Gyro bias [rad/s]   : " << prior_imu_bias_sigmas.tail<3>().transpose();
+  logMessage(utils::LogLevel::kInfo, oss.str());
 }
 
 void FactorGraphCore::addGpsFactor(
