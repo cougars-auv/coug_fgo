@@ -78,13 +78,13 @@ def _evaluate_estimator(
     if est_tum is None and counts.get(topic, 0) == 0:
         return
 
-    if est_tum is not None:
-        if gt_tum is None:
-            logger.warning(f"Skipping {topic}, no ground truth available.")
-            return
-        if all((out_dir / f"{m}.zip").exists() for m in BENCHMARK_METRICS):
-            logger.info(f"Skipping {topic}, results already exist.")
-            return
+    if (
+        est_tum is not None
+        and gt_tum is not None
+        and all((out_dir / f"{m}.zip").exists() for m in BENCHMARK_METRICS)
+    ):
+        logger.info(f"Skipping {topic}, results already exist.")
+        return
 
     logger.info(f"Evaluating {topic}...")
     est_tum = est_tum or evo_tools.export_bag_tum(bag_path, topic, out_dir)
@@ -92,8 +92,10 @@ def _evaluate_estimator(
         logger.error(f"Could not export {topic}.")
         return
 
-    if gt_tum is not None:
-        evo_tools.run_evo_evaluations(gt_tum, est_tum, out_dir, evo_flags)
+    if gt_tum is None:
+        logger.warning(f"Exported {topic}, but no ground truth to benchmark against.")
+        return
+    evo_tools.run_evo_evaluations(gt_tum, est_tum, out_dir, evo_flags)
 
 
 def _evaluate_agent(
