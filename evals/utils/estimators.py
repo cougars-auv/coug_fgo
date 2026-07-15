@@ -63,9 +63,9 @@ ESTIMATORS: list[Estimator] = [
         node="factor_graph_node_tpi",
     ),
     Estimator("global_iekf", "IEKF", "#8172B2"),
-    # Estimator("global_ukf", "UKF", "#937860"),
-    # Estimator("global_ekf", "EKF", "#DA8BC3"),
-    Estimator("global_tm", "TM", "#8C8C8C", topic="odometry/global_tm"),
+    # Estimator("global_ukf", "UKF", "#937860", topic="odometry/global_ukf"),
+    # Estimator("global_ekf", "EKF", "#DA8BC3", topic="odometry/global_ekf"),
+    Estimator("turtlmap", "TM", "#8C8C8C"),
     Estimator("imu", "SBG", "#CCB974", topic="imu/odometry"),
     Estimator("dvl", "DVL", "#64B5CD", topic="dvl/odometry"),
 ]
