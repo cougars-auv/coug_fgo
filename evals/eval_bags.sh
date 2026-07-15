@@ -22,8 +22,10 @@ else
   target_dir="${BAGS_DIR}/${selected_dir}"
 fi
 
-agents=$(basename -a "${CONFIG_DIR}"/*_params.yaml | sed 's/_params.yaml$//' | sort | gum choose --no-limit --header "Select agents to evaluate..." || exit 0)
-[ -z "${agents}" ] && exit 0
+while true; do
+  agents=$(basename -a "${CONFIG_DIR}"/*_params.yaml | sed 's/_params.yaml$//' | sort | gum choose --no-limit --header "Select agents to evaluate..." || exit 0)
+  [ -n "${agents}" ] && break
+done
 
 # --- Options ---
 evo_options=$(gum choose --no-limit --header "Select evo flags:" -- "--align" "--project_to_plane xy") || exit 0
