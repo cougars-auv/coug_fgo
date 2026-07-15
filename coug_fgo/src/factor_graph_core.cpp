@@ -611,7 +611,6 @@ void FactorGraphCore::addAuvDynamicsFactor(
 void FactorGraphCore::addImuPreintFactor(
     gtsam::NonlinearFactorGraph& graph, const std::deque<std::shared_ptr<utils::ImuData>>& imu_msgs,
     double target_time) {
-  // Implements a zero-order hold (ZOH) for IMU measurements
   if (!imu_preintegrator_ || imu_msgs.empty()) {
     return;
   }
@@ -653,7 +652,6 @@ void FactorGraphCore::addDvlLoosePreintFactor(
     gtsam::NonlinearFactorGraph& graph,
     const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
     const std::deque<std::shared_ptr<utils::AhrsData>>& ahrs_msgs, double target_time) {
-  // Implements a zero-order hold (ZOH) for DVL velocity measurements
   if (!dvl_loose_preintegrator_ || ahrs_msgs.empty()) {
     return;
   }
@@ -725,7 +723,6 @@ void FactorGraphCore::addDvlTightPreintFactor(
     const std::deque<std::shared_ptr<utils::TwistData>>& dvl_msgs,
     const std::deque<std::shared_ptr<utils::ImuData>>& imu_msgs, double target_time,
     const gtsam::Vector3& held_imu_acc, const gtsam::Vector3& held_imu_gyr) {
-  // Implements a zero-order hold (ZOH) for DVL velocity measurements
   if (!dvl_tight_preintegrator_ || imu_msgs.empty()) {
     return;
   }
