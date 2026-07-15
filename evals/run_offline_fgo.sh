@@ -3,11 +3,11 @@ set -e
 
 # --- Selection ---
 while true; do
-  bags=$(cd "${BAGS_DIR}" && find . -name "metadata.yaml" -exec dirname {} \; | sed 's|^\./||' | sort -r | gum choose --no-limit --header "Select bags to process offline..." || exit 0)
+  bags=$(cd "${BAGS_DIR}" && find . -name "metadata.yaml" -exec dirname {} \; | sed 's|^\./||' | sort -r | gum choose --no-limit --header "Select bags to process offline...") || exit 0
   [ -n "${bags}" ] && break
 done
 
-namespace=$(basename -a "${CONFIG_DIR}"/*_params.yaml | sed 's/_params.yaml$//' | sort | gum filter --placeholder "Select an agent namespace..." || exit 0)
+namespace=$(basename -a "${CONFIG_DIR}"/*_params.yaml | sed 's/_params.yaml$//' | sort | gum filter --placeholder "Select an agent namespace...") || exit 0
 [ -z "${namespace}" ] && exit 0
 
 # --- Options ---

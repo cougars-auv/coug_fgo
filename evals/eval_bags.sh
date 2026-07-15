@@ -13,7 +13,7 @@ for d in ${leaf_dirs}; do
   done
 done
 
-selected_dir=$(echo -e "${dir_list}" | sort -u | gum filter --placeholder "Select directory or bag to evaluate ('bags' for all)..." || exit 0)
+selected_dir=$(echo -e "${dir_list}" | sort -u | gum filter --placeholder "Select directory or bag to evaluate ('bags' for all)...") || exit 0
 [ -z "${selected_dir}" ] && exit 0
 
 if [ "${selected_dir}" == "bags" ]; then
@@ -23,7 +23,7 @@ else
 fi
 
 while true; do
-  agents=$(basename -a "${CONFIG_DIR}"/*_params.yaml | sed 's/_params.yaml$//' | sort | gum choose --no-limit --header "Select agents to evaluate..." || exit 0)
+  agents=$(basename -a "${CONFIG_DIR}"/*_params.yaml | sed 's/_params.yaml$//' | sort | gum choose --no-limit --header "Select agents to evaluate...") || exit 0
   [ -n "${agents}" ] && break
 done
 
