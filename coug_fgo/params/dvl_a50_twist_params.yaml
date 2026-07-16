@@ -25,7 +25,7 @@ dvl_a50_twist_node:
 
   fom_valid_threshold:
     type: double
-    default_value: 0.02
+    default_value: 0.01
     validation:
       gt<>: [0.0]
   use_fom_covariance:
