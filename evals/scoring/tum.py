@@ -19,21 +19,16 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
-from evo.core import lie_algebra as lie
-from evo.core import metrics, sync
-from evo.core.trajectory import PoseTrajectory3D
 from scipy.spatial.transform import Rotation
 
-from utils import estimators
+from scoring import estimators
 
 logger = logging.getLogger(__name__)
 
 TUM_KEYS = ("time", "x", "y", "z", "qx", "qy", "qz", "qw")
 
 
-def _run_logged(
-    args: list[str], cwd: Path | None = None
-) -> subprocess.CompletedProcess:
+def run_logged(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess:
     """
     Run a subprocess. It will write directly to the terminal.
 
@@ -159,107 +154,7 @@ def export_bag_tum(bag_path: str | Path, topic: str, out_dir: Path) -> Path | No
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     args = ["evo_traj", "bag2", str(Path(bag_path).resolve()), topic, "--save_as_tum"]
-    if _run_logged(args, cwd=out_dir).returncode != 0:
+    if run_logged(args, cwd=out_dir).returncode != 0:
         return None
 
     return latest_tum(out_dir)
-
-
-def run_evo_evaluations(
-    gt_file: str | Path, est_file: str | Path, evo_dir: Path, evo_flags: list[str]
-) -> None:
-    """
-    Run the evo APE and RPE evaluations and save the result archives.
-
-    :param gt_file: Ground truth trajectory in TUM format.
-    :param est_file: Estimated trajectory in TUM format.
-    :param evo_dir: Directory to save the evo result archives in.
-    :param evo_flags: Extra evo flags forwarded to every APE and RPE run.
-    """
-    base_flags = ["--t_max_diff", "0.05", "--no_warnings"]
-
-    for metric, cmd in [("APE", "evo_ape"), ("RPE", "evo_rpe")]:
-        for pose_relation, suffix in [("trans_part", "trans"), ("angle_deg", "rot")]:
-            args = [cmd, "tum", str(gt_file), str(est_file), "-r", pose_relation]
-            args += base_flags + evo_flags
-            args += ["--save_results", str(evo_dir / f"{metric.lower()}_{suffix}.zip")]
-            if metric == "RPE":
-                args += ["--delta", "1", "--delta_unit", "m", "--all_pairs"]
-
-            _run_logged(args)
-
-
-def compute_ape_rmse(
-    gt: dict | None, est: dict | None, crashed: bool = False, max_diff: float = 0.05
-) -> float:
-    """
-    Compute the aligned translational APE RMSE between two trajectories.
-
-    :param gt: Ground truth arrays keyed by state name.
-    :param est: Estimated arrays keyed by state name.
-    :param crashed: Whether the factor graph crashed while producing the estimate.
-    :param max_diff: Maximum timestamp difference for pose association.
-    :return: RMSE in meters, or infinity if the inputs are unusable.
-    """
-    if not gt or not est or crashed:
-        return float("inf")
-
-    def to_trajectory(pose: dict) -> PoseTrajectory3D:
-        """Convert pose arrays into an evo PoseTrajectory3D."""
-        return PoseTrajectory3D(
-            positions_xyz=np.column_stack([pose["x"], pose["y"], pose["z"]]),
-            orientations_quat_wxyz=np.column_stack(
-                [pose["qw"], pose["qx"], pose["qy"], pose["qz"]]
-            ),
-            timestamps=pose["time"],
-        )
-
-    try:
-        gt_sync, est_sync = sync.associate_trajectories(
-            to_trajectory(gt), to_trajectory(est), max_diff=max_diff
-        )
-        est_sync.align(gt_sync)
-
-        ape = metrics.APE(metrics.PoseRelation.translation_part)
-        ape.process_data((gt_sync, est_sync))
-        return ape.get_statistic(metrics.StatisticsType.rmse)
-    except Exception as e:
-        logger.error(f"Could not compute APE RMSE: {e}")
-        return float("inf")
-
-
-def umeyama_align(est: PoseTrajectory3D, ref: PoseTrajectory3D) -> None:
-    """
-    Umeyama-align an estimated trajectory to the reference in place.
-
-    :param est: Estimated trajectory to modify.
-    :param ref: Reference (ground truth) trajectory.
-    """
-    ref_sync, est_sync = sync.associate_trajectories(ref, est, max_diff=0.05)
-    if est_sync.num_poses < 2:
-        return
-    r, t, s = est_sync.align(ref_sync, correct_scale=False)
-    est.scale(s)
-    est.transform(lie.se3(r, t))
-
-
-def build_benchmark_tables(agent_dir: Path, metrics_names: tuple[str, ...]) -> None:
-    """
-    Aggregate an agent's evo result archives into per-metric benchmark tables.
-
-    :param agent_dir: The agent's evo output directory holding the result zips.
-    :param metrics_names: Metric names to tabulate (e.g. ``ape_trans``).
-    """
-    if not any(agent_dir.glob("*/*.zip")):
-        return
-
-    for old_table in agent_dir.glob("benchmark_*.csv"):
-        old_table.unlink()
-
-    for metric in metrics_names:
-        metric_zips = sorted(agent_dir.glob(f"*/{metric}.zip"))
-        if not metric_zips:
-            continue
-        args = ["evo_res", *map(str, metric_zips)]
-        args += ["--save_table", str(agent_dir / f"benchmark_{metric}.csv")]
-        _run_logged(args)

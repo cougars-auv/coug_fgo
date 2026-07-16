@@ -15,36 +15,26 @@
 
 import logging
 import math
+import tempfile
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import optuna
+import yaml
 from tqdm.contrib.logging import logging_redirect_tqdm
 
-from plots import state_plots
-from utils import evo_tools, pipeline
-from utils.log_setup import setup_logging
+from config import BAG_PATHS, EVO_FLAGS, NAMESPACE, config_paths
+from logs import setup_logging
+from offline import pipeline
+from plots import state
+from run_offline_fgo import process_and_evaluate
+from scoring import metrics, tum
 
 logger = logging.getLogger(__name__)
 
-NAMESPACE = "turtlmap"
-BAG_PATHS = [
-    str(
-        Path.home()
-        / "cougars-dev/bags/turtlmap_offline/log1_offline_2026-07-06-16-08-28"
-    ),
-    str(
-        Path.home()
-        / "cougars-dev/bags/turtlmap_offline/log2_offline_2026-07-06-16-15-19"
-    ),
-]
-CONFIG_PATHS = [
-    str(Path.home() / "cougars-dev/config/fleet/coug_fgo_params.yaml"),
-    str(Path.home() / f"cougars-dev/config/{NAMESPACE}_params.yaml"),
-]
-EVO_FLAGS = ["--align"]  # , "--project_to_plane", "xy"]
+CONFIG_PATHS = config_paths(NAMESPACE)
 
 DB_URL = f"sqlite:///{Path(__file__).parent.resolve()}/scalar_tuning.db"
 STUDY_NAME = f"{NAMESPACE}_scalar_sweep_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}"
@@ -55,10 +45,10 @@ MIN_SCALAR = 0.01
 MAX_SCALAR = 100
 
 QUIET_LOGGERS = (
-    "utils.pipeline",
-    "utils.factor_graph",
-    "utils.urdf",
-    # "utils.evo_tools",
+    "offline.pipeline",
+    "offline.graph",
+    "offline.urdf",
+    # "scoring.tum",
     "coug_fgo.core",
 )
 
@@ -81,6 +71,27 @@ def _quiet_loggers(level: int = logging.ERROR):
             lg.setLevel(lvl)
 
 
+@contextmanager
+def covariance_override_file(scalars: dict[str, float]):
+    """
+    Yield a temporary params file overriding sensor covariance scalars.
+
+    :param scalars: Mapping of sensor name to covariance scalar value.
+    """
+    override = {
+        "/**": {
+            "ros__parameters": {s: {"covariance_scalar": v} for s, v in scalars.items()}
+        }
+    }
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(override, f)
+        override_path = f.name
+    try:
+        yield override_path
+    finally:
+        Path(override_path).unlink()
+
+
 def _objective(trial: optuna.Trial, ground_truths: list[dict]) -> float:
     """
     Score one set of covariance scalars across all configured bags.
@@ -94,12 +105,12 @@ def _objective(trial: optuna.Trial, ground_truths: list[dict]) -> float:
         for s in SCALARS_TO_TUNE
     }
     rmses = []
-    with pipeline.covariance_override_file(scalars) as override_path:
+    with covariance_override_file(scalars) as override_path:
         for bag, pose_gt in zip(BAG_PATHS, ground_truths):
             results, crashed = pipeline.process_bag_offline(
                 bag, CONFIG_PATHS + [override_path], NAMESPACE
             )
-            rmses.append(evo_tools.compute_ape_rmse(pose_gt, results, crashed))
+            rmses.append(metrics.compute_ape_rmse(pose_gt, results, crashed))
 
     if not rmses:
         return float("inf")
@@ -109,9 +120,7 @@ def _objective(trial: optuna.Trial, ground_truths: list[dict]) -> float:
 def main() -> None:
     setup_logging()
 
-    ground_truths = [
-        evo_tools.load_ground_truth(bag, NAMESPACE)[0] for bag in BAG_PATHS
-    ]
+    ground_truths = [tum.load_ground_truth(bag, NAMESPACE)[0] for bag in BAG_PATHS]
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(
@@ -127,9 +136,9 @@ def main() -> None:
 
     plot_args = []
     with logging_redirect_tqdm():
-        with pipeline.covariance_override_file(study.best_params) as best_override_path:
+        with covariance_override_file(study.best_params) as best_override_path:
             for bag in BAG_PATHS:
-                result = pipeline.process_and_evaluate(
+                result = process_and_evaluate(
                     bag,
                     CONFIG_PATHS + [best_override_path],
                     NAMESPACE,
@@ -140,7 +149,7 @@ def main() -> None:
                     plot_args.append(result)
 
     for results, pose_gt, label in plot_args:
-        state_plots.plot_results(results, pose_gt, label)
+        state.plot_results(results, pose_gt, label)
     plt.show()
 
 

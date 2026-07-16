@@ -15,7 +15,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from utils import estimators
+from scoring import estimators
 
 GT_COLOR = estimators.GROUND_TRUTH_COLOR
 FGO_COLOR = estimators.timed_estimators()[0].color

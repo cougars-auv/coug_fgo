@@ -20,7 +20,7 @@ import pandas as pd
 import scienceplots  # noqa: F401
 import seaborn as sns
 
-from utils import estimators
+from scoring import estimators
 
 logger = logging.getLogger(__name__)
 

@@ -22,8 +22,8 @@ import seaborn as sns
 from evo.core.trajectory import PoseTrajectory3D
 from evo.tools import file_interface, plot
 
-from plots import state_plots
-from utils import estimators, evo_tools
+from plots import state
+from scoring import estimators, metrics, tum
 
 logger = logging.getLogger(__name__)
 
@@ -69,14 +69,14 @@ def _load_trajectories(
     :param evo_agent_dir: Agent directory inside a bag's evo folder.
     :return: Estimated trajectories keyed by algorithm, and the ground truth.
     """
-    gt_file = evo_tools.latest_tum(evo_agent_dir)
+    gt_file = tum.latest_tum(evo_agent_dir)
     gt_traj = file_interface.read_tum_trajectory_file(str(gt_file)) if gt_file else None
 
     est_trajs = {}
     for sub in sorted(evo_agent_dir.iterdir()):
         algo = estimators.label_for_folder(sub.name)
-        if sub.is_dir() and algo in ALGORITHMS and (tum := evo_tools.latest_tum(sub)):
-            est_trajs[algo] = file_interface.read_tum_trajectory_file(str(tum))
+        if sub.is_dir() and algo in ALGORITHMS and (tum_file := tum.latest_tum(sub)):
+            est_trajs[algo] = file_interface.read_tum_trajectory_file(str(tum_file))
 
     return est_trajs, gt_traj
 
@@ -89,7 +89,7 @@ def _positions_with_gaps(traj: PoseTrajectory3D) -> np.ndarray:
     :return: Positions with NaN rows inserted where the timestamps jump.
     """
     pos = traj.positions_xyz
-    gap_idx = state_plots.gap_indices(traj.timestamps)
+    gap_idx = state.gap_indices(traj.timestamps)
     return np.insert(pos, gap_idx, np.nan, axis=0) if len(gap_idx) else pos
 
 
@@ -101,7 +101,7 @@ def render(target_dir: Path, do_align: bool = False) -> None:
     :param do_align: Whether to Umeyama-align estimates to the ground truth.
     """
     logger.info("Rendering trajectory plots...")
-    for bag_dir, agent_dir in evo_tools.iter_evaluated_agents(target_dir):
+    for bag_dir, agent_dir in tum.iter_evaluated_agents(target_dir):
         est_trajs, gt_traj = _load_trajectories(agent_dir)
 
         if not est_trajs and gt_traj is None:
@@ -113,7 +113,7 @@ def render(target_dir: Path, do_align: bool = False) -> None:
         if gt_traj is not None and do_align:
             for algo, traj in est_trajs.items():
                 try:
-                    evo_tools.umeyama_align(traj, gt_traj)
+                    metrics.umeyama_align(traj, gt_traj)
                 except Exception as e:
                     logger.error(f"Could not align {algo}: {e}")
 

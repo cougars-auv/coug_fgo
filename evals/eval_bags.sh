@@ -32,4 +32,4 @@ evo_options=$(gum choose --no-limit --header "Select evo flags:" -- "--align" "-
 evo_flags=$(echo "${evo_options}" | tr '\n' ' ')
 
 # --- Evaluate ---
-python3 "$(dirname "$0")/_eval_bags.py" --target-dir "${target_dir}" --agents ${agents} --evo-flags="${evo_flags}"
+python3 "$(dirname "$0")/eval_bags.py" --target-dir "${target_dir}" --agents ${agents} --evo-flags="${evo_flags}"

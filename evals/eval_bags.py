@@ -17,14 +17,11 @@ import argparse
 import logging
 from pathlib import Path
 
-from utils import evaluation
-from utils.log_setup import setup_logging
+from config import AGENTS, EVO_FLAGS, TARGET_DIR
+from logs import setup_logging
+from scoring import evaluation
 
 logger = logging.getLogger(__name__)
-
-TARGET_DIR = Path.home() / "cougars-dev/bags/turtlmap_offline"
-AGENTS = ["coug1sim", "coug2sim", "coug3sim", "blue1sim", "bluerov2", "turtlmap"]
-EVO_FLAGS = ["--align"]  # , "--project_to_plane", "xy"]
 
 
 def main() -> None:
