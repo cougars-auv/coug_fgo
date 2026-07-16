@@ -71,11 +71,6 @@ ESTIMATORS: list[Estimator] = [
 ]
 
 
-def exported_estimators() -> list[Estimator]:
-    """Return the estimators that ``eval_bags.py`` exports from bags (have a topic)."""
-    return [e for e in ESTIMATORS if e.topic is not None]
-
-
 def timed_estimators() -> list[Estimator]:
     """Return the estimators that publish solver timing metrics (have a node)."""
     return [e for e in ESTIMATORS if e.node is not None]

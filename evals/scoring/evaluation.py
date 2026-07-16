@@ -71,11 +71,11 @@ def _evaluate_estimator(
     :param counts: Message counts keyed by topic name for this bag.
     :param evo_flags: Extra evo flags forwarded to APE and RPE runs.
     """
-    topic = f"/{agent}/{est.topic}"
+    topic_name = f"/{agent}/{est.topic}" if est.topic else None
     out_dir = agent_dir / est.key
     est_tum = tum.latest_tum(out_dir)
 
-    if est_tum is None and counts.get(topic, 0) == 0:
+    if est_tum is None and (not topic_name or counts.get(topic_name, 0) == 0):
         return
 
     if (
@@ -83,17 +83,21 @@ def _evaluate_estimator(
         and gt_tum is not None
         and all((out_dir / f"{m}.zip").exists() for m in BENCHMARK_METRICS)
     ):
-        logger.info(f"Skipping {topic}, results already exist.")
+        logger.info(f"Skipping {est.key}, results already exist.")
         return
 
-    logger.info(f"Evaluating {topic}...")
-    est_tum = est_tum or tum.export_bag_tum(bag_path, topic, out_dir)
+    logger.info(f"Evaluating {est.key}...")
+    if est_tum is None and topic_name:
+        est_tum = tum.export_bag_tum(bag_path, topic_name, out_dir)
+
     if est_tum is None:
-        logger.error(f"Could not export {topic}.")
+        logger.error(f"Could not find or export TUM for {est.key}.")
         return
 
     if gt_tum is None:
-        logger.warning(f"Exported {topic}, but no ground truth to benchmark against.")
+        logger.warning(
+            f"Found TUM for {est.key}, but no ground truth to benchmark against."
+        )
         return
     metrics.run_evo_evaluations(gt_tum, est_tum, out_dir, evo_flags)
 
@@ -115,8 +119,8 @@ def _evaluate_agent(
     has_gt = tum.latest_tum(agent_dir) is not None or counts.get(truth_topic, 0) > 0
     has_est = any(
         tum.latest_tum(agent_dir / est.key) is not None
-        or counts.get(f"/{agent}/{est.topic}", 0) > 0
-        for est in estimators.exported_estimators()
+        or (est.topic and counts.get(f"/{agent}/{est.topic}", 0) > 0)
+        for est in estimators.ESTIMATORS
     )
     if not has_gt and not has_est:
         return
@@ -125,7 +129,7 @@ def _evaluate_agent(
     if gt_tum is None:
         logger.warning(f"No ground truth found for {agent}.")
 
-    for est in estimators.exported_estimators():
+    for est in estimators.ESTIMATORS:
         _evaluate_estimator(bag_path, est, agent, agent_dir, gt_tum, counts, evo_flags)
 
     metrics.build_benchmark_tables(agent_dir, BENCHMARK_METRICS)
