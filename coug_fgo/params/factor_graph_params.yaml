@@ -396,7 +396,7 @@ factor_graph_node:
       default_value: false
     parameter_frame:
       type: string
-      default_value: "mag_link"
+      default_value: "imu_link"
       validation:
         not_empty<>: []
     use_parameter_tf:
@@ -461,7 +461,7 @@ factor_graph_node:
       default_value: false
     parameter_frame:
       type: string
-      default_value: "ahrs_link"
+      default_value: "imu_link"
       validation:
         not_empty<>: []
     use_parameter_tf:
