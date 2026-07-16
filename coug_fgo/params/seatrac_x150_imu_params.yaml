@@ -17,7 +17,7 @@ seatrac_x150_imu_node:
       lower_element_bounds<>: [0.0]
   magnetic_field_noise_sigmas:
     type: double_array
-    default_value: [0.003, 0.003, 0.003]
+    default_value: [0.006, 0.006, 0.006]
     validation:
       fixed_size<>: [3]
       lower_element_bounds<>: [0.0]

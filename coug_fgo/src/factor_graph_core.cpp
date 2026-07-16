@@ -103,12 +103,14 @@ Eigen::Matrix<double, N, N> sigmasSquaredDiag(const std::vector<double>& sigmas)
  * @param scalar Covariance scaling factor (applied to either source).
  * @param msg_cov The covariance reported by the sensor message.
  * @param warn_fallback Invoked when an invalid msg_cov forces the parameter fallback.
- * @return sigmasSquaredDiag(sigmas)*scalar if use_param or invalid msg_cov, else msg_cov*scalar.
+ * @param sensor_unit_scale Extra scaling applied only to a message-sourced covariance.
+ * @return param_cov if use_param or invalid msg_cov, else msg_cov*scalar*sensor_unit_scale.
  */
 template <int N>
 Eigen::Matrix<double, N, N> resolveCov(bool use_param, const std::vector<double>& sigmas,
                                        double scalar, const Eigen::Matrix<double, N, N>& msg_cov,
-                                       const std::function<void()>& warn_fallback = {}) {
+                                       const std::function<void()>& warn_fallback = {},
+                                       double sensor_unit_scale = 1.0) {
   if (use_param) {
     return sigmasSquaredDiag<N>(sigmas) * scalar;
   }
@@ -118,15 +120,15 @@ Eigen::Matrix<double, N, N> resolveCov(bool use_param, const std::vector<double>
     }
     return sigmasSquaredDiag<N>(sigmas) * scalar;
   }
-  return msg_cov * scalar;
+  return msg_cov * scalar * sensor_unit_scale;
 }
 
 /**
  * @brief Scalar-variance version of resolveCov.
- * @return sigma^2 * scalar if use_param is set or msg_var is unusable, otherwise msg_var * scalar.
+ * @return param_var if use_param or invalid msg_var, else msg_var*scalar*sensor_unit_scale.
  */
 double resolveVar(bool use_param, double sigma, double scalar, double msg_var,
-                  const std::function<void()>& warn_fallback = {}) {
+                  const std::function<void()>& warn_fallback = {}, double sensor_unit_scale = 1.0) {
   if (use_param) {
     return sigma * sigma * scalar;
   }
@@ -136,7 +138,7 @@ double resolveVar(bool use_param, double sigma, double scalar, double msg_var,
     }
     return sigma * sigma * scalar;
   }
-  return msg_var * scalar;
+  return msg_var * scalar * sensor_unit_scale;
 }
 
 /**
@@ -309,14 +311,23 @@ FactorGraphCore::configureImuPreintegration(const utils::InitialState& init_stat
       gtsam::Vector3(params_.imu.gravity[0], params_.imu.gravity[1], params_.imu.gravity[2]);
   imu_params->body_P_sensor = tfs_.target_T_imu;
 
-  imu_params->accelerometerCovariance = resolveCov<3>(
-      params_.imu.use_parameter_covariance, params_.imu.parameter_covariance.accel_noise_sigmas,
-      params_.imu.covariance_scalar, init_state.imu->linear_acceleration_covariance,
-      covFallbackWarning("IMU accelerometer"));
-  imu_params->gyroscopeCovariance = resolveCov<3>(
-      params_.imu.use_parameter_covariance, params_.imu.parameter_covariance.gyro_noise_sigmas,
-      params_.imu.covariance_scalar, init_state.imu->angular_velocity_covariance,
-      covFallbackWarning("IMU gyroscope"));
+  // IMPORTANT! GTSAM preintegration requires continuous-time densities.
+  bool use_param_cov = params_.imu.use_parameter_covariance;
+  if (!use_param_cov && params_.imu.sensor_rate_hz <= 0.0) {
+    logMessage(utils::LogLevel::kWarn,
+               "imu.sensor_rate_hz must be set to use sensor-reported IMU covariance; falling "
+               "back to the parameter covariance.");
+    use_param_cov = true;
+  }
+  const double imu_dt = use_param_cov ? 1.0 : 1.0 / params_.imu.sensor_rate_hz;
+  imu_params->accelerometerCovariance =
+      resolveCov<3>(use_param_cov, params_.imu.parameter_covariance.accel_noise_sigmas,
+                    params_.imu.covariance_scalar, init_state.imu->linear_acceleration_covariance,
+                    covFallbackWarning("IMU accelerometer"), imu_dt);
+  imu_params->gyroscopeCovariance =
+      resolveCov<3>(use_param_cov, params_.imu.parameter_covariance.gyro_noise_sigmas,
+                    params_.imu.covariance_scalar, init_state.imu->angular_velocity_covariance,
+                    covFallbackWarning("IMU gyroscope"), imu_dt);
   imu_params->biasAccCovariance = sigmasSquaredDiag(params_.imu.accel_bias_rw_sigmas);
   imu_params->biasOmegaCovariance = sigmasSquaredDiag(params_.imu.gyro_bias_rw_sigmas);
   imu_params->biasAccOmegaInt = gtsam::Matrix66::Zero();
@@ -376,11 +387,15 @@ void FactorGraphCore::addPriorFactors(const utils::InitialState& init_state,
       if (params_.mag.enable_mag) {
         double h_mag = std::sqrt(params_.mag.reference_field[0] * params_.mag.reference_field[0] +
                                  params_.mag.reference_field[1] * params_.mag.reference_field[1]);
+        // Normalize sensor-reported covariance to match the normalized reference_field.
+        const double init_field_norm = init_state.mag->magnetic_field.norm();
+        const double mag_cov_scale =
+            init_field_norm > 1e-12 ? 1.0 / (init_field_norm * init_field_norm) : 1.0;
         double mag_sigma_norm = std::sqrt(resolveVar(
             params_.mag.use_parameter_covariance,
             params_.mag.parameter_covariance.magnetic_field_noise_sigmas[0],
             params_.mag.covariance_scalar, init_state.mag->magnetic_field_covariance(0, 0),
-            covFallbackWarning("Magnetometer")));
+            covFallbackWarning("Magnetometer"), mag_cov_scale));
         prior_pose_sigmas(2) = mag_sigma_norm / h_mag;
       }
       const gtsam::Matrix3 accel_cov = resolveCov<3>(
@@ -437,8 +452,8 @@ void FactorGraphCore::addPriorFactors(const utils::InitialState& init_state,
 
   // Log the initial state and priors (target frame in the map frame, bias in the IMU frame)
   std::ostringstream oss;
-  oss << "Initial state (t=" << init_state.time << "):\n";
-  oss << std::scientific << std::setprecision(4);
+  oss << "Initial state (t=" << std::fixed << std::setprecision(4) << init_state.time << "):\n";
+  oss << std::scientific;
   oss << "  Position [m]        : " << init_state.pose.translation().transpose() << "\n"
       << "  Orientation [rad]   : " << init_state.pose.rotation().rpy().transpose() << " (RPY)\n"
       << "  Velocity [m/s]      : " << init_state.velocity.transpose() << "\n"
@@ -527,15 +542,24 @@ void FactorGraphCore::addMagFactor(
   gtsam::Point3 ref_vec(params_.mag.reference_field[0], params_.mag.reference_field[1],
                         params_.mag.reference_field[2]);
 
-  gtsam::SharedNoiseModel mag_noise = gtsam::noiseModel::Gaussian::Covariance(resolveCov<3>(
-      params_.mag.use_parameter_covariance,
-      params_.mag.parameter_covariance.magnetic_field_noise_sigmas, params_.mag.covariance_scalar,
-      mag_msg->magnetic_field_covariance, covFallbackWarning("Magnetometer")));
+  // Normalize the measurement to unit length to match the normalized reference_field.
+  const double field_norm = mag_msg->magnetic_field.norm();
+  if (field_norm < 1e-12) {
+    logMessage(utils::LogLevel::kWarn, "Skipped a zero-magnitude magnetometer measurement.");
+    return;
+  }
+  const gtsam::Point3 measured_unit = mag_msg->magnetic_field / field_norm;
+
+  gtsam::SharedNoiseModel mag_noise = gtsam::noiseModel::Gaussian::Covariance(
+      resolveCov<3>(params_.mag.use_parameter_covariance,
+                    params_.mag.parameter_covariance.magnetic_field_noise_sigmas,
+                    params_.mag.covariance_scalar, mag_msg->magnetic_field_covariance,
+                    covFallbackWarning("Magnetometer"), 1.0 / (field_norm * field_norm)));
 
   mag_noise = applyRobustKernel(mag_noise, params_.mag.robust_kernel, params_.mag.robust_k);
 
-  graph.emplace_shared<MagFactorArm>(X(current_step_), mag_msg->magnetic_field, ref_vec,
-                                     tfs_.target_T_mag, mag_noise);
+  graph.emplace_shared<MagFactorArm>(X(current_step_), measured_unit, ref_vec, tfs_.target_T_mag,
+                                     mag_noise);
 }
 
 void FactorGraphCore::addDvlFactor(gtsam::NonlinearFactorGraph& graph,

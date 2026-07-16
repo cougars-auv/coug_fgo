@@ -219,28 +219,33 @@ factor_graph_node:
     use_parameter_covariance:
       type: bool
       default_value: false
+    sensor_rate_hz:
+      type: double
+      default_value: 0.0
+      validation:
+        gt_eq<>: [0.0]
     parameter_covariance:
       accel_noise_sigmas:
         type: double_array
-        default_value: [0.0078, 0.0078, 0.0078]
+        default_value: [0.00056, 0.00056, 0.00056]
         validation:
           fixed_size<>: [3]
           lower_element_bounds<>: [0.0]
       gyro_noise_sigmas:
         type: double_array
-        default_value: [0.0012, 0.0012, 0.0012]
+        default_value: [0.0000524, 0.0000524, 0.0000524]
         validation:
           fixed_size<>: [3]
           lower_element_bounds<>: [0.0]
     accel_bias_rw_sigmas:
       type: double_array
-      default_value: [0.000105, 0.000105, 0.000105]
+      default_value: [0.00014, 0.00014, 0.00014]
       validation:
         fixed_size<>: [3]
         lower_element_bounds<>: [0.0]
     gyro_bias_rw_sigmas:
       type: double_array
-      default_value: [0.0000391, 0.0000391, 0.0000391]
+      default_value: [0.0000339, 0.0000339, 0.0000339]
       validation:
         fixed_size<>: [3]
         lower_element_bounds<>: [0.0]
@@ -251,7 +256,7 @@ factor_graph_node:
         gt<>: [0.0]
     gravity:
       type: double_array
-      default_value: [0.0, 0.0, -9.8]
+      default_value: [0.0, 0.0, -9.81]
       validation:
         fixed_size<>: [3]
     diagnostic_timeout_sec:
@@ -419,7 +424,7 @@ factor_graph_node:
     parameter_covariance:
       magnetic_field_noise_sigmas:
         type: double_array
-        default_value: [0.003, 0.003, 0.003]
+        default_value: [0.006, 0.006, 0.006]
         validation:
           fixed_size<>: [3]
           lower_element_bounds<>: [0.0]
