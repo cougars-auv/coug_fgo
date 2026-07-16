@@ -75,9 +75,13 @@ geometry_msgs::msg::TwistWithCovarianceStamped DvlA50TwistNode::convertToTwist(
   twist_msg.header.frame_id =
       params_.use_parameter_frame ? params_.parameter_frame : msg->header.frame_id;
 
-  uint64_t sec = msg->time_of_validity / 1000000;
-  uint64_t nanosec = (msg->time_of_validity % 1000000) * 1000;
-  twist_msg.header.stamp = rclcpp::Time(sec, nanosec, RCL_ROS_TIME);
+  if (params_.override_timestamp) {
+    twist_msg.header.stamp = msg->header.stamp;
+  } else {
+    uint64_t sec = msg->time_of_validity / 1000000;
+    uint64_t nanosec = (msg->time_of_validity % 1000000) * 1000;
+    twist_msg.header.stamp = rclcpp::Time(sec, nanosec, RCL_ROS_TIME);
+  }
 
   twist_msg.twist.twist.linear.x = msg->velocity.x;
   twist_msg.twist.twist.linear.y = msg->velocity.y;

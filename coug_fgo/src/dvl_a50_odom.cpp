@@ -48,8 +48,6 @@ DvlA50OdomNode::DvlA50OdomNode(const rclcpp::NodeOptions& options)
 }
 
 void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
-  const auto stamp = this->get_clock()->now();
-
   std::string current_dvl_frame =
       params_.use_parameter_frame ? params_.parameter_frame : msg->header.frame_id;
 
@@ -89,11 +87,13 @@ void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
 
   odom.child_frame_id = params_.base_frame;
 
-  // TODO: Fix DVL time sync so we don't have to do this
-  // uint64_t sec = static_cast<uint64_t>(msg->time);
-  // uint64_t nanosec = static_cast<uint64_t>((msg->time - sec) * 1e9);
-  // odom.header.stamp = rclcpp::Time(sec, nanosec, RCL_ROS_TIME);
-  odom.header.stamp = stamp;
+  if (params_.override_timestamp) {
+    odom.header.stamp = msg->header.stamp;
+  } else {
+    uint64_t sec = static_cast<uint64_t>(msg->time);
+    uint64_t nanosec = static_cast<uint64_t>((msg->time - sec) * 1e9);
+    odom.header.stamp = rclcpp::Time(sec, nanosec, RCL_ROS_TIME);
+  }
 
   odom.pose.pose = p_base_in_odom;
 

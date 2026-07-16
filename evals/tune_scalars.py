@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 CONFIG_PATHS = config_paths(NAMESPACE)
 
-DB_URL = f"sqlite:///{Path(__file__).parent.resolve()}/scalar_tuning.db"
+DB_URL = f"sqlite:///{Path(__file__).parent.resolve()}/tuning.db"
 STUDY_NAME = f"{NAMESPACE}_scalar_sweep_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}"
 
 SCALARS_TO_TUNE = ["const_vel"]

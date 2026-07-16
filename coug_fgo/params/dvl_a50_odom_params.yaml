@@ -9,6 +9,10 @@ dvl_a50_odom_node:
     validation:
       gt<>: [0.0]
 
+  override_timestamp:
+    type: bool
+    default_value: false
+
   # --- ROS Topics and Frames ---
   input_topic:
     type: string
