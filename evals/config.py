@@ -18,16 +18,16 @@ NAMESPACE = "turtlmap"
 BAG_PATHS = [
     str(
         Path.home()
-        / "cougars-dev/bags/turtlmap_offline/log1_offline_2026-07-06-16-08-28"
+        / "cougars-dev/bags/turtlmap_ros2_eval/log1_ros2_eval_2026-07-16-11-57-41"
     ),
     str(
         Path.home()
-        / "cougars-dev/bags/turtlmap_offline/log2_offline_2026-07-06-16-15-19"
+        / "cougars-dev/bags/turtlmap_ros2_eval/log2_ros2_eval_2026-07-16-12-04-30"
     ),
 ]
 EVO_FLAGS = ["--align"]  # , "--project_to_plane", "xy"]
 
-TARGET_DIR = Path.home() / "cougars-dev/bags/turtlmap_offline"
+TARGET_DIR = Path.home() / "cougars-dev/bags/turtlmap_ros2_eval"
 AGENTS = ["coug1sim", "coug2sim", "coug3sim", "blue1sim", "bluerov2", "turtlmap"]
 
 
