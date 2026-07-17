@@ -13,6 +13,13 @@ dvl_a50_odom_node:
     type: bool
     default_value: false
 
+  orientation_noise_sigmas:
+    type: double_array
+    default_value: [0.01745, 0.01745, 0.03491]
+    validation:
+      fixed_size<>: [3]
+      lower_element_bounds<>: [0.0]
+
   # --- ROS Topics and Frames ---
   input_topic:
     type: string

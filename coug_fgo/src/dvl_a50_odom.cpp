@@ -102,6 +102,11 @@ void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
   odom.pose.covariance[7] = var;
   odom.pose.covariance[14] = var;
 
+  const auto& s = params_.orientation_noise_sigmas;
+  odom.pose.covariance[21] = s[0] * s[0];
+  odom.pose.covariance[28] = s[1] * s[1];
+  odom.pose.covariance[35] = s[2] * s[2];
+
   odom_pub_->publish(odom);
 }
 
