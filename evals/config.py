@@ -15,19 +15,13 @@
 from pathlib import Path
 
 NAMESPACE = "turtlmap"
+TARGET_DIR = Path.home() / "cougars-dev/bags/turtlmap/turtlmap_ros2_eval"
 BAG_PATHS = [
-    str(
-        Path.home()
-        / "cougars-dev/bags/turtlmap_ros2_eval/log1_ros2_eval_2026-07-16-11-57-41"
-    ),
-    str(
-        Path.home()
-        / "cougars-dev/bags/turtlmap_ros2_eval/log2_ros2_eval_2026-07-16-12-04-30"
-    ),
+    str(TARGET_DIR / "log1_ros2_eval_2026-07-16-11-57-41"),
+    str(TARGET_DIR / "log2_ros2_eval_2026-07-16-12-04-30"),
 ]
 EVO_FLAGS = ["--align"]  # , "--project_to_plane", "xy"]
 
-TARGET_DIR = Path.home() / "cougars-dev/bags/turtlmap_ros2_eval"
 AGENTS = ["coug1sim", "coug2sim", "coug3sim", "blue1sim", "bluerov2", "turtlmap"]
 
 

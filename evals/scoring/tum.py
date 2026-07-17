@@ -14,7 +14,6 @@
 
 import logging
 import subprocess
-import sys
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -36,8 +35,7 @@ def run_logged(args: list[str], cwd: Path | None = None) -> subprocess.Completed
     :param cwd: Working directory to run the command in, if any.
     :return: The completed process.
     """
-    result = subprocess.run(args, cwd=cwd, stdout=sys.stdout, stderr=sys.stderr)
-    return result
+    return subprocess.run(args, cwd=cwd)
 
 
 def evo_agent_dir(bag_path: str | Path, namespace: str) -> Path:

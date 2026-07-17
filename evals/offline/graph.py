@@ -289,7 +289,7 @@ class OfflineFactorGraph:
 
         results = {
             k: np.array([r[k] for r in self.results])
-            for k in self.results[0].keys()
+            for k in self.results[0]
             if k != "smoothed_path"
         }
 

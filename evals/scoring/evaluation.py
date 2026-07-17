@@ -47,7 +47,6 @@ def _bag_message_counts(bag_path: Path) -> dict[str, int]:
     return {
         entry["topic_metadata"]["name"]: entry.get("message_count", 0)
         for entry in info.get("topics_with_message_count", [])
-        if "topic_metadata" in entry and "name" in entry.get("topic_metadata", {})
     }
 
 

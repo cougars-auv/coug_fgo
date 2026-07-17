@@ -118,28 +118,17 @@ def align_dicts(est: dict, ref: dict) -> None:
     :param ref: Reference ground truth arrays keyed by state name.
     """
     est_traj = dict_to_trajectory(est)
-    ref_traj = dict_to_trajectory(ref)
+    umeyama_align(est_traj, dict_to_trajectory(ref))
 
-    umeyama_align(est_traj, ref_traj)
+    for i, key in enumerate(("x", "y", "z")):
+        est[key] = est_traj.positions_xyz[:, i]
+    for i, key in enumerate(("qw", "qx", "qy", "qz")):
+        est[key] = est_traj.orientations_quat_wxyz[:, i]
 
-    est["x"] = est_traj.positions_xyz[:, 0]
-    est["y"] = est_traj.positions_xyz[:, 1]
-    est["z"] = est_traj.positions_xyz[:, 2]
-    est["qw"] = est_traj.orientations_quat_wxyz[:, 0]
-    est["qx"] = est_traj.orientations_quat_wxyz[:, 1]
-    est["qy"] = est_traj.orientations_quat_wxyz[:, 2]
-    est["qz"] = est_traj.orientations_quat_wxyz[:, 3]
-
-    roll, pitch, yaw = (
-        Rotation.from_quat(
-            np.column_stack([est["qx"], est["qy"], est["qz"], est["qw"]])
-        )
-        .as_euler("xyz")
-        .T
+    quats_xyzw = est_traj.orientations_quat_wxyz[:, [1, 2, 3, 0]]
+    est["roll"], est["pitch"], est["yaw"] = (
+        Rotation.from_quat(quats_xyzw).as_euler("xyz").T
     )
-    est["roll"] = roll
-    est["pitch"] = pitch
-    est["yaw"] = yaw
 
 
 def build_benchmark_tables(agent_dir: Path, metrics_names: tuple[str, ...]) -> None:
