@@ -15,6 +15,8 @@
 
 import argparse
 import logging
+import os
+import shutil
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -27,6 +29,21 @@ from plots import state
 from scoring import metrics, tum
 
 logger = logging.getLogger(__name__)
+
+
+def save_config(dest_dir: Path) -> None:
+    """
+    Copy the active config directory into a run's output directory.
+
+    :param dest_dir: Output directory to copy the config folder into.
+    """
+    config_dir = os.environ.get("CONFIG_DIR", "")
+    if not config_dir or not os.path.isdir(config_dir):
+        return
+
+    dest = dest_dir / "config"
+    shutil.copytree(config_dir, dest, dirs_exist_ok=True)
+    logger.info(f"Config saved: {dest}")
 
 
 def process_and_evaluate(
@@ -58,6 +75,7 @@ def process_and_evaluate(
 
     evo_dir = tum.evo_agent_dir(bag_path, namespace) / tag
     evo_dir.mkdir(parents=True, exist_ok=True)
+    save_config(evo_dir)
     est_path = evo_dir / f"{namespace}_{tag}.tum"
     tum.save_tum(est_path, results)
 
