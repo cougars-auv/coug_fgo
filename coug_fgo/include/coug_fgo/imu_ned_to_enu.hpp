@@ -49,7 +49,7 @@ class ImuNedToEnuNode : public rclcpp::Node {
   void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg);
 
   /**
-   * @brief Re-references the orientation from NED to ENU (body axes and covariance unchanged).
+   * @brief Re-references the orientation and its covariance from NED to ENU (body axes unchanged).
    * @param msg The incoming NED-referenced IMU message.
    * @return The converted IMU message; rates and accelerations pass through untouched.
    */
