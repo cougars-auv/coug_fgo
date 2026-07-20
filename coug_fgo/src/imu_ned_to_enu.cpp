@@ -59,7 +59,7 @@ sensor_msgs::msg::Imu ImuNedToEnuNode::convertToEnu(const sensor_msgs::msg::Imu:
   out.orientation.z = s * (q.y - q.x);
 
   if (out.orientation_covariance[0] >= 0.0) {
-    // Pose orientation covariance is expressed about the world-frame axes
+    // Pose orientation covariance is expressed about the world frame axes
     static const Eigen::Matrix3d M = (Eigen::Matrix3d() << 0, 1, 0, 1, 0, 0, 0, 0, -1).finished();
     Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>> cov(out.orientation_covariance.data());
     cov = (M * cov * M.transpose()).eval();

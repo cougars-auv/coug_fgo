@@ -64,7 +64,7 @@ nav_msgs::msg::Odometry OdomNedToEnuNode::convertToEnu(
 
   if (out.pose.covariance[0] >= 0.0) {
     static const Eigen::Matrix<double, 6, 6> T = []() {
-      // Pose orientation covariance is expressed about the world-frame axes
+      // Pose orientation covariance is expressed about the world frame axes
       static const Eigen::Matrix3d M = (Eigen::Matrix3d() << 0, 1, 0, 1, 0, 0, 0, 0, -1).finished();
       Eigen::Matrix<double, 6, 6> t = Eigen::Matrix<double, 6, 6>::Zero();
       t.block<3, 3>(0, 0) = M;
