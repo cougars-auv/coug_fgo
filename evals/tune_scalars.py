@@ -15,6 +15,7 @@
 
 import logging
 import math
+import os
 import tempfile
 from contextlib import contextmanager
 from datetime import datetime
@@ -36,7 +37,8 @@ logger = logging.getLogger(__name__)
 
 CONFIG_PATHS = config_paths(NAMESPACE)
 
-DB_URL = f"sqlite:///{Path(__file__).parent.resolve()}/tuning.db"
+DB_PATH = Path(os.path.commonpath(BAG_PATHS)).resolve() / "optuna_study.db"
+DB_URL = f"sqlite:///{DB_PATH}"
 STUDY_NAME = f"{NAMESPACE}_scalar_sweep_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}"
 
 SCALARS_TO_TUNE = ["const_vel"]
