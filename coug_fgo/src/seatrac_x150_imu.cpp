@@ -68,7 +68,6 @@ sensor_msgs::msg::Imu SeatracX150ImuNode::convertToImu(
     imu_msg.header.frame_id = params_.parameter_frame;
   }
 
-  // Convert to quaternion
   if (msg->includes_local_attitude) {
     static constexpr double kSeatracToRad = M_PI / 1800.0;
     double roll_rad = msg->attitude_roll * kSeatracToRad;

@@ -61,6 +61,7 @@ void DvlA50OdomNode::dvlCallback(const dvl_msgs::msg::DVLDR::SharedPtr msg) {
     return;
   }
 
+  // Transform from DVL to base frame pose in the map frame
   geometry_msgs::msg::Pose p_base_in_dvl;
   p_base_in_dvl.position.x = dvl_T_base_tf.transform.translation.x;
   p_base_in_dvl.position.y = dvl_T_base_tf.transform.translation.y;
