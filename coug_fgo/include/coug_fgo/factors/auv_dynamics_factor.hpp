@@ -100,7 +100,7 @@ class AuvDynamicsFactorArm
 
     gtsam::Vector3 abs_v_target_i = v_target_i.cwiseAbs();
     gtsam::Vector3 drag_force =
-        -(linear_drag_ * v_target_i + quad_drag_ * abs_v_target_i.asDiagonal() * v_target_i);
+        -(linear_drag_ * v_target_i + quad_drag_ * v_target_i.cwiseProduct(abs_v_target_i));
 
     // Jacobian of the velocity prediction with respect to v_target_i
     gtsam::Matrix33 J_scale = gtsam::Matrix33::Zero();
