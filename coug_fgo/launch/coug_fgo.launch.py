@@ -29,6 +29,9 @@ def generate_launch_description() -> LaunchDescription:
     use_sim_time = LaunchConfiguration("use_sim_time")
     auv_ns = LaunchConfiguration("auv_ns")
     loc_comparison = LaunchConfiguration("loc_comparison")
+    lead_agent = LaunchConfiguration("lead_agent")
+
+    is_lead_agent = EqualsSubstitution(auv_ns, lead_agent)
 
     fleet_params = PathJoinSubstitution(
         [
@@ -135,6 +138,11 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="false",
                 description="Launch additional localization nodes if true",
             ),
+            DeclareLaunchArgument(
+                "lead_agent",
+                default_value="",
+                description="Namespace of the lead agent (optional)",
+            ),
             Node(
                 package="coug_fgo",
                 executable="factor_graph",
@@ -155,6 +163,7 @@ def generate_launch_description() -> LaunchDescription:
                         "mag.parameter_frame": imu_link_frame,
                         "ahrs.parameter_frame": imu_link_frame,
                         "dynamics.parameter_frame": com_link_frame,
+                        "multiagent.enable_multiagent": is_lead_agent,
                     },
                 ],
             ),
@@ -180,6 +189,7 @@ def generate_launch_description() -> LaunchDescription:
                         "mag.parameter_frame": imu_link_frame,
                         "ahrs.parameter_frame": imu_link_frame,
                         "dynamics.parameter_frame": com_link_frame,
+                        "multiagent.enable_multiagent": is_lead_agent,
                         "global_odom_topic": "odometry/global_isam2",
                         "smoothed_path_topic": "smoothed_path_isam2",
                         "publish_global_tf": False,
@@ -210,6 +220,7 @@ def generate_launch_description() -> LaunchDescription:
                         "mag.parameter_frame": imu_link_frame,
                         "ahrs.parameter_frame": imu_link_frame,
                         "dynamics.parameter_frame": com_link_frame,
+                        "multiagent.enable_multiagent": is_lead_agent,
                         "global_odom_topic": "odometry/global_lpi",
                         "smoothed_path_topic": "smoothed_path_lpi",
                         "publish_global_tf": False,
@@ -239,6 +250,7 @@ def generate_launch_description() -> LaunchDescription:
                         "mag.parameter_frame": imu_link_frame,
                         "ahrs.parameter_frame": imu_link_frame,
                         "dynamics.parameter_frame": com_link_frame,
+                        "multiagent.enable_multiagent": is_lead_agent,
                         "global_odom_topic": "odometry/global_tpi",
                         "smoothed_path_topic": "smoothed_path_tpi",
                         "publish_global_tf": False,

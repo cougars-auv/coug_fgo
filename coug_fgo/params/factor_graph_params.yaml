@@ -119,6 +119,9 @@ factor_graph_node:
     default_value: "cmd_wrench"
     validation:
       not_empty<>: []
+  multiagent_topics:
+    type: string_array
+    default_value: []
   global_odom_topic:
     type: string
     default_value: "odometry/global"
@@ -367,7 +370,7 @@ factor_graph_node:
         type: double
         default_value: 0.02
         validation:
-          gt_eq<>: [0.0]
+          gt<>: [0.0]
     diagnostic_timeout_sec:
       type: double
       default_value: 1.0
@@ -651,6 +654,130 @@ factor_graph_node:
       validation:
         fixed_size<>: [3]
         lower_element_bounds<>: [0.0]
+    diagnostic_timeout_sec:
+      type: double
+      default_value: 1.0
+      validation:
+        gt<>: [0.0]
+    robust_kernel:
+      type: string
+      default_value: "None"
+      validation:
+        one_of<>: [["None", "Huber", "Tukey"]]
+    robust_k:
+      type: double
+      default_value: 1.345
+      validation:
+        gt<>: [0.0]
+
+  multiagent:
+    enable_multiagent:
+      type: bool
+      default_value: false
+    use_parameter_frame:
+      type: bool
+      default_value: false
+    parameter_frame:
+      type: string
+      default_value: "modem_link"
+      validation:
+        not_empty<>: []
+    use_parameter_tf:
+      type: bool
+      default_value: false
+    parameter_tf:
+      position:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0]
+        validation:
+          fixed_size<>: [3]
+      orientation:
+        type: double_array
+        default_value: [0.0, 0.0, 0.0, 1.0]
+        validation:
+          fixed_size<>: [4]
+    covariance_scalar:
+      type: double
+      default_value: 1.0
+      validation:
+        gt<>: [0.0]
+    bearing_noise_sigmas:
+      type: double_array
+      default_value: [0.01745, 0.01745]
+      validation:
+        fixed_size<>: [2]
+        lower_element_bounds<>: [0.0]
+    range_noise_sigma:
+      type: double
+      default_value: 0.1
+      validation:
+        gt<>: [0.0]
+    neighbor:
+      modem_tf:
+        position:
+          type: double_array
+          default_value: [0.0, 0.0, 0.0]
+          validation:
+            fixed_size<>: [3]
+        orientation:
+          type: double_array
+          default_value: [0.0, 0.0, 0.0, 1.0]
+          validation:
+            fixed_size<>: [4]
+      ahrs:
+        enable_ahrs:
+          type: bool
+          default_value: true
+        covariance_scalar:
+          type: double
+          default_value: 1.0
+          validation:
+            gt<>: [0.0]
+        orientation_noise_sigmas:
+          type: double_array
+          default_value: [0.00698, 0.00698, 0.01745]
+          validation:
+            fixed_size<>: [3]
+            lower_element_bounds<>: [0.0]
+        mag_declination_radians:
+          type: double
+          default_value: 0.0
+          validation:
+            bounds<>: [-3.14159, 3.14159]
+        robust_kernel:
+          type: string
+          default_value: "None"
+          validation:
+            one_of<>: [["None", "Huber", "Tukey"]]
+        robust_k:
+          type: double
+          default_value: 1.345
+          validation:
+            gt<>: [0.0]
+      depth:
+        enable_depth:
+          type: bool
+          default_value: true
+        covariance_scalar:
+          type: double
+          default_value: 1.0
+          validation:
+            gt<>: [0.0]
+        position_z_noise_sigma:
+          type: double
+          default_value: 0.02
+          validation:
+            gt<>: [0.0]
+        robust_kernel:
+          type: string
+          default_value: "None"
+          validation:
+            one_of<>: [["None", "Huber", "Tukey"]]
+        robust_k:
+          type: double
+          default_value: 1.345
+          validation:
+            gt<>: [0.0]
     diagnostic_timeout_sec:
       type: double
       default_value: 1.0

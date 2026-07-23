@@ -57,6 +57,19 @@ Eigen::Matrix<double, N, N> toCovMatrix(const Array& arr) {
   return Eigen::Map<const Eigen::Matrix<double, N, N, Eigen::RowMajor>>(arr.data());
 }
 
+/**
+ * @brief Extracts a neighboring agent's name from its status topic (the leading segment).
+ * @param topic The neighbor status topic (e.g. "/coug2/base/agent/status").
+ * @return The leading namespace segment (e.g. "coug2"), or the full topic if none is found.
+ */
+std::string agentNameFromTopic(const std::string& topic) {
+  size_t start = topic.find_first_not_of('/');
+  if (start == std::string::npos) {
+    return topic;
+  }
+  return topic.substr(start, topic.find('/', start) - start);
+}
+
 }  // namespace
 
 void FactorGraphNode::setupRosInterfaces() {
@@ -239,6 +252,40 @@ void FactorGraphNode::setupRosInterfaces() {
         sensor_options);
   }
 
+  if (params_.multiagent.enable_multiagent) {
+    multiagent_queues_.reserve(params_.multiagent_topics.size());
+    multiagent_subs_.reserve(params_.multiagent_topics.size());
+    for (size_t i = 0; i < params_.multiagent_topics.size(); ++i) {
+      multiagent_queues_.push_back(
+          std::make_unique<utils::ThreadSafeQueue<std::shared_ptr<utils::AgentStatusData>>>());
+      multiagent_subs_.push_back(create_subscription<coug_interfaces::msg::AgentStatus>(
+          params_.multiagent_topics[i], rclcpp::SystemDefaultsQoS(),
+          [this, i](const coug_interfaces::msg::AgentStatus::SharedPtr msg) {
+            std::string child = params_.multiagent.use_parameter_frame
+                                    ? params_.multiagent.parameter_frame
+                                    : msg->header.frame_id;
+            loadOrLookupTf(target_T_modem_tf_, child, params_.multiagent.use_parameter_tf,
+                           params_.multiagent.parameter_tf.position,
+                           params_.multiagent.parameter_tf.orientation);
+            auto data = std::make_shared<utils::AgentStatusData>();
+            data->timestamp = rclcpp::Time(msg->header.stamp).seconds();
+            data->pose = toGtsam(msg->local_odometry);
+            data->pose_covariance = toCovMatrix<6>(msg->odometry_covariance);
+            data->pressure_depth = msg->pressure_depth;
+            data->imu_orientation = toGtsam(msg->imu_orientation);
+            data->includes_range = msg->includes_range;
+            data->range_dist = msg->range_dist;
+            data->includes_usbl = msg->includes_usbl;
+            data->usbl_azimuth = msg->usbl_azimuth;
+            data->usbl_elevation = msg->usbl_elevation;
+            data->includes_position = msg->includes_position;
+            data->position_depth = msg->position_depth;
+            multiagent_queues_[i]->push(data);
+          },
+          sensor_options));
+    }
+  }
+
   if (keyframe_source_ == KeyframeSource::kTimer ||
       backup_keyframe_source_ == KeyframeSource::kTimer) {
     double period = 1.0 / params_.keyframe_timer_hz;
@@ -397,6 +444,25 @@ void FactorGraphNode::loadOrLookupTf(geometry_msgs::msg::TransformStamped& tf_ou
   }
 }
 
+utils::TfBundle FactorGraphNode::buildCurrentTfBundle() {
+  std::scoped_lock lock(tf_mutex_);
+  utils::TfBundle tfs;
+  tfs.target_T_imu = toGtsam(target_T_imu_tf_.transform);
+  tfs.target_T_gps = toGtsam(target_T_gps_tf_.transform);
+  tfs.target_T_depth = toGtsam(target_T_depth_tf_.transform);
+  tfs.target_T_mag = toGtsam(target_T_mag_tf_.transform);
+  tfs.target_T_ahrs = toGtsam(target_T_ahrs_tf_.transform);
+  tfs.target_T_dvl = toGtsam(target_T_dvl_tf_.transform);
+  tfs.target_T_base = toGtsam(target_T_base_tf_.transform);
+  if (!target_T_com_tf_.header.frame_id.empty()) {
+    tfs.target_T_com = toGtsam(target_T_com_tf_.transform);
+  }
+  if (!target_T_modem_tf_.header.frame_id.empty()) {
+    tfs.target_T_modem = toGtsam(target_T_modem_tf_.transform);
+  }
+  return tfs;
+}
+
 utils::QueueBundle FactorGraphNode::drainAllQueues() {
   utils::QueueBundle queues;
   queues.imu = imu_queue_.drain();
@@ -406,6 +472,10 @@ utils::QueueBundle FactorGraphNode::drainAllQueues() {
   queues.ahrs = ahrs_queue_.drain();
   queues.dvl = dvl_queue_.drain();
   queues.wrench = wrench_queue_.drain();
+  queues.multiagent.resize(multiagent_queues_.size());
+  for (size_t i = 0; i < multiagent_queues_.size(); ++i) {
+    queues.multiagent[i] = multiagent_queues_[i]->drain();
+  }
   return queues;
 }
 
@@ -417,6 +487,9 @@ void FactorGraphNode::restoreAllQueues(const utils::QueueBundle& queues) {
   ahrs_queue_.restore(queues.ahrs);
   dvl_queue_.restore(queues.dvl);
   wrench_queue_.restore(queues.wrench);
+  for (size_t i = 0; i < multiagent_queues_.size() && i < queues.multiagent.size(); ++i) {
+    multiagent_queues_[i]->restore(queues.multiagent[i]);
+  }
 }
 
 void FactorGraphNode::publishGlobalOdom(const gtsam::Pose3& current_pose,
@@ -664,14 +737,7 @@ void FactorGraphNode::initializeGraph() {
     return;
   }
 
-  utils::TfBundle tfs;
-  {
-    std::scoped_lock lock(tf_mutex_);
-    tfs = {toGtsam(target_T_imu_tf_.transform),   toGtsam(target_T_gps_tf_.transform),
-           toGtsam(target_T_depth_tf_.transform), toGtsam(target_T_mag_tf_.transform),
-           toGtsam(target_T_ahrs_tf_.transform),  toGtsam(target_T_dvl_tf_.transform),
-           toGtsam(target_T_base_tf_.transform),  toGtsam(target_T_com_tf_.transform)};
-  }
+  utils::TfBundle tfs = buildCurrentTfBundle();
 
   std::optional<utils::InitialState> init_state =
       state_init_->update(newest_stamp, init_queues, tfs);
@@ -728,7 +794,7 @@ void FactorGraphNode::updateGraph() {
 
   // --- Update Request ---
   utils::QueueBundle queues = drainAllQueues();
-  auto leftover = core_->update(*target_time, queues);
+  auto leftover = core_->update(*target_time, queues, buildCurrentTfBundle());
   restoreAllQueues(leftover ? *leftover : queues);
 }
 
@@ -821,6 +887,12 @@ void FactorGraphNode::checkSensorStatus(diagnostic_updater::DiagnosticStatusWrap
               params_.dvl.enable_dvl, params_.dvl.enable_dvl, params_.dvl.diagnostic_timeout_sec);
   check_queue("Wrench", wrench_queue_.size(), wrench_queue_.secondsSinceLastArrival(),
               params_.dynamics.enable_dynamics, false, params_.dynamics.diagnostic_timeout_sec);
+  for (size_t i = 0; i < multiagent_queues_.size(); ++i) {
+    check_queue("Multi (" + agentNameFromTopic(params_.multiagent_topics[i]) + ")",
+                multiagent_queues_[i]->size(), multiagent_queues_[i]->secondsSinceLastArrival(),
+                params_.multiagent.enable_multiagent, false,
+                params_.multiagent.diagnostic_timeout_sec);
+  }
 
   if (!offline_sensors.empty()) {
     std::string msg = "Sensor data unavailable: ";

@@ -30,6 +30,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <coug_interfaces/msg/agent_status.hpp>
 #include <coug_interfaces/msg/graph_metrics.hpp>
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
@@ -147,6 +148,12 @@ class FactorGraphNode : public rclcpp::Node {
                       const std::vector<double>& quat);
 
   /**
+   * @brief Builds a GTSAM sensor transform bundle from the currently resolved transforms.
+   * @return The transform bundle; unresolved transforms are left identity.
+   */
+  utils::TfBundle buildCurrentTfBundle();
+
+  /**
    * @brief Drains every sensor queue into one bundle.
    * @return The drained sensor data bundle.
    */
@@ -252,6 +259,8 @@ class FactorGraphNode : public rclcpp::Node {
   utils::ThreadSafeQueue<std::shared_ptr<utils::AhrsData>> ahrs_queue_;
   utils::ThreadSafeQueue<std::shared_ptr<utils::TwistData>> dvl_queue_;
   utils::ThreadSafeQueue<std::shared_ptr<utils::WrenchData>> wrench_queue_;
+  std::vector<std::unique_ptr<utils::ThreadSafeQueue<std::shared_ptr<utils::AgentStatusData>>>>
+      multiagent_queues_;
 
   // --- Multithreading ---
   std::thread frontend_thread_;
@@ -278,6 +287,7 @@ class FactorGraphNode : public rclcpp::Node {
   geometry_msgs::msg::TransformStamped target_T_mag_tf_;
   geometry_msgs::msg::TransformStamped target_T_ahrs_tf_;
   geometry_msgs::msg::TransformStamped target_T_com_tf_;
+  geometry_msgs::msg::TransformStamped target_T_modem_tf_;
 
   std::string imu_frame_;
 
@@ -295,6 +305,7 @@ class FactorGraphNode : public rclcpp::Node {
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr ahrs_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr dvl_sub_;
   rclcpp::Subscription<geometry_msgs::msg::WrenchStamped>::SharedPtr wrench_sub_;
+  std::vector<rclcpp::Subscription<coug_interfaces::msg::AgentStatus>::SharedPtr> multiagent_subs_;
   rclcpp::TimerBase::SharedPtr keyframe_timer_;
 
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reset_srv_;

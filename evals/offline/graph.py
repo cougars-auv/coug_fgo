@@ -91,6 +91,12 @@ class OfflineFactorGraph:
             "wrench": subscribed("dynamics"),
         }
 
+        self.multiagent_enabled = self.params["multiagent"]["enable_multiagent"]
+        self.multiagent_topics = (
+            self.params["multiagent"]["topics"] if self.multiagent_enabled else []
+        )
+        self.n_multiagent = len(self.multiagent_topics)
+
         self.is_lm = self.params["solver_type"] == "LevenbergMarquardt"
         if self.is_lm and not self.params["publish_smoothed_path"]:
             raise RuntimeError(
@@ -128,6 +134,9 @@ class OfflineFactorGraph:
         """Reset the queues and bookkeeping shared between graph runs."""
         self.is_initialized = False
         self.queues: dict[str, list[tuple]] = {sensor: [] for sensor in SENSORS}
+        self.multiagent_queues: list[list[tuple]] = [
+            [] for _ in range(self.n_multiagent)
+        ]
         self._using_backup = False
         self._last_target_time: float | None = None
         self._last_update_time: float | None = None
@@ -149,6 +158,10 @@ class OfflineFactorGraph:
             if not topic.startswith("/"):
                 topic = f"/{self.namespace}/{topic}" if self.namespace else f"/{topic}"
             topics.setdefault(topic, []).append(sensor)
+        for i, topic in enumerate(self.multiagent_topics):
+            if not topic.startswith("/"):
+                topic = f"/{self.namespace}/{topic}" if self.namespace else f"/{topic}"
+            topics.setdefault(topic, []).append(f"multiagent_{i}")
         return topics
 
     def pending_init_sensors(self) -> list[str]:
@@ -167,14 +180,22 @@ class OfflineFactorGraph:
         """
         Queue one sensor measurement and trigger keyframe processing when due.
 
-        :param sensor: Sensor key from SENSORS.
+        :param sensor: Sensor key from SENSORS, or ``multiagent_{i}`` for neighbor status.
         :param frame_id: ROS frame the measurement was reported in.
         :param measurement: Extracted measurement tuple, with the stamp first.
         """
+        self._stream_time = max(self._stream_time, measurement[0])
+
+        if sensor.startswith("multiagent_"):
+            self._resolve_sensor_tf("modem", frame_id)
+            self.multiagent_queues[int(sensor.removeprefix("multiagent_"))].append(
+                measurement
+            )
+            return
+
         self._resolve_sensor_tf(sensor, frame_id)
         self.queues[sensor].append(measurement)
         self._last_msg_time[sensor] = measurement[0]
-        self._stream_time = max(self._stream_time, measurement[0])
 
         sources = (self.kf_source, self.kf_backup)
         if (sensor == "dvl" and "DVL" in sources) or (
@@ -215,6 +236,7 @@ class OfflineFactorGraph:
 
         batches = self.queues
         self.queues = {sensor: [] for sensor in SENSORS}
+        self.multiagent_queues = [[] for _ in range(self.n_multiagent)]
         if self.fg.initialize(newest_stamp, **batches):
             self.is_initialized = True
             logger.info("Graph initialized successfully.")
@@ -233,19 +255,19 @@ class OfflineFactorGraph:
                 and newest_stamp - last_received > self.kf_timeout
             )
             if last_received is None or timed_out:
-                if self.kf_backup != "None":
-                    active_source = self.kf_backup
-                    if not self._using_backup:
+                if not self._using_backup:
+                    if self.kf_backup != "None":
                         logger.warning(
                             f"Primary keyframe source '{self.kf_source}' timed out. "
                             f"Using backup '{self.kf_backup}'."
                         )
-                else:
-                    if not self._using_backup:
+                    else:
                         logger.error(
                             f"Primary keyframe source '{self.kf_source}' timed out and no backup is configured. "
                             "No new keyframes will be created."
                         )
+                if self.kf_backup != "None":
+                    active_source = self.kf_backup
                 self._using_backup = True
             else:
                 self._using_backup = False
@@ -258,9 +280,12 @@ class OfflineFactorGraph:
             return
         self._last_target_time = target_time
 
-        leftover = self.fg.update(target_time, **self.queues)
+        leftover = self.fg.update(
+            target_time, **self.queues, multiagent=self.multiagent_queues
+        )
         if leftover is None:
             return
+        self.multiagent_queues = leftover.pop("multiagent")
         self.queues = leftover
 
     def _optimize_graph(self) -> None:
@@ -333,12 +358,15 @@ class OfflineFactorGraph:
         """
         Resolve and register a sensor's static transform once.
 
-        :param sensor: Sensor key from SENSORS.
+        :param sensor: Sensor key from SENSORS, or ``modem`` for neighbor status.
         :param frame_id: Frame reported by the sensor's messages.
         """
         if sensor in self.tfs_resolved:
             return
-        cfg = self.params["sensors"]["dynamics" if sensor == "wrench" else sensor]
+        if sensor == "modem":
+            cfg = self.params["multiagent"]
+        else:
+            cfg = self.params["sensors"]["dynamics" if sensor == "wrench" else sensor]
         frame = cfg["parameter_frame"] if cfg["use_parameter_frame"] else frame_id
         pos, quat = self._load_or_lookup_tf(cfg, frame)
         self.fg.set_tf("com" if sensor == "wrench" else sensor, pos, quat)

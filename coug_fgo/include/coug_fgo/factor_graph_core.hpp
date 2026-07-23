@@ -36,6 +36,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "coug_fgo/factor_graph_parameters.hpp"
 #include "coug_fgo/utils/data_types.hpp"
@@ -99,9 +100,11 @@ class FactorGraphCore {
    * @brief Builds factors for one keyframe and writes the graph to the buffer.
    * @param target_time The keyframe timestamp.
    * @param queues Drained sensor data structs (consumed).
+   * @param tfs Latest sensor transforms to refresh (picks up lazily-resolved ones).
    * @return Structs newer than the keyframe to re-queue, or nullopt if the timestamp was stale.
    */
-  std::optional<utils::QueueBundle> update(double target_time, utils::QueueBundle& queues);
+  std::optional<utils::QueueBundle> update(double target_time, utils::QueueBundle& queues,
+                                           const utils::TfBundle& tfs);
 
   /**
    * @brief Consumes the buffer and runs the GTSAM smoother.
@@ -246,6 +249,18 @@ class FactorGraphCore {
                                double target_time, const gtsam::Vector3& held_imu_acc,
                                const gtsam::Vector3& held_imu_gyr);
 
+  /**
+   * @brief Adds neighboring-agent odometry, depth, orientation, and range/bearing factors.
+   * @param graph The target factor graph.
+   * @param values The new variable estimates.
+   * @param timestamps The new key timestamps.
+   * @param queues Drained per-neighbor status structs, one deque per neighbor.
+   * @param target_time The current keyframe timestamp.
+   */
+  void addMultiAgentFactors(gtsam::NonlinearFactorGraph& graph, gtsam::Values& values,
+                            gtsam::IncrementalFixedLagSmoother::KeyTimestampMap& timestamps,
+                            utils::QueueBundle& queues, double target_time);
+
   // --- Parameters ---
   const factor_graph_node::Params params_;
   utils::TfBundle tfs_;
@@ -279,6 +294,7 @@ class FactorGraphCore {
   gtsam::Vector3 last_imu_acc_ = gtsam::Vector3::Zero();
   gtsam::Vector3 last_imu_gyr_ = gtsam::Vector3::Zero();
   std::shared_ptr<utils::WrenchData> last_wrench_msg_;
+  std::vector<std::shared_ptr<utils::AgentStatusData>> last_multiagent_status_;
 
   // --- Buffer ---
   mutable std::mutex state_mutex_;

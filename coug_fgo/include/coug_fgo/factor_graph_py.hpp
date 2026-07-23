@@ -54,6 +54,9 @@ class FactorGraphPy {
   using AhrsBatch = std::vector<std::tuple<double, Eigen::Vector4d, Eigen::Matrix3d>>;
   using TwistBatch = std::vector<std::tuple<double, Eigen::Vector3d, Matrix6d>>;
   using WrenchBatch = std::vector<std::tuple<double, Vector6d>>;
+  using AgentStatus = std::tuple<double, Eigen::Vector3d, Eigen::Vector4d, Matrix6d, double,
+                                 Eigen::Vector4d, bool, double, bool, double, double, bool, double>;
+  using MultiAgentBatch = std::vector<std::vector<AgentStatus>>;
 
   /**
    * @brief Constructs the wrapper, loading parameters from ROS 2 YAML config files.
@@ -70,7 +73,7 @@ class FactorGraphPy {
 
   /**
    * @brief Sets one sensor transform (sensor pose in the target frame).
-   * @param name One of "imu", "gps", "depth", "mag", "ahrs", "dvl", "base", "com".
+   * @param name One of "imu", "gps", "depth", "mag", "ahrs", "dvl", "base", "com", "modem".
    * @param position Translation [x, y, z] in meters.
    * @param quat_xyzw Orientation quaternion (x, y, z, w).
    * @throws std::invalid_argument If the name is not a known transform.
@@ -94,7 +97,8 @@ class FactorGraphPy {
    */
   pybind11::object update(double target_time, const ImuBatch& imu, const OdomBatch& gps,
                           const DepthBatch& depth, const MagBatch& mag, const AhrsBatch& ahrs,
-                          const TwistBatch& dvl, const WrenchBatch& wrench);
+                          const TwistBatch& dvl, const WrenchBatch& wrench,
+                          const MultiAgentBatch& multiagent);
 
   /**
    * @brief Runs the GTSAM smoother on the buffered keyframes.
@@ -119,7 +123,7 @@ class FactorGraphPy {
   static utils::QueueBundle to_bundle(const ImuBatch& imu, const OdomBatch& gps,
                                       const DepthBatch& depth, const MagBatch& mag,
                                       const AhrsBatch& ahrs, const TwistBatch& dvl,
-                                      const WrenchBatch& wrench);
+                                      const WrenchBatch& wrench, const MultiAgentBatch& multiagent);
 
   /**
    * @brief Converts a core QueueBundle back into a dict of Python measurement batches.

@@ -840,8 +840,53 @@ void FactorGraphCore::addDvlTightPreintFactor(
       gtsam::noiseModel::Gaussian::Covariance(dvl_tight_preintegrator_->covariance()));
 }
 
+void FactorGraphCore::addMultiAgentFactors(
+    gtsam::NonlinearFactorGraph& graph, gtsam::Values& values,
+    gtsam::IncrementalFixedLagSmoother::KeyTimestampMap& timestamps, utils::QueueBundle& queues,
+    double target_time) {
+  (void)graph;
+  (void)values;
+  (void)timestamps;
+  (void)target_time;
+
+  last_multiagent_status_.resize(queues.multiagent.size());
+
+  for (size_t i = 0; i < queues.multiagent.size(); ++i) {
+    for (const auto& msg : queues.multiagent[i]) {
+      std::ostringstream oss;
+      oss << std::fixed << std::setprecision(4);
+      oss << "Neighbor [" << i << "] status (t=" << msg->timestamp << "):\n"
+          << "  Position [m]       : " << msg->pose.translation().transpose() << "\n"
+          << "  Position cov [m^2] : " << msg->pose_covariance.diagonal().head<3>().transpose()
+          << "\n"
+          << "  Orientation [rad]  : " << msg->pose.rotation().rpy().transpose() << " (RPY)\n"
+          << "  Orient cov [rad^2] : " << msg->pose_covariance.diagonal().tail<3>().transpose()
+          << "\n"
+          << "  Depth [m]          : " << msg->pressure_depth << "\n"
+          << "  IMU orient. [rad]  : " << msg->imu_orientation.rpy().transpose() << " (RPY)";
+      if (msg->includes_usbl) {
+        oss << "\n  USBL az/el [rad]   : " << msg->usbl_azimuth << ", " << msg->usbl_elevation;
+      }
+      if (msg->includes_range) {
+        oss << "\n  Range [m]          : " << msg->range_dist;
+      }
+      if (msg->includes_position) {
+        oss << "\n  Position depth [m] : " << msg->position_depth;
+      }
+      logMessage(utils::LogLevel::kInfo, oss.str());
+    }
+
+    if (!queues.multiagent[i].empty()) {
+      last_multiagent_status_[i] = queues.multiagent[i].back();
+    }
+  }
+
+  // TODO: Add here w Kalliyan
+}
+
 std::optional<utils::QueueBundle> FactorGraphCore::update(double target_time,
-                                                          utils::QueueBundle& queues) {
+                                                          utils::QueueBundle& queues,
+                                                          const utils::TfBundle& tfs) {
   if (target_time <= prev_time_ + 1e-6) {
     return std::nullopt;
   }
@@ -855,6 +900,9 @@ std::optional<utils::QueueBundle> FactorGraphCore::update(double target_time,
   std::sort(queues.ahrs.begin(), queues.ahrs.end(), by_time);
   std::sort(queues.dvl.begin(), queues.dvl.end(), by_time);
   std::sort(queues.wrench.begin(), queues.wrench.end(), by_time);
+  for (auto& agent : queues.multiagent) {
+    std::sort(agent.begin(), agent.end(), by_time);
+  }
 
   if (queues.imu.empty() || queues.imu.front()->timestamp > target_time) {
     logMessage(utils::LogLevel::kWarn,
@@ -870,6 +918,9 @@ std::optional<utils::QueueBundle> FactorGraphCore::update(double target_time,
   utils::QueueBundle leftover;
 
   std::scoped_lock state_lock(state_mutex_);
+
+  // Update lazily-resolved transforms
+  tfs_ = tfs;
 
   const gtsam::Vector3 held_imu_acc = last_imu_acc_;
   const gtsam::Vector3 held_imu_gyr = last_imu_gyr_;
@@ -888,6 +939,10 @@ std::optional<utils::QueueBundle> FactorGraphCore::update(double target_time,
   splitAfterTarget(queues.ahrs, leftover.ahrs);
   splitAfterTarget(queues.dvl, leftover.dvl);
   splitAfterTarget(queues.wrench, leftover.wrench);
+  leftover.multiagent.resize(queues.multiagent.size());
+  for (size_t i = 0; i < queues.multiagent.size(); ++i) {
+    splitAfterTarget(queues.multiagent[i], leftover.multiagent[i]);
+  }
 
   if (params_.comparison.enable_loose_dvl_preintegration && !queues.ahrs.empty()) {
     leftover.ahrs.push_front(queues.ahrs.back());
@@ -943,6 +998,10 @@ std::optional<utils::QueueBundle> FactorGraphCore::update(double target_time,
         addConstVelFactor(new_graph, target_time);
       }
     }
+  }
+
+  if (params_.multiagent.enable_multiagent) {
+    addMultiAgentFactors(new_graph, new_values, new_timestamps, queues, target_time);
   }
 
   // --- Add State Predictions ---

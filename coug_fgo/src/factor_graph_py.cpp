@@ -38,14 +38,32 @@ using utils::StateInitializer;
 namespace {
 
 /**
+ * @brief Converts a ROS (x, y, z, w) quaternion to a GTSAM Rot3.
+ * @param quat_xyzw Orientation quaternion (x, y, z, w).
+ * @return The equivalent GTSAM Rot3.
+ */
+gtsam::Rot3 toRot3(const Eigen::Vector4d& quat_xyzw) {
+  return gtsam::Rot3::Quaternion(quat_xyzw(3), quat_xyzw(0), quat_xyzw(1), quat_xyzw(2));
+}
+
+/**
+ * @brief Converts a GTSAM Rot3 to a ROS (x, y, z, w) quaternion.
+ * @param rot The rotation to convert.
+ * @return The equivalent quaternion (x, y, z, w).
+ */
+Eigen::Vector4d toQuatXyzw(const gtsam::Rot3& rot) {
+  gtsam::Quaternion q = rot.toQuaternion();
+  return Eigen::Vector4d(q.x(), q.y(), q.z(), q.w());
+}
+
+/**
  * @brief Converts a ROS (x, y, z, w) quaternion and translation to a GTSAM Pose3.
  * @param position Translation [x, y, z].
  * @param quat_xyzw Orientation quaternion (x, y, z, w).
  * @return The equivalent GTSAM Pose3.
  */
 gtsam::Pose3 toPose3(const Eigen::Vector3d& position, const Eigen::Vector4d& quat_xyzw) {
-  gtsam::Rot3 r = gtsam::Rot3::Quaternion(quat_xyzw(3), quat_xyzw(0), quat_xyzw(1), quat_xyzw(2));
-  return gtsam::Pose3(r, gtsam::Point3(position));
+  return gtsam::Pose3(toRot3(quat_xyzw), gtsam::Point3(position));
 }
 
 /**
@@ -199,6 +217,16 @@ pybind11::dict FactorGraphPy::get_params() const {
   sensors["dynamics"] = sensor_dict(params_.dynamics, params_.dynamics.enable_dynamics,
                                     params_.dynamics.enable_dynamics_dropout_only);
 
+  pybind11::dict multiagent;
+  multiagent["enable_multiagent"] = params_.multiagent.enable_multiagent;
+  multiagent["topics"] = params_.multiagent_topics;
+  multiagent["use_parameter_frame"] = params_.multiagent.use_parameter_frame;
+  multiagent["parameter_frame"] = params_.multiagent.parameter_frame;
+  multiagent["use_parameter_tf"] = params_.multiagent.use_parameter_tf;
+  multiagent["tf_position"] = params_.multiagent.parameter_tf.position;
+  multiagent["tf_orientation"] = params_.multiagent.parameter_tf.orientation;
+  p["multiagent"] = multiagent;
+
   pybind11::dict base;
   base["enable"] = true;
   base["enable_extra_only"] = false;
@@ -227,7 +255,8 @@ void FactorGraphPy::set_tf(const std::string& name, const Eigen::Vector3d& posit
       {"imu", &utils::TfBundle::target_T_imu},     {"gps", &utils::TfBundle::target_T_gps},
       {"depth", &utils::TfBundle::target_T_depth}, {"mag", &utils::TfBundle::target_T_mag},
       {"ahrs", &utils::TfBundle::target_T_ahrs},   {"dvl", &utils::TfBundle::target_T_dvl},
-      {"base", &utils::TfBundle::target_T_base},   {"com", &utils::TfBundle::target_T_com}};
+      {"base", &utils::TfBundle::target_T_base},   {"com", &utils::TfBundle::target_T_com},
+      {"modem", &utils::TfBundle::target_T_modem}};
 
   auto it = kTfFields.find(name);
   if (it == kTfFields.end()) {
@@ -239,7 +268,8 @@ void FactorGraphPy::set_tf(const std::string& name, const Eigen::Vector3d& posit
 utils::QueueBundle FactorGraphPy::to_bundle(const ImuBatch& imu, const OdomBatch& gps,
                                             const DepthBatch& depth, const MagBatch& mag,
                                             const AhrsBatch& ahrs, const TwistBatch& dvl,
-                                            const WrenchBatch& wrench) {
+                                            const WrenchBatch& wrench,
+                                            const MultiAgentBatch& multiagent) {
   utils::QueueBundle queues;
 
   for (const auto& [t, accel, gyro, accel_cov, gyro_cov] : imu) {
@@ -279,8 +309,7 @@ utils::QueueBundle FactorGraphPy::to_bundle(const ImuBatch& imu, const OdomBatch
   for (const auto& [t, quat_xyzw, orientation_cov] : ahrs) {
     auto msg = std::make_shared<utils::AhrsData>();
     msg->timestamp = t;
-    msg->orientation =
-        gtsam::Rot3::Quaternion(quat_xyzw(3), quat_xyzw(0), quat_xyzw(1), quat_xyzw(2));
+    msg->orientation = toRot3(quat_xyzw);
     msg->orientation_covariance = orientation_cov;
     queues.ahrs.push_back(msg);
   }
@@ -299,6 +328,28 @@ utils::QueueBundle FactorGraphPy::to_bundle(const ImuBatch& imu, const OdomBatch
     msg->force = force_torque.head<3>();
     msg->torque = force_torque.tail<3>();
     queues.wrench.push_back(msg);
+  }
+
+  queues.multiagent.resize(multiagent.size());
+  for (size_t i = 0; i < multiagent.size(); ++i) {
+    for (const auto& [t, position, quat_xyzw, pose_cov, depth_z, imu_quat_xyzw, includes_range,
+                      range_dist, includes_usbl, usbl_azimuth, usbl_elevation, includes_position,
+                      position_depth] : multiagent[i]) {
+      auto msg = std::make_shared<utils::AgentStatusData>();
+      msg->timestamp = t;
+      msg->pose = toPose3(position, quat_xyzw);
+      msg->pose_covariance = pose_cov;
+      msg->pressure_depth = depth_z;
+      msg->imu_orientation = toRot3(imu_quat_xyzw);
+      msg->includes_range = includes_range;
+      msg->range_dist = range_dist;
+      msg->includes_usbl = includes_usbl;
+      msg->usbl_azimuth = usbl_azimuth;
+      msg->usbl_elevation = usbl_elevation;
+      msg->includes_position = includes_position;
+      msg->position_depth = position_depth;
+      queues.multiagent[i].push_back(msg);
+    }
   }
 
   return queues;
@@ -328,9 +379,7 @@ pybind11::dict FactorGraphPy::from_bundle(const utils::QueueBundle& queues) {
 
   AhrsBatch ahrs;
   for (const auto& m : queues.ahrs) {
-    gtsam::Quaternion q = m->orientation.toQuaternion();
-    ahrs.emplace_back(m->timestamp, Eigen::Vector4d(q.x(), q.y(), q.z(), q.w()),
-                      m->orientation_covariance);
+    ahrs.emplace_back(m->timestamp, toQuatXyzw(m->orientation), m->orientation_covariance);
   }
 
   TwistBatch dvl;
@@ -345,6 +394,19 @@ pybind11::dict FactorGraphPy::from_bundle(const utils::QueueBundle& queues) {
     wrench.emplace_back(m->timestamp, force_torque);
   }
 
+  MultiAgentBatch multiagent;
+  multiagent.reserve(queues.multiagent.size());
+  for (const auto& agent : queues.multiagent) {
+    std::vector<AgentStatus> neighbor;
+    for (const auto& m : agent) {
+      neighbor.emplace_back(m->timestamp, m->pose.translation(), toQuatXyzw(m->pose.rotation()),
+                            m->pose_covariance, m->pressure_depth, toQuatXyzw(m->imu_orientation),
+                            m->includes_range, m->range_dist, m->includes_usbl, m->usbl_azimuth,
+                            m->usbl_elevation, m->includes_position, m->position_depth);
+    }
+    multiagent.push_back(std::move(neighbor));
+  }
+
   pybind11::dict batches;
   batches["imu"] = imu;
   batches["gps"] = gps;
@@ -353,6 +415,7 @@ pybind11::dict FactorGraphPy::from_bundle(const utils::QueueBundle& queues) {
   batches["ahrs"] = ahrs;
   batches["dvl"] = dvl;
   batches["wrench"] = wrench;
+  batches["multiagent"] = multiagent;
   return batches;
 }
 
@@ -363,7 +426,7 @@ bool FactorGraphPy::initialize(double current_time, const ImuBatch& imu, const O
     return true;
   }
 
-  utils::QueueBundle queues = to_bundle(imu, gps, depth, mag, ahrs, dvl, wrench);
+  utils::QueueBundle queues = to_bundle(imu, gps, depth, mag, ahrs, dvl, wrench, {});
 
   if (auto init_state = state_init_->update(current_time, queues, tfs_)) {
     core_->initialize(*init_state, tfs_);
@@ -375,13 +438,14 @@ bool FactorGraphPy::initialize(double current_time, const ImuBatch& imu, const O
 pybind11::object FactorGraphPy::update(double target_time, const ImuBatch& imu,
                                        const OdomBatch& gps, const DepthBatch& depth,
                                        const MagBatch& mag, const AhrsBatch& ahrs,
-                                       const TwistBatch& dvl, const WrenchBatch& wrench) {
+                                       const TwistBatch& dvl, const WrenchBatch& wrench,
+                                       const MultiAgentBatch& multiagent) {
   if (!is_initialized_) {
     return pybind11::none();
   }
 
-  utils::QueueBundle queues = to_bundle(imu, gps, depth, mag, ahrs, dvl, wrench);
-  auto leftover = core_->update(target_time, queues);
+  utils::QueueBundle queues = to_bundle(imu, gps, depth, mag, ahrs, dvl, wrench, multiagent);
+  auto leftover = core_->update(target_time, queues, tfs_);
   if (!leftover) {
     return pybind11::none();
   }
@@ -466,7 +530,8 @@ PYBIND11_MODULE(coug_fgo_py, m) {
            pybind11::arg("mag") = FactorGraphPy::MagBatch(),
            pybind11::arg("ahrs") = FactorGraphPy::AhrsBatch(),
            pybind11::arg("dvl") = FactorGraphPy::TwistBatch(),
-           pybind11::arg("wrench") = FactorGraphPy::WrenchBatch())
+           pybind11::arg("wrench") = FactorGraphPy::WrenchBatch(),
+           pybind11::arg("multiagent") = FactorGraphPy::MultiAgentBatch())
       .def("optimize", &FactorGraphPy::optimize)
       .def("reset", &FactorGraphPy::reset)
       .def_property_readonly("is_initialized", &FactorGraphPy::is_initialized);

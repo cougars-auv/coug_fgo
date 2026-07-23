@@ -91,4 +91,22 @@ EXTRACTORS = {
         m.header.frame_id,
         (_stamp(m), np.concatenate([_vec3(m.wrench.force), _vec3(m.wrench.torque)])),
     ),
+    "multiagent": lambda m: (
+        m.header.frame_id,
+        (
+            _stamp(m),
+            _vec3(m.local_odometry.position),
+            _quat(m.local_odometry.orientation),
+            _cov(m.odometry_covariance, 6),
+            m.pressure_depth,
+            _quat(m.imu_orientation),
+            m.includes_range,
+            m.range_dist,
+            m.includes_usbl,
+            m.usbl_azimuth,
+            m.usbl_elevation,
+            m.includes_position,
+            m.position_depth,
+        ),
+    ),
 }

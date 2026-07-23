@@ -78,7 +78,10 @@ def process_bag_offline(
                 msg = reader.deserialize(rawdata, conn.msgtype)
                 try:
                     for sensor in topic_to_sensors[conn.topic]:
-                        frame_id, measurement = EXTRACTORS[sensor](msg)
+                        key = (
+                            "multiagent" if sensor.startswith("multiagent_") else sensor
+                        )
+                        frame_id, measurement = EXTRACTORS[key](msg)
                         graph.add_message(sensor, frame_id, measurement)
                 except Exception as e:
                     logger.error(f"Factor graph optimization failed: {e}")

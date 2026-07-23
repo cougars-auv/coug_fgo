@@ -29,6 +29,7 @@
 #include <Eigen/Dense>
 #include <deque>
 #include <memory>
+#include <vector>
 
 namespace coug_fgo::utils {
 
@@ -45,6 +46,7 @@ struct TfBundle {
   gtsam::Pose3 target_T_dvl;
   gtsam::Pose3 target_T_base;
   gtsam::Pose3 target_T_com;
+  gtsam::Pose3 target_T_modem;
 };
 
 /**
@@ -110,6 +112,25 @@ struct WrenchData {
 };
 
 /**
+ * @struct AgentStatusData
+ * @brief C++ container for a neighboring agent's broadcast status data.
+ */
+struct AgentStatusData {
+  double timestamp{0.0};
+  gtsam::Pose3 pose;
+  gtsam::Matrix66 pose_covariance;
+  double pressure_depth{0.0};
+  gtsam::Rot3 imu_orientation;
+  bool includes_range{false};
+  double range_dist{0.0};
+  bool includes_usbl{false};
+  double usbl_azimuth{0.0};
+  double usbl_elevation{0.0};
+  bool includes_position{false};
+  double position_depth{0.0};
+};
+
+/**
  * @struct QueueBundle
  * @brief Bundle of drained per-sensor message deques.
  */
@@ -121,6 +142,7 @@ struct QueueBundle {
   std::deque<std::shared_ptr<AhrsData>> ahrs;
   std::deque<std::shared_ptr<TwistData>> dvl;
   std::deque<std::shared_ptr<WrenchData>> wrench;
+  std::vector<std::deque<std::shared_ptr<AgentStatusData>>> multiagent;
 };
 
 /**
