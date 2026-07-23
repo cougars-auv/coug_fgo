@@ -608,6 +608,7 @@ void FactorGraphNode::publishImuBias(const gtsam::imuBias::ConstantBias& current
   }
 
   // IMPORTANT! We use 'linear' for accelerometer bias and 'angular' for gyroscope bias.
+  // Preserves accel/gyro cross-covariance; sensor_msgs/Imu has no field for that.
   imu_bias_msg.twist.twist.linear = toVectorMsg(current_imu_bias.accelerometer());
   imu_bias_msg.twist.twist.angular = toVectorMsg(current_imu_bias.gyroscope());
   imu_bias_msg.twist.covariance = toCovariance36Msg(gtsam::Matrix66(imu_bias_covariance));
