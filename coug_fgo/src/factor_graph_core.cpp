@@ -854,9 +854,10 @@ void FactorGraphCore::addMultiAgentFactors(
   for (size_t i = 0; i < queues.multiagent.size(); ++i) {
     for (const auto& msg : queues.multiagent[i]) {
       std::ostringstream oss;
-      oss << std::fixed << std::setprecision(4);
-      oss << "Neighbor [" << i << "] status (t=" << msg->timestamp << "):\n"
-          << "  Position [m]       : " << msg->pose.translation().transpose() << "\n"
+      oss << "Neighbor [" << i << "] status (t=" << std::fixed << std::setprecision(4)
+          << msg->timestamp << "):\n";
+      oss << std::scientific;
+      oss << "  Position [m]       : " << msg->pose.translation().transpose() << "\n"
           << "  Position cov [m^2] : " << msg->pose_covariance.diagonal().head<3>().transpose()
           << "\n"
           << "  Orientation [rad]  : " << msg->pose.rotation().rpy().transpose() << " (RPY)\n"
