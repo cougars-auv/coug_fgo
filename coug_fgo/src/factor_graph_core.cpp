@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "coug_fgo/factors/ahrs_factor.hpp"
+#include "coug_fgo/factors/ahrs_yaw_factor.hpp"
 #include "coug_fgo/factors/auv_dynamics_factor.hpp"
 #include "coug_fgo/factors/const_vel_factor.hpp"
 #include "coug_fgo/factors/depth_factor.hpp"
@@ -48,6 +49,7 @@
 #include "coug_fgo/utils/param_enums.hpp"
 
 using coug_fgo::factors::AhrsFactorArm;
+using coug_fgo::factors::AhrsYawFactorArm;
 using coug_fgo::factors::AuvDynamicsFactorArm;
 using coug_fgo::factors::ConstVelFactor;
 using coug_fgo::factors::DepthFactorArm;
@@ -516,6 +518,24 @@ void FactorGraphCore::addAhrsFactor(gtsam::NonlinearFactorGraph& graph,
   }
 
   const auto& ahrs_msg = ahrs_msgs.back();
+
+  // Handle yaw-only AHRS factor option
+  if (params_.ahrs.constrain_yaw_only) {
+    const double ahrs_yaw_var =
+        resolveVar(params_.ahrs.use_parameter_covariance,
+                   params_.ahrs.parameter_covariance.orientation_noise_sigmas[2],
+                   params_.ahrs.covariance_scalar, ahrs_msg->orientation_covariance(2, 2),
+                   covFallbackWarning("AHRS"));
+    gtsam::SharedNoiseModel ahrs_noise =
+        gtsam::noiseModel::Isotropic::Sigma(1, std::sqrt(ahrs_yaw_var));
+
+    ahrs_noise = applyRobustKernel(ahrs_noise, params_.ahrs.robust_kernel, params_.ahrs.robust_k);
+
+    graph.emplace_shared<AhrsYawFactorArm>(X(current_step_), ahrs_msg->orientation,
+                                           tfs_.target_T_ahrs, params_.ahrs.mag_declination_radians,
+                                           ahrs_noise);
+    return;
+  }
 
   gtsam::SharedNoiseModel ahrs_noise = gtsam::noiseModel::Gaussian::Covariance(resolveCov<3>(
       params_.ahrs.use_parameter_covariance,

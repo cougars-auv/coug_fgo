@@ -459,6 +459,9 @@ factor_graph_node:
     enable_ahrs_init_only:
       type: bool
       default_value: false
+    constrain_yaw_only:
+      type: bool
+      default_value: true
     use_parameter_frame:
       type: bool
       default_value: false

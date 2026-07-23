@@ -170,7 +170,7 @@ class FactorGraphCore {
                       const std::deque<std::shared_ptr<utils::OdometryData>>& depth_msgs);
 
   /**
-   * @brief Adds an AHRS attitude factor with sensor rotation and declination compensation.
+   * @brief Adds an AHRS attitude (or yaw) factor with sensor rotation and declination compensation.
    * @param graph The target factor graph.
    * @param ahrs_msgs Drained AHRS IMU structs (only the newest is used).
    */
